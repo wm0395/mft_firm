@@ -1,0 +1,8 @@
+repos:
+  - repo: local
+    hooks:
+      - id: layer-check
+        name: Layer Architecture Check
+        entry: env PYTHONPATH=. layer-lint project
+        language: system
+        pass_filenames: false

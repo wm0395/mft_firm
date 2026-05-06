@@ -1,0 +1,23 @@
+Goal:
+Break task into architecture-safe subtasks.
+
+Rules:
+
+- one subtask = one layer
+- no cross-layer subtasks
+- define inputs/outputs
+- respect pipeline order
+
+Output:
+
+{
+  "subtasks": [
+    {
+      "id": 1,
+      "layer": "...",
+      "inputs": [...],
+      "outputs": [...],
+      "files": [...]
+    }
+  ]
+}

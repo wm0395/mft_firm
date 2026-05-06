@@ -1,0 +1,33 @@
+[project]
+name = "mft-codex-cli"
+version = "0.1.0"
+description = "Deterministic CLI layer for Codex-driven development tasks."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "layer-linter", "pylint-clean-architecture"]
+
+[project.scripts]
+mft = "codex_cli.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["codex_cli*"]
+
+[tool.setuptools.package-data]
+codex_cli = ["prompts/*.txt", "memory/*.md", "memory/violations/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.pylint.main]
+load-plugins = ["clean_architecture_linter"]
+
+[tool.clean-arch]
+visibility_enforcement = true
+
+[tool.clean-arch.layer_map]
+"data" = "Infrastructure"
+"signals" = "UseCase"
+"hypotheses" = "Domain"

@@ -1,0 +1,10 @@
+mft_architecture:
+  containers:
+    - project
+  layers:
+    - portfolio
+    - decision
+    - trade_engine
+    - hypotheses
+    - signals
+    - data

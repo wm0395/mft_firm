@@ -1,0 +1,18 @@
+Goal:
+Audit architecture.
+
+Reject if:
+
+- boundary violation
+- coupling issue
+- unclear ownership
+- non-deterministic logic
+
+Return:
+
+{
+  "verdict": "accept | revise",
+  "architecture_violations": [...],
+  "coupling_issues": [...],
+  "fix_instructions": [...]
+}

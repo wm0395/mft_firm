@@ -1,0 +1,26 @@
+Goal:
+Implement subtask with correct architecture.
+
+Subtask:
+{SUBTASK}
+
+Context:
+{CONTEXT}
+
+Relevant Files:
+{FILES}
+
+Scratchpad:
+{SCRATCHPAD}
+
+Constraints:
+
+- must belong to ONE layer
+- no cross-layer access
+- no shared state
+- no hidden dependencies
+- one responsibility per function
+
+Done when:
+- passes architecture checks
+- deterministic

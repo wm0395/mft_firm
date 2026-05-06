@@ -1,0 +1,1 @@
+"""MFT architecture root package."""
