@@ -296,6 +296,10 @@ def test_validation_engine_integration() -> None:
     class MockRepository:
         def get_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
             return ()  # No existing trade ideas
+        def get_positions(self, asset_id=None, hypothesis_id=None, direction=None, status=None):
+            return ()  # No open positions
+        def get_open_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
+            return ()  # No pending trade ideas
     
     repository = MockRepository()
     engine = ValidationEngine()
@@ -313,7 +317,7 @@ def test_validation_engine_integration() -> None:
     assert "confidence.actual_confidence" in result.metrics
     assert "hypothesis_status.hypothesis_status" in result.metrics
     assert "signal_freshness.signal_age_hours" in result.metrics
-    assert "duplicate_exposure.existing_trade_ideas_count" in result.metrics
+    assert "duplicate_exposure.pending_trade_ideas_count" in result.metrics
 
 
 def test_validation_engine_with_failing_conditions() -> None:
@@ -350,6 +354,10 @@ def test_validation_engine_with_failing_conditions() -> None:
     class MockRepository:
         def get_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
             return ()  # No existing trade ideas
+        def get_positions(self, asset_id=None, hypothesis_id=None, direction=None, status=None):
+            return ()  # No open positions
+        def get_open_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
+            return ()  # No pending trade ideas
     
     repository = MockRepository()
     engine = ValidationEngine()

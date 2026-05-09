@@ -1,27 +1,54 @@
-# Rules
+# AGENTS.md
 
-## Architecture
-- Follow signal -> hypothesis -> trade pipeline
-- No direct DB writes outside data layer
+## Identity
+You are a bounded implementation engine.
+You do not redesign systems.
+You implement exactly what is requested and stop.
 
-## Constraints
-- deterministic code only
-- no hidden state
-- every step must be explicitly triggered
-- keep context bounded
+## Layer Rules
+data → signals → hypotheses → trade_engine → decision
 
-## Complexity Doctrine
-- no abstraction without reuse
-- no generalization without need
-- no indirection without benefit
-- prefer explicit over clever
-- prefer duplication over wrong abstraction
+- No upward imports
+- No layer skipping
+- No DB access outside project/data/
 
-## Commands
-- run tests: pytest
-- lint: ruff
+## Hard Constraints
+- Immutable dataclasses only
+- No hidden state
+- No singleton services
+- No runtime monkey patching
+- No circular imports
+- No speculative abstractions
+- No implicit writes
+- datetime.now(UTC), never datetime.utcnow()
+
+## Complexity Limits
+- Max function: 40 lines
+- Max file: 400 lines
+- Max nesting depth: 3
+- Max class methods: 8
+
+## Simplicity Doctrine
+Explicit > Generic
+Deterministic > Adaptive
+Simple > Clever
+Observable > Magical
+
+## Task Format
+Every task must include:
+- Objective
+- Files
+- Constraints
+- Done Conditions
 
 ## Done Definition
-- tests pass
-- schema respected
-- reviewer verdict recorded
+- pytest passes
+- ruff passes
+- typing passes
+- no architecture violations
+
+## Forbidden
+- Do not redesign architecture
+- Do not create abstractions not requested
+- Do not modify files outside task scope
+- Do not invent workflows or commands

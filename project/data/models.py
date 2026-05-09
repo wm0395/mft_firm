@@ -5,6 +5,27 @@ from datetime import datetime, timezone
 
 
 @dataclass(frozen=True)
+class HypothesisMetrics:
+    n_signals: int
+    hit_rate: float
+    mean_return: float
+    median_return: float
+    volatility: float
+    sharpe_like_score: float
+    max_drawdown: float
+
+@dataclass(frozen=True)
+class SignalEvaluation:
+    signal_id: str
+    hypothesis_id: str
+    forward_return_1: float
+    forward_return_5: float
+    forward_return_20: float
+    evaluation_timestamp: str
+    experiment_id: str | None = None
+    research_run_id: str | None = None
+
+@dataclass(frozen=True)
 class HypothesisEvaluation:
     evaluation_id: str
     asset_id: str
@@ -18,6 +39,9 @@ class HypothesisEvaluation:
     generated_trade_idea: bool
     validation_result_json: str | None  # JSON string of validation result or None
     created_at: str  # ISO 8601 string
+    experiment_id: str | None = None
+    research_run_id: str | None = None
+    dataset_snapshot_id: str | None = None
 
     @staticmethod
     def now() -> str:

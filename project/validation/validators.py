@@ -110,10 +110,15 @@ def duplicate_exposure_validator(
     context: dict,
 ) -> ValidationResult:
     """
-    Reject if existing open trade idea exists for:
+    Reject if existing active exposure exists for:
     * same asset
     * same direction
     * same hypothesis
+    
+    Active exposure is defined as:
+    - An open position
+    - A trade idea pending decision
+    
     Reason: "duplicate_exposure"
     """
     repository: DataRepository = context.get("repository")
@@ -126,21 +131,31 @@ def duplicate_exposure_validator(
             validated_at=ValidationResult.now(),
         )
     
-    # Get existing trade ideas for the same asset, hypothesis, and direction
-    existing_trade_ideas = repository.get_trade_ideas(
+    # 1. Check for open positions
+    open_positions = repository.get_positions(
+        asset_id=evaluation.asset_id,
+        hypothesis_id=evaluation.hypothesis_id,
+        direction=evaluation.direction,
+        status="open"
+    )
+    
+    # 2. Check for trade ideas pending decision
+    pending_trade_ideas = repository.get_open_trade_ideas(
         asset_id=evaluation.asset_id,
         hypothesis_id=evaluation.hypothesis_id,
         direction=evaluation.direction
     )
     
-    # If there are existing trade ideas, reject to prevent duplicate exposure
-    is_valid = len(existing_trade_ideas) == 0
+    # If either exist, reject to prevent duplicate exposure
+    has_exposure = len(open_positions) > 0 or len(pending_trade_ideas) > 0
+    is_valid = not has_exposure
     reasons = [] if is_valid else ["duplicate_exposure"]
     metrics = {
         "evaluation_asset_id": evaluation.asset_id,
         "evaluation_hypothesis_id": evaluation.hypothesis_id,
         "evaluation_direction": evaluation.direction,
-        "existing_trade_ideas_count": len(existing_trade_ideas)
+        "open_positions_count": len(open_positions),
+        "pending_trade_ideas_count": len(pending_trade_ideas)
     }
     return ValidationResult(
         is_valid=is_valid,

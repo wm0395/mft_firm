@@ -400,6 +400,10 @@ def test_validation_engine_with_new_validators() -> None:
     class MockRepository:
         def get_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
             return ()  # No existing trade ideas
+        def get_positions(self, asset_id=None, hypothesis_id=None, direction=None, status=None):
+            return ()  # No open positions
+        def get_open_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
+            return ()  # No pending trade ideas
     
     repository = MockRepository()
     engine = ValidationEngine()
@@ -420,7 +424,7 @@ def test_validation_engine_with_new_validators() -> None:
     assert "hypothesis_status.hypothesis_status" in result.metrics
     assert "signal_freshness.signal_age_hours" in result.metrics
     assert "signal_freshness.evaluation_timestamp" in result.metrics  # This one always returns timestamp
-    assert "duplicate_exposure.existing_trade_ideas_count" in result.metrics
+    assert "duplicate_exposure.pending_trade_ideas_count" in result.metrics
     assert "impossible_directional_conflicts.direction" in result.metrics
     
     # Check that we ran all validators by checking we have a reasonable number of metrics
@@ -462,6 +466,10 @@ def test_validation_engine_with_malformed_payload() -> None:
     class MockRepository:
         def get_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
             return ()
+        def get_positions(self, asset_id=None, hypothesis_id=None, direction=None, status=None):
+            return ()  # No open positions
+        def get_open_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
+            return ()  # No pending trade ideas
     
     repository = MockRepository()
     engine = ValidationEngine()

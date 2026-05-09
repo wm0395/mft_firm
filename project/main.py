@@ -134,6 +134,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Database file path",
     )
     
+    report_hypotheses_parser = subcommands.add_parser("report-hypotheses")
+    report_hypotheses_parser.add_argument(
+        "--horizon",
+        type=int,
+        choices=[1, 5, 20],
+        default=20,
+        help="Evaluation horizon to report (1, 5, or 20)",
+    )
+    report_hypotheses_parser.add_argument(
+        "--database",
+        default="project_mft.duckdb",
+        help="Database file path",
+    )
+
+    backtest_parser = subcommands.add_parser("backtest-hypothesis")
+    backtest_parser.add_argument("hypothesis_id")
+    backtest_parser.add_argument("asset_symbol")
+    backtest_parser.add_argument("start_date", help="Start date (YYYY-MM-DD)")
+    backtest_parser.add_argument("end_date", help="End date (YYYY-MM-DD)")
+    backtest_parser.add_argument(
+        "--database",
+        default="project_mft.duckdb",
+        help="Database file path",
+    )
+    
     return parser
 
 
@@ -920,6 +945,83 @@ def main(argv: list[str] | None = None) -> int:
                         if 'threshold' in key or 'actual' in key or 'age' in key or 'count' in key or 'error' in key:
                             print(f"     {key}: {value}")
         
+        db.close()
+        return 0
+
+    if args.command == "report-hypotheses":
+        from project.data.models import SignalEvaluation
+        from project.learning.engine import aggregate_signal_performance
+        from collections import defaultdict
+        
+        evals = repository.get_signal_evaluations()
+        if not evals:
+            print("No signal evaluations found.")
+            db.close()
+            return 0
+            
+        # Group by hypothesis_id
+        grouped = defaultdict(list)
+        for e in evals:
+            grouped[e.hypothesis_id].append(e)
+            
+        horizon_map = {1: 0, 5: 1, 20: 2}
+        horizon_idx = horizon_map.get(args.horizon, 2)
+        
+        print(f"Hypothesis Performance Report (Horizon: {args.horizon} bars)")
+        print("=" * 80)
+        print(f"{'Hypothesis ID':<30} {'Signals':<10} {'Hit Rate':<10} {'Mean Ret':<10} {'Sharpe':<10}")
+        print("-" * 80)
+        
+        for hyp_id, hyp_evals in sorted(grouped.items()):
+            metrics = aggregate_signal_performance(hyp_evals, horizon_idx=horizon_idx)
+            print(f"{hyp_id:<30} {metrics.n_signals:<10} {metrics.hit_rate:<10.4f} {metrics.mean_return:<10.4f} {metrics.sharpe_like_score:<10.4f}")
+            
+        db.close()
+        return 0
+
+    if args.command == "backtest-hypothesis":
+        from project.backtesting.engine import BacktestEngine
+        from project.backtesting.models import BacktestConfig
+        from datetime import datetime
+        
+        try:
+            start_dt = datetime.strptime(args.start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(args.end_date, "%Y-%m-%d")
+        except ValueError as e:
+            print(f"Error parsing dates: {e}. Expected format YYYY-MM-DD")
+            db.close()
+            return 1
+            
+        engine = BacktestEngine(repository)
+        config = BacktestConfig()
+        
+        print(f"Running backtest for {args.hypothesis_id} on {args.asset_symbol}...")
+        print(f"Period: {args.start_date} to {args.end_date}")
+        print("-" * 40)
+        
+        try:
+            result = engine.run(
+                hypothesis_id=args.hypothesis_id,
+                asset_symbol=args.asset_symbol,
+                start_timestamp=start_dt,
+                end_timestamp=end_dt,
+                config=config
+            )
+            
+            print(f"Backtest Result for {result.hypothesis_id}:")
+            print(f"  Total Trades: {result.total_trades}")
+            print(f"  Win Rate:     {result.win_rate:.2%}")
+            print(f"  Total PnL:    ${result.total_pnl:,.2f}")
+            print(f"  Mean PnL:     ${result.mean_pnl:,.2f}")
+            print(f"  Max Drawdown: ${result.max_drawdown:,.2f}")
+            print(f"  Sharpe Ratio: {result.sharpe_ratio:.4f}")
+            print(f"  Total Return: {result.total_return_pct:.2%}")
+            
+        except Exception as e:
+            print(f"Backtest failed: {e}")
+            db.close()
+            return 1
+            
         db.close()
         return 0
 
