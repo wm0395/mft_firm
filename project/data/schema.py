@@ -73,6 +73,22 @@ SCHEMA_SQL = (
     )
     """,
     """
+    create table if not exists hypothesis_evaluations (
+        evaluation_id varchar primary key,
+        asset_id varchar not null,
+        hypothesis_id varchar not null,
+        hypothesis_version integer not null,
+        timestamp varchar not null,
+        direction varchar not null,
+        confidence double not null,
+        signals_snapshot_json varchar not null,
+        explanation_json varchar not null,
+        generated_trade_idea boolean not null,
+        validation_result_json varchar,
+        created_at varchar not null
+    )
+    """,
+    """
     create table if not exists trade_ideas (
         trade_id varchar primary key,
         asset_id varchar not null,
@@ -89,7 +105,8 @@ SCHEMA_SQL = (
         trade_id varchar not null,
         action varchar not null,
         structured_reason varchar not null,
-        notes varchar not null
+        notes varchar not null,
+        created_at varchar not null
     )
     """,
     """
@@ -113,6 +130,7 @@ REQUIRED_TABLES = {
     "hypotheses",
     "hypothesis_signal_map",
     "backtests",
+    "hypothesis_evaluations",
     "trade_ideas",
     "decisions",
     "positions",

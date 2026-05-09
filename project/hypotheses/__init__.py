@@ -1,4 +1,7 @@
-"""Hypotheses layer.
+from project.hypotheses.ma_crossover import MACrossoverHypothesis
+from project.hypotheses.rsi_mean_reversion import RSIMeanReversionHypothesis
 
-Consumes signals only and contains deterministic hypothesis logic.
-"""
+__all__ = [
+    "MACrossoverHypothesis",
+    "RSIMeanReversionHypothesis",
+]

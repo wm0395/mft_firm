@@ -573,6 +573,10 @@ def main(argv: list[str] | None = None) -> int:
             
         print()
     
+    db.close()
+
+        print("@@@ ENTERING SHOW-COMPETITION BLOCK @@@", file=sys.stderr)
+        print("@@@ ENTERING SHOW-COMPETITION BLOCK @@@", file=sys.stderr)
     if args.command == "show-competition":
         print("=== ENTERING SHOW-COMPETITION ===", file=sys.stderr)
         print("=== ENTERING SHOW-COMPETITION (STDOUT) ===", file=sys.stdout)

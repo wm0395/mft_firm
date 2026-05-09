@@ -31,3 +31,6 @@ class HypothesisRegistry:
 
     def required_signals(self, hypothesis_id: str) -> tuple[str, ...]:
         return self._signal_map[hypothesis_id]
+
+    def get_definition(self, hypothesis_id: str) -> HypothesisDefinition | None:
+        return self._definitions.get(hypothesis_id)

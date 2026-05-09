@@ -4,6 +4,7 @@ import json
 
 from project.common.models import Asset, RawDataPoint, Signal, TradeIdea, utc_now_iso
 from project.data.db import DuckDBAccess
+from project.data.models import HypothesisEvaluation
 
 
 class DataRepository:
@@ -102,3 +103,149 @@ class DataRepository:
                 json.dumps(trade.signals_snapshot, sort_keys=True),
             ),
         )
+
+    def persist_hypothesis_evaluation(self, evaluation: HypothesisEvaluation) -> None:
+        self._db.execute(
+            """
+            insert into hypothesis_evaluations values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            on conflict(evaluation_id) do nothing
+            """,
+            (
+                evaluation.evaluation_id,
+                evaluation.asset_id,
+                evaluation.hypothesis_id,
+                evaluation.hypothesis_version,
+                evaluation.timestamp,
+                evaluation.direction,
+                evaluation.confidence,
+                evaluation.signals_snapshot_json,
+                evaluation.explanation_json,
+                evaluation.generated_trade_idea,
+                evaluation.validation_result_json,
+                evaluation.created_at,
+            ),
+        )
+
+    def get_hypothesis_evaluations(self, asset_id: str | None = None, hypothesis_id: str | None = None) -> tuple[HypothesisEvaluation, ...]:
+        conditions = []
+        params = []
+        
+        if asset_id is not None:
+            conditions.append("asset_id = ?")
+            params.append(asset_id)
+            
+        if hypothesis_id is not None:
+            conditions.append("hypothesis_id = ?")
+            params.append(hypothesis_id)
+            
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        
+        rows = self._db.fetch_all(
+            f"""
+            select evaluation_id, asset_id, hypothesis_id, hypothesis_version, timestamp, 
+                   direction, confidence, signals_snapshot_json, explanation_json, 
+                   generated_trade_idea, validation_result_json, created_at
+            from hypothesis_evaluations
+            where {where_clause}
+            order by timestamp
+            """,
+            params,
+        )
+        
+        return tuple(
+            HypothesisEvaluation(
+                evaluation_id=row[0],
+                asset_id=row[1],
+                hypothesis_id=row[2],
+                hypothesis_version=row[3],
+                timestamp=row[4],
+                direction=row[5],
+                confidence=row[6],
+                signals_snapshot_json=row[7],
+                explanation_json=row[8],
+                generated_trade_idea=bool(row[9]),
+                validation_result_json=row[10],
+                created_at=row[11],
+            )
+            for row in rows
+        )
+
+    def get_trade_ideas(self, asset_id: str | None = None, hypothesis_id: str | None = None, direction: str | None = None) -> tuple[TradeIdea, ...]:
+        from project.common.models import TradeIdea
+        import json
+        
+        conditions = []
+        params = []
+        
+        if asset_id is not None:
+            conditions.append("asset_id = ?")
+            params.append(asset_id)
+            
+        if hypothesis_id is not None:
+            conditions.append("hypothesis_id = ?")
+            params.append(hypothesis_id)
+            
+        if direction is not None:
+            conditions.append("direction = ?")
+            params.append(direction)
+            
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        
+        rows = self._db.fetch_all(
+            f"""
+            select trade_id, asset_id, hypothesis_id, version, direction, confidence, signals_snapshot_json
+            from trade_ideas
+            where {where_clause}
+            """,
+            params,
+        )
+        
+        return tuple(
+            TradeIdea(
+                trade_id=row[0],
+                asset_id=row[1],
+                hypothesis_id=row[2],
+                version=row[3],
+                direction=row[4],
+                confidence=row[5],
+                signals_snapshot=json.loads(row[6]),
+            )
+            for row in rows
+        )
+
+    def persist_decision(self, decision: Decision) -> None:
+        self._db.execute(
+            """
+            insert into decisions values (?, ?, ?, ?, ?, ?)
+            on conflict(decision_id) do nothing
+            """,
+            (
+                decision.decision_id,
+                decision.trade_id,
+                decision.action,
+                decision.structured_reason,
+                decision.notes,
+                decision.created_at,
+            ),
+        )
+
+    def get_decisions(self, trade_id: str | None = None) -> tuple[tuple, ...]:
+        conditions = []
+        params = []
+        
+        if trade_id is not None:
+            conditions.append("trade_id = ?")
+            params.append(trade_id)
+            
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        
+        rows = self._db.fetch_all(
+            f"""
+            select decision_id, trade_id, action, structured_reason, notes, created_at
+            from decisions
+            where {where_clause}
+            """,
+            params,
+        )
+        
+        return tuple(tuple(row) for row in rows)

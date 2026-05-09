@@ -37,9 +37,39 @@ def default_signal_registry() -> SignalRegistry:
     )
     registry.register(
         SignalDefinition(
+            signal_type="ma_3",
+            category="technical",
+            definition="3-period moving average of close",
+            dependencies=("price",),
+            is_persistent=True,
+            version=1,
+        )
+    )
+    registry.register(
+        SignalDefinition(
+            signal_type="ma_5",
+            category="technical",
+            definition="5-period moving average of close",
+            dependencies=("price",),
+            is_persistent=True,
+            version=1,
+        )
+    )
+    registry.register(
+        SignalDefinition(
             signal_type="ma_20",
             category="technical",
             definition="20-period moving average of close",
+            dependencies=("price",),
+            is_persistent=True,
+            version=1,
+        )
+    )
+    registry.register(
+        SignalDefinition(
+            signal_type="volatility_5",
+            category="technical",
+            definition="5-period mean absolute close return",
             dependencies=("price",),
             is_persistent=True,
             version=1,

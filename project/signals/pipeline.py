@@ -20,7 +20,10 @@ def compute_latest_price_signals(
     raw_reference = raw_points[-1].data_id
     definitions = {
         "rsi_14": rsi(prices, 14),
+        "ma_3": moving_average(prices, 3),
+        "ma_5": moving_average(prices, 5),
         "ma_20": moving_average(prices, 20),
+        "volatility_5": volatility(prices, 5),
         "volatility_20": volatility(prices, 20),
     }
     signals: list[Signal] = []

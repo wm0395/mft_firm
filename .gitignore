@@ -9,3 +9,4 @@ build/
 codex_cli/codex_cli/memory/*
 codex_cli/memory/*
 codex_cli/tasks/*
+*.duckdb
