@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Tuple
+from typing import Any, Dict, Tuple
 
 from project.common.models import Direction
 

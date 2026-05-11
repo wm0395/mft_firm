@@ -1,12 +1,9 @@
 from __future__ import annotations
-import math
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from statistics import stdev
 
 from project.backtesting.models import BacktestConfig, BacktestResult, BacktestTrade
 from project.data.repository import DataRepository
-from project.data.models import HypothesisEvaluation
 
 class BacktestEngine:
     def __init__(self, repository: DataRepository):
@@ -34,7 +31,7 @@ class BacktestEngine:
         eval_map = {e.timestamp: e for e in evaluations}
         
         trades: list[BacktestTrade] = []
-        active_trade: BacktestTrade | None = None
+        active_trade: tuple[str, str, float, int] | None = None
         
         # 2. Simulate
         # We iterate through bars. 
@@ -52,73 +49,48 @@ class BacktestEngine:
                 should_exit = False
                 
                 # Condition 1: Opposite Signal
-                if direction != "flat" and direction != active_trade.direction:
+                active_direction, entry_timestamp, entry_price, entry_bar_idx = active_trade
+                if direction != "flat" and direction != active_direction:
                     should_exit = True
-                
-                # Condition 2: Fixed Horizon
                 if config.exit_horizon:
-                    bars_held = i - active_trade.entry_bar_idx
+                    bars_held = i - entry_bar_idx
                     if bars_held >= config.exit_horizon:
                         should_exit = True
-                
                 if should_exit:
-                    # Exit at next open
                     exit_price = next_open
-                    # Apply slippage
                     slippage = exit_price * (config.slippage_bps / 10000)
-                    if active_trade.direction == "long":
+                    if active_direction == "long":
                         exit_price -= slippage
                     else:
                         exit_price += slippage
-                        
-                    # Calculate PnL
-                    pnl_pct = (exit_price - active_trade.entry_price) / active_trade.entry_price if active_trade.direction == "long" else \
-                              (active_trade.entry_price - exit_price) / active_trade.entry_price
-                    
+                    pnl_pct = (
+                        (exit_price - entry_price) / entry_price
+                        if active_direction == "long"
+                        else (entry_price - exit_price) / entry_price
+                    )
                     pnl_usd = pnl_pct * config.position_size
-                    
                     trades.append(BacktestTrade(
-                        trade_id=f"trade:{hypothesis_id}:{active_trade.entry_timestamp}",
+                        trade_id=f"trade:{hypothesis_id}:{entry_timestamp}",
                         hypothesis_id=hypothesis_id,
                         asset_id=asset_id,
-                        direction=active_trade.direction,
-                        entry_timestamp=active_trade.entry_timestamp,
-                        entry_price=active_trade.entry_price,
+                        direction=active_direction,
+                        entry_timestamp=entry_timestamp,
+                        entry_price=entry_price,
                         exit_timestamp=next_timestamp,
                         exit_price=exit_price,
                         pnl=pnl_usd,
-                        duration=i - active_trade.entry_bar_idx
+                        duration=i - entry_bar_idx,
                     ))
                     active_trade = None
 
-            # Entry Logic
             if not active_trade and direction != "flat":
-                # Enter at next open
                 entry_price = next_open
-                # Apply slippage
                 slippage = entry_price * (config.slippage_bps / 10000)
                 if direction == "long":
                     entry_price += slippage
                 else:
                     entry_price -= slippage
-                
-                # Create a temporary "active trade" tracking object
-                # We use a helper class or just a dict, but for simplicity let's use a dummy Trade object
-                # and store the index
-                active_trade = BacktestTrade(
-                    trade_id=f"trade:{hypothesis_id}:{next_timestamp}",
-                    hypothesis_id=hypothesis_id,
-                    asset_id=asset_id,
-                    direction=direction,
-                    entry_timestamp=next_timestamp,
-                    entry_price=entry_price,
-                    exit_timestamp=None,
-                    exit_price=None,
-                    pnl=None,
-                    duration=None
-                )
-                # Monkey-patch the index for horizon tracking
-                setattr(active_trade, 'entry_bar_idx', i + 1)
+                active_trade = (direction, next_timestamp, entry_price, i + 1)
 
         return self._calculate_metrics(hypothesis_id, asset_id, trades)
 
@@ -147,9 +119,7 @@ class BacktestEngine:
             if dd > max_dd:
                 max_dd = dd
                 
-        # Sharpe Ratio (approximate: mean / std)
-        import statistics
-        vol = statistics.stdev(pnls) if len(pnls) > 1 else 0.0
+        vol = stdev(pnls) if len(pnls) > 1 else 0.0
         sharpe = (mean_pnl / vol) if vol > 0 else 0.0
         
         return BacktestResult(

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import timezone
 from project.common.models import HypothesisDefinition, HypothesisOutput, Signal, utc_now_iso
 from project.common.explainability import create_rsi_explanation
 

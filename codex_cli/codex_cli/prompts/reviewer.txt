@@ -1,18 +1,12 @@
 Goal:
-Audit architecture.
+Review the proposed implementation packet for bugs, architecture violations, and missing validation.
 
-Reject if:
+Review focus:
+- import direction and layer boundaries
+- mutable state or hidden writes
+- missing tests or verification gaps
+- unnecessary abstractions
 
-- boundary violation
-- coupling issue
-- unclear ownership
-- non-deterministic logic
-
-Return:
-
-{
-  "verdict": "accept | revise",
-  "architecture_violations": [...],
-  "coupling_issues": [...],
-  "fix_instructions": [...]
-}
+Output:
+- findings first
+- concise remediation steps

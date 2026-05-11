@@ -12,54 +12,72 @@ class TaskStore:
         self.paths = paths
         self.paths.ensure()
 
-    def create(self, description: str, route: str) -> Task:
+    def create(
+        self,
+        objective: str,
+        files: tuple[str, ...],
+        constraints: tuple[str, ...],
+        done_conditions: tuple[str, ...],
+        route: str,
+        provider: str,
+    ) -> Task:
         task = Task(
             id=self._next_id(),
-            description=description,
+            objective=objective,
+            files=files,
+            constraints=constraints,
+            done_conditions=done_conditions,
             route=route,
+            recommended_provider=provider,
         )
         self.save(task)
         return task
 
     def get(self, task_id: str) -> Task:
-        for base in (self.paths.active_tasks, self.paths.completed_tasks):
-            path = base / f"{task_id}.json"
-            if path.exists():
-                return Task.from_dict(json.loads(path.read_text(encoding="utf-8")))
-        raise FileNotFoundError(f"Task not found: {task_id}")
+        path = self._find_path(task_id)
+        return Task.from_dict(json.loads(path.read_text(encoding="utf-8")))
 
     def save(self, task: Task) -> None:
-        task.touch()
-        directory = self.paths.completed_tasks if task.status == COMPLETED else self.paths.active_tasks
-        path = directory / f"{task.id}.json"
-        path.write_text(json.dumps(task.to_dict(), indent=2) + "\n", encoding="utf-8")
-
-        other = self.paths.completed_tasks if directory == self.paths.active_tasks else self.paths.active_tasks
-        other_path = other / f"{task.id}.json"
-        if other_path.exists():
-            other_path.unlink()
+        current = task.touch()
+        directory = self.paths.completed_tasks if current.status == COMPLETED else self.paths.active_tasks
+        self._write_task(directory / f"{current.id}.json", current)
+        self._remove_shadow(directory, current.id)
 
     def complete(self, task_id: str) -> Task:
-        task = self.get(task_id)
-        task.status = COMPLETED
+        task = self.get(task_id).complete()
         self.save(task)
         return task
 
     def list_active(self) -> list[Task]:
         return self._list(self.paths.active_tasks)
 
+    def _find_path(self, task_id: str) -> Path:
+        for directory in (self.paths.active_tasks, self.paths.completed_tasks):
+            path = directory / f"{task_id}.json"
+            if path.exists():
+                return path
+        raise FileNotFoundError(f"Task not found: {task_id}")
+
+    def _write_task(self, path: Path, task: Task) -> None:
+        path.write_text(json.dumps(task.to_dict(), indent=2) + "\n", encoding="utf-8")
+
+    def _remove_shadow(self, directory: Path, task_id: str) -> None:
+        other = self.paths.completed_tasks if directory == self.paths.active_tasks else self.paths.active_tasks
+        other_path = other / f"{task_id}.json"
+        if other_path.exists():
+            other_path.unlink()
+
     def _list(self, directory: Path) -> list[Task]:
-        tasks = []
-        for path in sorted(directory.glob("task_*.json")):
-            tasks.append(Task.from_dict(json.loads(path.read_text(encoding="utf-8"))))
-        return tasks
+        return [self._read_task(path) for path in sorted(directory.glob("task_*.json"))]
+
+    def _read_task(self, path: Path) -> Task:
+        return Task.from_dict(json.loads(path.read_text(encoding="utf-8")))
 
     def _next_id(self) -> str:
-        numbers = []
+        numbers: list[int] = []
         for directory in (self.paths.active_tasks, self.paths.completed_tasks):
             for path in directory.glob("task_*.json"):
-                try:
-                    numbers.append(int(path.stem.split("_", 1)[1]))
-                except (IndexError, ValueError):
-                    continue
+                parts = path.stem.split("_", 1)
+                if len(parts) == 2 and parts[1].isdigit():
+                    numbers.append(int(parts[1]))
         return f"task_{max(numbers, default=0) + 1:03d}"

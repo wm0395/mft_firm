@@ -1,11 +1,15 @@
 from __future__ import annotations
+
 import json
 from datetime import datetime
+from typing import Any
 
-
-from project.common.models import Asset, Decision, Position, RawDataPoint, Signal, TradeIdea, utc_now_iso
+from project.backtesting.models import BacktestResult
+from project.common.models import Asset, Position, RawDataPoint, Signal, TradeIdea, TradeOutcome, utc_now_iso
 from project.data.db import DuckDBAccess
 from project.data.models import HypothesisEvaluation, SignalEvaluation
+from project.data.reporting_store import load_backtest_results, load_trade_outcomes, persist_backtest_result
+from project.data.row_parsers import build_filters, raw_point_from_row, trade_idea_from_row
 
 
 class DataRepository:
@@ -16,23 +20,50 @@ class DataRepository:
         self._db.initialize_schema()
 
     def ingest_market_data(
-        self, 
-        asset_symbol: str, 
-        timestamp: datetime, 
-        open: float, 
-        high: float, 
-        low: float, 
-        close: float, 
-        volume: float
+        self,
+        asset_symbol: str,
+        timestamp: datetime,
+        open: float,
+        high: float,
+        low: float,
+        close: float,
+        volume: float,
     ) -> None:
+        market_id = f"market:{asset_symbol}:{timestamp.isoformat()}"
         self._db.execute(
             """
-            insert into raw_market_data values (?, ?, ?, ?, ?, ?, ?)
+            insert into raw_market_data values (?, ?, ?, ?, ?, ?, ?, ?)
+            on conflict(id) do nothing
             """,
-            (asset_symbol, timestamp, open, high, low, close, volume),
+            (market_id, asset_symbol, timestamp, open, high, low, close, volume),
         )
 
-    def persist_signal_evaluation(self, eval: SignalEvaluation) -> None:
+    def get_market_data(
+        self,
+        asset_symbol: str,
+        start_timestamp: datetime | None,
+        end_timestamp: datetime | None,
+    ) -> tuple[tuple, ...]:
+        conditions = ["asset_symbol = ?"]
+        params: list[object] = [asset_symbol]
+        if start_timestamp is not None:
+            conditions.append("timestamp >= ?")
+            params.append(start_timestamp)
+        if end_timestamp is not None:
+            conditions.append("timestamp <= ?")
+            params.append(end_timestamp)
+        rows = self._db.fetch_all(
+            f"""
+            select timestamp, open, high, low, close, volume
+            from raw_market_data
+            where {" and ".join(conditions)}
+            order by timestamp
+            """,
+            params,
+        )
+        return tuple(rows)
+
+    def persist_signal_evaluation(self, evaluation: SignalEvaluation) -> None:
         self._db.execute(
             """
             insert into signal_evaluations values (?, ?, ?, ?, ?, ?)
@@ -43,14 +74,32 @@ class DataRepository:
                 forward_return_20 = excluded.forward_return_20,
                 evaluation_timestamp = excluded.evaluation_timestamp
             """,
-            (eval.signal_id, eval.hypothesis_id, eval.forward_return_1, eval.forward_return_5, eval.forward_return_20, eval.evaluation_timestamp),
+            (
+                evaluation.signal_id,
+                evaluation.hypothesis_id,
+                evaluation.forward_return_1,
+                evaluation.forward_return_5,
+                evaluation.forward_return_20,
+                evaluation.evaluation_timestamp,
+            ),
         )
 
     def get_signal_evaluations(self) -> tuple[SignalEvaluation, ...]:
         rows = self._db.fetch_all(
-            "select signal_id, hypothesis_id, forward_return_1, forward_return_5, forward_return_20, evaluation_timestamp from signal_evaluations"
+            """
+            select signal_id, hypothesis_id, forward_return_1, forward_return_5,
+                   forward_return_20, evaluation_timestamp
+            from signal_evaluations
+            order by evaluation_timestamp, signal_id
+            """
         )
         return tuple(SignalEvaluation(*row) for row in rows)
+
+    def persist_backtest_result(self, result: BacktestResult) -> None:
+        persist_backtest_result(self._db, result)
+
+    def get_backtest_results(self) -> tuple[BacktestResult, ...]:
+        return load_backtest_results(self._db)
 
     def add_asset(self, symbol: str, name: str, sector: str, market: str) -> Asset:
         if not symbol or not name or not market:
@@ -69,7 +118,15 @@ class DataRepository:
             insert into assets values (?, ?, ?, ?, ?, ?, ?)
             on conflict(asset_id) do nothing
             """,
-            (asset.asset_id, asset.symbol, asset.name, asset.sector, asset.market, asset.is_active, asset.created_at),
+            (
+                asset.asset_id,
+                asset.symbol,
+                asset.name,
+                asset.sector,
+                asset.market,
+                asset.is_active,
+                asset.created_at,
+            ),
         )
         return asset
 
@@ -78,18 +135,6 @@ class DataRepository:
             "select asset_id, symbol, name, sector, market, is_active, created_at from assets order by symbol"
         )
         return tuple(Asset(*row) for row in rows)
-
-    def get_market_data(self, asset_symbol: str, start_timestamp: datetime, end_timestamp: datetime) -> tuple[tuple, ...]:
-        rows = self._db.fetch_all(
-            """
-            select timestamp, open, high, low, close, volume
-            from raw_market_data
-            where asset_symbol = ? and timestamp between ? and ?
-            order by timestamp
-            """,
-            (asset_symbol, start_timestamp, end_timestamp),
-        )
-        return tuple(rows)
 
     def ingest_raw(self, point: RawDataPoint) -> None:
         self._db.execute(
@@ -117,14 +162,14 @@ class DataRepository:
             """,
             (asset_id, data_type),
         )
-        return tuple(RawDataPoint(row[0], row[1], row[2], row[3], json.loads(row[4]), row[5]) for row in rows)
+        return tuple(raw_point_from_row(row) for row in rows)
 
     def persist_signal(self, signal: Signal) -> None:
         signal_id = f"signal:{signal.asset_id}:{signal.timestamp}:{signal.signal_type}"
         self._db.execute(
             """
             insert into signals values (?, ?, ?, ?, ?, ?, ?)
-            on conflict(asset_id, timestamp, signal_type) do nothing
+            on conflict(signal_id) do nothing
             """,
             (
                 signal_id,
@@ -154,11 +199,71 @@ class DataRepository:
             ),
         )
 
+    def get_trade_ideas(
+        self,
+        asset_id: str | None = None,
+        hypothesis_id: str | None = None,
+        direction: str | None = None,
+    ) -> tuple[TradeIdea, ...]:
+        where_clause, params = build_filters(
+            [
+                ("asset_id = ?", asset_id),
+                ("hypothesis_id = ?", hypothesis_id),
+                ("direction = ?", direction),
+            ]
+        )
+        rows = self._db.fetch_all(
+            f"""
+            select trade_id, asset_id, hypothesis_id, version, direction, confidence, signals_snapshot_json
+            from trade_ideas
+            where {where_clause}
+            order by trade_id
+            """,
+            params,
+        )
+        return tuple(trade_idea_from_row(row) for row in rows)
+
+    def get_open_trade_ideas(
+        self,
+        asset_id: str | None = None,
+        hypothesis_id: str | None = None,
+        direction: str | None = None,
+    ) -> tuple[TradeIdea, ...]:
+        where_clause, params = build_filters(
+            [
+                ("ti.asset_id = ?", asset_id),
+                ("ti.hypothesis_id = ?", hypothesis_id),
+                ("ti.direction = ?", direction),
+            ]
+        )
+        rows = self._db.fetch_all(
+            f"""
+            select ti.trade_id, ti.asset_id, ti.hypothesis_id, ti.version,
+                   ti.direction, ti.confidence, ti.signals_snapshot_json
+            from trade_ideas ti
+            left join decisions d on ti.trade_id = d.trade_id
+            where d.decision_id is null and {where_clause}
+            order by ti.trade_id
+            """,
+            params,
+        )
+        return tuple(trade_idea_from_row(row) for row in rows)
+
     def persist_hypothesis_evaluation(self, evaluation: HypothesisEvaluation) -> None:
         self._db.execute(
             """
-            insert into hypothesis_evaluations values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            on conflict(evaluation_id) do nothing
+            insert into hypothesis_evaluations values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            on conflict(evaluation_id) do update set
+                direction = excluded.direction,
+                confidence = excluded.confidence,
+                signals_snapshot_json = excluded.signals_snapshot_json,
+                explanation_json = excluded.explanation_json,
+                generated_trade_idea = excluded.generated_trade_idea,
+                validation_result_json = excluded.validation_result_json,
+                created_at = excluded.created_at,
+                experiment_id = excluded.experiment_id,
+                research_run_id = excluded.research_run_id,
+                dataset_snapshot_id = excluded.dataset_snapshot_id
             """,
             (
                 evaluation.evaluation_id,
@@ -173,95 +278,33 @@ class DataRepository:
                 evaluation.generated_trade_idea,
                 evaluation.validation_result_json,
                 evaluation.created_at,
+                evaluation.experiment_id,
+                evaluation.research_run_id,
+                evaluation.dataset_snapshot_id,
             ),
         )
 
-    def get_hypothesis_evaluations(self, asset_id: str | None = None, hypothesis_id: str | None = None) -> tuple[HypothesisEvaluation, ...]:
-        conditions = []
-        params = []
-        
-        if asset_id is not None:
-            conditions.append("asset_id = ?")
-            params.append(asset_id)
-            
-        if hypothesis_id is not None:
-            conditions.append("hypothesis_id = ?")
-            params.append(hypothesis_id)
-            
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-        
+    def get_hypothesis_evaluations(
+        self,
+        asset_id: str | None = None,
+        hypothesis_id: str | None = None,
+    ) -> tuple[HypothesisEvaluation, ...]:
+        where_clause, params = build_filters(
+            [("asset_id = ?", asset_id), ("hypothesis_id = ?", hypothesis_id)]
+        )
         rows = self._db.fetch_all(
             f"""
-            select evaluation_id, asset_id, hypothesis_id, hypothesis_version, timestamp, 
-                   direction, confidence, signals_snapshot_json, explanation_json, 
-                   generated_trade_idea, validation_result_json, created_at
+            select evaluation_id, asset_id, hypothesis_id, hypothesis_version, timestamp,
+                   direction, confidence, signals_snapshot_json, explanation_json,
+                   generated_trade_idea, validation_result_json, created_at,
+                   experiment_id, research_run_id, dataset_snapshot_id
             from hypothesis_evaluations
             where {where_clause}
-            order by timestamp
+            order by timestamp, evaluation_id
             """,
             params,
         )
-        
-        return tuple(
-            HypothesisEvaluation(
-                evaluation_id=row[0],
-                asset_id=row[1],
-                hypothesis_id=row[2],
-                hypothesis_version=row[3],
-                timestamp=row[4],
-                direction=row[5],
-                confidence=row[6],
-                signals_snapshot_json=row[7],
-                explanation_json=row[8],
-                generated_trade_idea=bool(row[9]),
-                validation_result_json=row[10],
-                created_at=row[11],
-            )
-            for row in rows
-        )
-
-    def get_trade_ideas(self, asset_id: str | None = None, hypothesis_id: str | None = None, direction: str | None = None) -> tuple[TradeIdea, ...]:
-        from project.common.models import TradeIdea
-        import json
-        
-        conditions = []
-        params = []
-        
-        if asset_id is not None:
-            conditions.append("asset_id = ?")
-            params.append(asset_id)
-            
-        if hypothesis_id is not None:
-            conditions.append("hypothesis_id = ?")
-            params.append(hypothesis_id)
-            
-        if direction is not None:
-            conditions.append("direction = ?")
-            params.append(direction)
-            
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-        
-        rows = self._db.fetch_all(
-            f"""
-            select trade_id, asset_id, hypothesis_id, version, direction, confidence, signals_snapshot_json
-            from trade_ideas
-            where {where_clause}
-            """,
-            params,
-        )
-        
-        return tuple(
-            TradeIdea(
-                trade_id=row[0],
-                asset_id=row[1],
-                hypothesis_id=row[2],
-                version=row[3],
-                direction=row[4],
-                confidence=row[5],
-                signals_snapshot=json.loads(row[6]),
-            )
-            for row in rows
-        )
+        return tuple(HypothesisEvaluation(*row) for row in rows)
 
     def persist_position(self, position: Position) -> None:
         self._db.execute(
@@ -283,102 +326,33 @@ class DataRepository:
         )
 
     def get_positions(
-        self, 
-        asset_id: str | None = None, 
-        hypothesis_id: str | None = None, 
-        direction: str | None = None, 
-        status: str | None = None
+        self,
+        asset_id: str | None = None,
+        hypothesis_id: str | None = None,
+        direction: str | None = None,
+        status: str | None = None,
     ) -> tuple[Position, ...]:
-        from project.common.models import Position
-        
-        conditions = []
-        params = []
-        
-        if asset_id is not None:
-            conditions.append("ti.asset_id = ?")
-            params.append(asset_id)
-            
-        if hypothesis_id is not None:
-            conditions.append("ti.hypothesis_id = ?")
-            params.append(hypothesis_id)
-            
-        if direction is not None:
-            conditions.append("ti.direction = ?")
-            params.append(direction)
-            
-        if status is not None:
-            conditions.append("p.status = ?")
-            params.append(status)
-            
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-        
+        where_clause, params = build_filters(
+            [
+                ("ti.asset_id = ?", asset_id),
+                ("ti.hypothesis_id = ?", hypothesis_id),
+                ("ti.direction = ?", direction),
+                ("p.status = ?", status),
+            ]
+        )
         rows = self._db.fetch_all(
             f"""
             select p.position_id, p.trade_id, p.entry_price, p.exit_price, p.pnl, p.status
             from positions p
             join trade_ideas ti on p.trade_id = ti.trade_id
             where {where_clause}
+            order by p.position_id
             """,
             params,
         )
-        
-        return tuple(
-            Position(
-                position_id=row[0],
-                trade_id=row[1],
-                entry_price=row[2],
-                exit_price=row[3],
-                pnl=row[4],
-                status=row[5],
-            )
-            for row in rows
-        )
+        return tuple(Position(*row) for row in rows)
 
-    def get_open_trade_ideas(self, asset_id: str | None = None, hypothesis_id: str | None = None, direction: str | None = None) -> tuple[TradeIdea, ...]:
-        from project.common.models import TradeIdea
-        import json
-        
-        conditions = []
-        params = []
-        
-        if asset_id is not None:
-            conditions.append("ti.asset_id = ?")
-            params.append(asset_id)
-            
-        if hypothesis_id is not None:
-            conditions.append("ti.hypothesis_id = ?")
-            params.append(hypothesis_id)
-            
-        if direction is not None:
-            conditions.append("ti.direction = ?")
-            params.append(direction)
-            
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-        
-        rows = self._db.fetch_all(
-            f"""
-            select ti.trade_id, ti.asset_id, ti.hypothesis_id, ti.version, ti.direction, ti.confidence, ti.signals_snapshot_json
-            from trade_ideas ti
-            left join decisions d on ti.trade_id = d.trade_id
-            where d.decision_id is null and {where_clause}
-            """,
-            params,
-        )
-        
-        return tuple(
-            TradeIdea(
-                trade_id=row[0],
-                asset_id=row[1],
-                hypothesis_id=row[2],
-                version=row[3],
-                direction=row[4],
-                confidence=row[5],
-                signals_snapshot=json.loads(row[6]),
-            )
-            for row in rows
-        )
-
-    def persist_decision(self, decision: Decision) -> None:
+    def persist_decision(self, decision: Any) -> None:
         self._db.execute(
             """
             insert into decisions values (?, ?, ?, ?, ?, ?)
@@ -395,22 +369,16 @@ class DataRepository:
         )
 
     def get_decisions(self, trade_id: str | None = None) -> tuple[tuple, ...]:
-        conditions = []
-        params = []
-        
-        if trade_id is not None:
-            conditions.append("trade_id = ?")
-            params.append(trade_id)
-            
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-        
-        rows = self._db.fetch_all(
+        where_clause, params = build_filters([("trade_id = ?", trade_id)])
+        return tuple(self._db.fetch_all(
             f"""
             select decision_id, trade_id, action, structured_reason, notes, created_at
             from decisions
             where {where_clause}
+            order by created_at, decision_id
             """,
             params,
-        )
-        
-        return tuple(tuple(row) for row in rows)
+        ))
+
+    def get_trade_outcomes(self) -> tuple[TradeOutcome, ...]:
+        return load_trade_outcomes(self._db)

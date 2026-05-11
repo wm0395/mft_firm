@@ -1,26 +1,13 @@
 Goal:
-Implement subtask with correct architecture.
+Prepare an implementation packet for the assigned task.
 
-Subtask:
-{SUBTASK}
-
-Context:
-{CONTEXT}
-
-Relevant Files:
-{FILES}
-
-Scratchpad:
-{SCRATCHPAD}
-
-Constraints:
-
-- must belong to ONE layer
-- no cross-layer access
-- no shared state
-- no hidden dependencies
-- one responsibility per function
+Requirements:
+- honor the declared files and constraints
+- keep the solution minimal
+- prefer explicit changes over abstraction
+- document only the context needed to execute
 
 Done when:
-- passes architecture checks
-- deterministic
+- the packet is actionable
+- the context is bounded
+- the task schema is complete

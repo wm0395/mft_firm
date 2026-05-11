@@ -24,10 +24,9 @@ Steps:
 
 def diagnose_task(task: Task, paths: ProjectPaths) -> dict[str, object]:
     patterns = _read_patterns(paths)
-    matched = _match_patterns(task, patterns)
     return {
         "task_id": task.id,
-        "violations": matched,
+        "violations": _match_patterns(task, patterns),
         "known_patterns": patterns,
     }
 
@@ -36,12 +35,11 @@ def build_fix_prompt(task: Task, diagnosis: dict[str, object]) -> dict[str, obje
     return {
         "task_id": task.id,
         "status": "ready",
-        "message": "Fix prompt built. Apply this prompt to Codex for the architecture-only fix step.",
         "prompt": "\n\n".join(
             (
                 FIX_AGENT_PROMPT.strip(),
-                f"Task:\n{json.dumps(task.to_dict(), indent=2)}",
-                f"Diagnosis:\n{json.dumps(diagnosis, indent=2)}",
+                "Task:\n" + json.dumps(task.to_dict(), indent=2),
+                "Diagnosis:\n" + json.dumps(diagnosis, indent=2),
             )
         ),
     }
@@ -54,34 +52,24 @@ def _read_patterns(paths: ProjectPaths) -> dict[str, Any]:
 
 
 def _match_patterns(task: Task, patterns: dict[str, Any]) -> list[dict[str, object]]:
-    review = task.review or {}
-    haystack = json.dumps(
-        {
-            "description": task.description,
-            "subtasks": [subtask.to_dict() for subtask in task.subtasks],
-            "review": review,
-        }
-    ).lower()
-
+    haystack = json.dumps(task.to_dict()).lower()
     matches = []
     for key, value in patterns.items():
-        pattern_text = str(value.get("pattern", "")).lower() if isinstance(value, dict) else ""
-        tokens = [token for token in key.split("_") if token]
-        if pattern_text and pattern_text in haystack:
-            matches.append(_match(key, value, "pattern"))
+        if not isinstance(value, dict):
             continue
-        if any(token in haystack for token in tokens):
-            matches.append(_match(key, value, "keyword"))
-
+        pattern = str(value.get("pattern", "")).lower()
+        if pattern and pattern in haystack:
+            matches.append(_match(key, value, 0.9))
+            continue
+        if any(token in haystack for token in key.split("_")):
+            matches.append(_match(key, value, 0.6))
     return matches
 
 
-def _match(key: str, value: Any, source: str) -> dict[str, object]:
-    if not isinstance(value, dict):
-        value = {}
+def _match(key: str, value: dict[str, object], confidence: float) -> dict[str, object]:
     return {
         "violation": key,
         "cause": value.get("pattern", "matched known architecture violation"),
         "fix": value.get("fix", "apply minimal architecture-preserving fix"),
-        "confidence": 0.9 if source == "pattern" else 0.6,
+        "confidence": confidence,
     }

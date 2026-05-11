@@ -4,22 +4,22 @@ from .models import Task
 from .paths import ProjectPaths
 
 
-SCRATCHPAD_TEMPLATE = """# Task: {description}
+SCRATCHPAD_TEMPLATE = """# Task: {objective}
 
-## Understanding
-- Task id: {task_id}
-- Route: {route}
+## Objective
+- {objective}
 
-## Plan
-1. Keep the implementation minimal.
-2. Execute only the requested task.
-3. Run reviewer checks before completion.
+## Files
+{files}
 
-## Open Questions
-- None recorded.
+## Constraints
+{constraints}
+
+## Done Conditions
+{done_conditions}
 
 ## Decisions
-- Created deterministic scratchpad from task metadata.
+- None recorded.
 """
 
 
@@ -30,9 +30,10 @@ class ScratchpadStore:
 
     def create(self, task: Task) -> str:
         text = SCRATCHPAD_TEMPLATE.format(
-            description=task.description,
-            task_id=task.id,
-            route=task.route,
+            objective=task.objective,
+            files=self._render_lines(task.files),
+            constraints=self._render_lines(task.constraints),
+            done_conditions=self._render_lines(task.done_conditions),
         )
         self.write(task.id, text)
         return text
@@ -44,8 +45,10 @@ class ScratchpadStore:
         return path.read_text(encoding="utf-8")
 
     def write(self, task_id: str, text: str) -> None:
-        line_count = len(text.splitlines())
-        if line_count > 400:
+        if len(text.splitlines()) > 400:
             raise ValueError("Scratchpad exceeds 400 line limit")
         path = self.paths.scratchpads / f"{task_id}.md"
         path.write_text(text, encoding="utf-8")
+
+    def _render_lines(self, items: tuple[str, ...]) -> str:
+        return "\n".join(f"- {item}" for item in items) if items else "- None recorded."

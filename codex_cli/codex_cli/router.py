@@ -1,23 +1,26 @@
 from __future__ import annotations
 
 
-COMPLEXITY_MARKERS = (
-    "architecture",
-    "multi",
-    "multiple",
-    "refactor",
-    "database",
-    "schema",
-    "pipeline",
-    "system",
-    "integrate",
-)
+ARCHITECTURE_MARKERS = ("architecture", "refactor", "layer", "contract", "drift")
+BULK_MARKERS = ("generate tests", "bulk", "mass", "sweep", "repetitive")
+REVIEW_MARKERS = ("audit", "review", "debug", "investigate", "design")
 
 
-def route(description: str) -> str:
-    words = description.lower().split()
-    if len(words) > 18:
-        return "planner"
-    if any(marker in description.lower() for marker in COMPLEXITY_MARKERS):
+def route(objective: str) -> str:
+    text = objective.lower()
+    if len(text.split()) > 18 or _contains(text, ARCHITECTURE_MARKERS):
         return "planner"
     return "executor"
+
+
+def recommend_provider(objective: str, route_name: str) -> str:
+    text = objective.lower()
+    if _contains(text, BULK_MARKERS):
+        return "opencode"
+    if route_name == "planner" or _contains(text, REVIEW_MARKERS):
+        return "gemini"
+    return "codex"
+
+
+def _contains(text: str, markers: tuple[str, ...]) -> bool:
+    return any(marker in text for marker in markers)

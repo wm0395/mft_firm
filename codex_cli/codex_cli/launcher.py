@@ -1,0 +1,148 @@
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+
+LAUNCH_PROVIDERS = ("codex", "opencode")
+INTERACTIVE = "interactive"
+ONESHOT = "oneshot"
+
+
+@dataclass(frozen=True)
+class LaunchResult:
+    provider: str
+    mode: str
+    command: tuple[str, ...]
+    exit_code: int
+    stdout: str
+    stderr: str
+    json_output: bool
+    model: str | None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "provider": self.provider,
+            "mode": self.mode,
+            "command": list(self.command),
+            "exit_code": self.exit_code,
+            "stdout": self.stdout,
+            "stderr": self.stderr,
+            "json_output": self.json_output,
+            "model": self.model,
+        }
+
+
+def launch_task(
+    provider: str,
+    mode: str,
+    prompt: str,
+    workspace: Path,
+    model: str | None,
+    json_output: bool,
+) -> LaunchResult:
+    _validate_launch(provider, mode, json_output)
+    command = build_launch_command(provider, mode, prompt, workspace, model, json_output)
+    env = _build_env(workspace)
+    if mode == INTERACTIVE:
+        result = subprocess.run(command, check=False, env=env)
+        return LaunchResult(provider, mode, tuple(command), result.returncode, "", "", json_output, model)
+    result = subprocess.run(command, check=False, capture_output=True, text=True, env=env)
+    return LaunchResult(
+        provider,
+        mode,
+        tuple(command),
+        result.returncode,
+        result.stdout,
+        result.stderr,
+        json_output,
+        model,
+    )
+
+
+def build_launch_command(
+    provider: str,
+    mode: str,
+    prompt: str,
+    workspace: Path,
+    model: str | None,
+    json_output: bool,
+) -> list[str]:
+    executable = _resolve_binary(provider)
+    workspace_text = str(workspace)
+    if provider == "codex":
+        return _codex_command(executable, mode, prompt, workspace_text, model, json_output)
+    return _opencode_command(executable, mode, prompt, workspace_text, model, json_output)
+
+
+def _validate_launch(provider: str, mode: str, json_output: bool) -> None:
+    if provider not in LAUNCH_PROVIDERS:
+        raise ValueError(f"Unsupported launch provider: {provider}")
+    if mode not in {INTERACTIVE, ONESHOT}:
+        raise ValueError(f"Unsupported launch mode: {mode}")
+    if json_output and mode != ONESHOT:
+        raise ValueError("--json is only supported in oneshot mode")
+    if mode == INTERACTIVE and not sys.stdin.isatty():
+        raise ValueError("Interactive mode requires a TTY; use --mode oneshot instead")
+
+
+def _resolve_binary(provider: str) -> str:
+    resolved = shutil.which(provider)
+    if resolved is None:
+        raise FileNotFoundError(f"Required provider binary not found: {provider}")
+    return resolved
+
+
+def _codex_command(
+    executable: str,
+    mode: str,
+    prompt: str,
+    workspace: str,
+    model: str | None,
+    json_output: bool,
+) -> list[str]:
+    if mode == INTERACTIVE:
+        command = [executable, "-C", workspace]
+        if model:
+            command.extend(["-m", model])
+        command.append(prompt)
+        return command
+    command = [executable, "exec", "-C", workspace]
+    if model:
+        command.extend(["-m", model])
+    if json_output:
+        command.append("--json")
+    command.append(prompt)
+    return command
+
+
+def _opencode_command(
+    executable: str,
+    mode: str,
+    prompt: str,
+    workspace: str,
+    model: str | None,
+    json_output: bool,
+) -> list[str]:
+    if mode == INTERACTIVE:
+        command = [executable, "--dir", workspace, "--prompt", prompt]
+    else:
+        command = [executable, "run", "--dir", workspace]
+        if json_output:
+            command.extend(["--format", "json"])
+        command.append(prompt)
+    if model:
+        command.extend(["--model", model])
+    return command
+
+
+def _build_env(workspace: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    root = str(workspace)
+    existing = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = root if not existing else f"{root}{os.pathsep}{existing}"
+    return env

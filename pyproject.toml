@@ -6,3 +6,19 @@ exclude = [
     "__pycache__",
     "codex_cli/mft_codex_cli.egg-info",
 ]
+
+[tool.mypy]
+files = [
+    "project/cli.py",
+    "project/cli_support.py",
+    "project/cli_readonly.py",
+    "project/main.py",
+    "project/data/repository.py",
+    "project/data/schema.py",
+    "project/data/row_parsers.py",
+    "project/data/reporting_store.py",
+    "project/replay/engine.py",
+    "project/decision/models.py",
+]
+follow_imports = "silent"
+python_version = "3.12"

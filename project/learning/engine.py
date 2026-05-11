@@ -1,8 +1,7 @@
 from __future__ import annotations
 import statistics
 import math
-from datetime import UTC, datetime
-from typing import List, Dict
+from typing import List
 
 from project.common.models import TradeOutcome
 from project.data.models import SignalEvaluation, HypothesisMetrics

@@ -1,9 +1,8 @@
 import pytest
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from project.data.db import DuckDBAccess
 from project.data.repository import DataRepository
-from project.replay.engine import ReplayEngine, ReplayConfig
+from project.replay.engine import ReplayEngine
 
 @pytest.fixture
 def db_repo(tmp_path):
@@ -24,10 +23,14 @@ def test_replay_engine_returns(db_repo):
     for i in range(25):
         ts = base_ts + timedelta(hours=i)
         # Price: 100 at t0, then 101, 102... then 110 at t5, then 120 at t20
-        if i == 0: price = 100.0
-        elif i == 5: price = 110.0
-        elif i == 20: price = 120.0
-        else: price = 100.0 + i
+        if i == 0:
+            price = 100.0
+        elif i == 5:
+            price = 110.0
+        elif i == 20:
+            price = 120.0
+        else:
+            price = 100.0 + i
         data.append((asset_symbol, ts, price, price+1, price-1, price, 1000.0))
         
     for row in data:

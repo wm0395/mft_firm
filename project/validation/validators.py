@@ -4,7 +4,6 @@ from project.data.models import HypothesisEvaluation
 from project.data.repository import DataRepository
 from project.hypotheses.registry import HypothesisRegistry
 from project.validation.models import ValidationResult
-from project.common.models import HypothesisStatus
 import json
 
 

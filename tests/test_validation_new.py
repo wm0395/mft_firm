@@ -1,20 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
-from uuid import uuid4
 
-from project.common.models import HypothesisStatus
 from project.data.models import HypothesisEvaluation
-from project.data.repository import DataRepository
 from project.hypotheses.registry import HypothesisRegistry, HypothesisDefinition
 from project.validation.engine import ValidationEngine
-from project.validation.models import ValidationResult
 from project.validation.validators import (
     malformed_signal_payload_validator,
     inconsistent_timestamps_validator,
     confidence_out_of_range_validator,
     invalid_hypothesis_version_validator,
-    duplicate_signal_definitions_validator,
     impossible_directional_conflicts_validator,
 )
 
@@ -38,7 +33,7 @@ def test_malformed_signal_payload_validator() -> None:
     )
     
     result = malformed_signal_payload_validator(evaluation, {})
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     
     # Invalid signals_snapshot_json
@@ -58,7 +53,7 @@ def test_malformed_signal_payload_validator() -> None:
     )
     
     result = malformed_signal_payload_validator(evaluation_bad_signals, {})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "malformed_signal_payload" in result.reasons
     assert "Invalid signals_snapshot_json" in result.metrics["error"]
     
@@ -79,7 +74,7 @@ def test_malformed_signal_payload_validator() -> None:
     )
     
     result = malformed_signal_payload_validator(evaluation_bad_explanation, {})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "malformed_signal_payload" in result.reasons
     assert "Invalid explanation_json" in result.metrics["error"]
 
@@ -105,7 +100,7 @@ def test_inconsistent_timestamps_validator() -> None:
     )
     
     result = inconsistent_timestamps_validator(evaluation_recent, {})
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     
     # Too far in future
@@ -126,7 +121,7 @@ def test_inconsistent_timestamps_validator() -> None:
     )
     
     result = inconsistent_timestamps_validator(evaluation_future, {})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "inconsistent_timestamps" in result.reasons
     assert result.metrics["issue"] == "timestamp_too_far_in_future"
     
@@ -148,7 +143,7 @@ def test_inconsistent_timestamps_validator() -> None:
     )
     
     result = inconsistent_timestamps_validator(evaluation_past, {})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "inconsistent_timestamps" in result.reasons
     assert result.metrics["issue"] == "timestamp_too_far_in_past"
     
@@ -169,7 +164,7 @@ def test_inconsistent_timestamps_validator() -> None:
     )
     
     result = inconsistent_timestamps_validator(evaluation_invalid, {})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "inconsistent_timestamps" in result.reasons
     assert "Invalid timestamp format" in result.metrics["error"]
 
@@ -193,7 +188,7 @@ def test_confidence_out_of_range_validator() -> None:
     )
     
     result = confidence_out_of_range_validator(evaluation_valid, {})
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     
     # Too low confidence
@@ -213,7 +208,7 @@ def test_confidence_out_of_range_validator() -> None:
     )
     
     result = confidence_out_of_range_validator(evaluation_low, {})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "confidence_out_of_range" in result.reasons
     assert result.metrics["confidence"] == -0.1
     assert result.metrics["min_allowed"] == 0.0
@@ -236,7 +231,7 @@ def test_confidence_out_of_range_validator() -> None:
     )
     
     result = confidence_out_of_range_validator(evaluation_high, {})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "confidence_out_of_range" in result.reasons
     assert result.metrics["confidence"] == 1.5
 
@@ -271,7 +266,7 @@ def test_invalid_hypothesis_version_validator() -> None:
     registry.register(definition, ("rsi_14",))
     
     result = invalid_hypothesis_version_validator(evaluation_valid, {"hypothesis_registry": registry})
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     
     # Invalid version (too low)
@@ -291,7 +286,7 @@ def test_invalid_hypothesis_version_validator() -> None:
     )
     
     result = invalid_hypothesis_version_validator(evaluation_wrong_version, {"hypothesis_registry": registry})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "invalid_hypothesis_version" in result.reasons
     assert result.metrics["evaluation_version"] == 0
     assert result.metrics["registered_version"] == 1
@@ -313,7 +308,7 @@ def test_invalid_hypothesis_version_validator() -> None:
     )
     
     result = invalid_hypothesis_version_validator(evaluation_wrong_version_high, {"hypothesis_registry": registry})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "invalid_hypothesis_version" in result.reasons
     assert result.metrics["evaluation_version"] == 2
     assert result.metrics["registered_version"] == 1
@@ -338,7 +333,7 @@ def test_impossible_directional_conflicts_validator() -> None:
     )
     
     result = impossible_directional_conflicts_validator(evaluation_valid, {})
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     
     # Invalid direction
@@ -358,7 +353,7 @@ def test_impossible_directional_conflicts_validator() -> None:
     )
     
     result = impossible_directional_conflicts_validator(evaluation_invalid, {})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "impossible_directional_conflicts" in result.reasons
     assert result.metrics["direction"] == "invalid_direction"
     assert "long" in result.metrics["allowed_directions"]
@@ -416,7 +411,7 @@ def test_validation_engine_with_new_validators() -> None:
     )
     
     # Should be valid with all checks passing
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     # Check that we have metrics from validators that return metrics on success
     # Note: Some validators return empty metrics on success (e.g., malformed_signal_payload when valid)
@@ -482,6 +477,6 @@ def test_validation_engine_with_malformed_payload() -> None:
     )
     
     # Should be invalid due to malformed signal payload
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "malformed_signal_payload" in result.reasons
     assert len(result.reasons) >= 1  # At least this reason

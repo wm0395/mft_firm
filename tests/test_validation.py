@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
-from uuid import uuid4
 
-from project.common.models import HypothesisStatus
 from project.data.models import HypothesisEvaluation
-from project.data.repository import DataRepository
 from project.hypotheses.registry import HypothesisRegistry, HypothesisDefinition
 from project.validation.engine import ValidationEngine
-from project.validation.models import ValidationResult
 from project.validation.validators import (
     confidence_validator,
     hypothesis_status_validator,
@@ -36,7 +32,7 @@ def test_confidence_validator() -> None:
     )
     
     result = confidence_validator(evaluation, {})
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     assert result.metrics["actual_confidence"] == 0.6
     
@@ -57,7 +53,7 @@ def test_confidence_validator() -> None:
     )
     
     result = confidence_validator(evaluation_low, {})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert result.reasons == ["low_confidence"]
     assert result.metrics["actual_confidence"] == 0.5
 
@@ -65,21 +61,6 @@ def test_confidence_validator() -> None:
 def test_hypothesis_status_validator() -> None:
     """Test hypothesis status validator."""
     # Active hypothesis - should be valid
-    evaluation = HypothesisEvaluation(
-        evaluation_id="test",
-        asset_id="asset:TEST",
-        hypothesis_id="hypothesis:test",
-        hypothesis_version=1,
-        timestamp="2026-05-06T00:00:00Z",
-        direction="long",
-        confidence=0.8,
-        signals_snapshot_json='{"rsi_14": 30.0}',
-        explanation_json='{"rule": "test"}',
-        generated_trade_idea=False,
-        validation_result_json=None,
-        created_at="2026-05-06T00:00:00Z",
-    )
-    
     registry = HypothesisRegistry()
     definition_active = HypothesisDefinition(
         hypothesis_id="hypothesis:test:active",
@@ -108,7 +89,7 @@ def test_hypothesis_status_validator() -> None:
     )
     
     result = hypothesis_status_validator(evaluation_active, {"hypothesis_registry": registry})
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     
     # Testing hypothesis - should be valid
@@ -139,7 +120,7 @@ def test_hypothesis_status_validator() -> None:
     )
     
     result = hypothesis_status_validator(evaluation_testing, {"hypothesis_registry": registry})
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     
     # Deprecated hypothesis - should be invalid
@@ -170,7 +151,7 @@ def test_hypothesis_status_validator() -> None:
     )
     
     result = hypothesis_status_validator(evaluation_deprecated, {"hypothesis_registry": registry})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert result.reasons == ["invalid_hypothesis_status"]
     
     # Missing hypothesis - should be invalid
@@ -189,7 +170,7 @@ def test_hypothesis_status_validator() -> None:
         created_at="2026-05-06T00:00:00Z",
     )
     result = hypothesis_status_validator(evaluation_no_hypothesis, {"hypothesis_registry": registry})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert result.reasons == ["invalid_hypothesis_status"]
 
 
@@ -212,7 +193,7 @@ def test_signal_freshness_validator() -> None:
     )
     
     result = signal_freshness_validator(evaluation, {"max_signal_age_hours": 24})
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     
     # Stale signal - should be invalid (create new evaluation)
@@ -233,7 +214,7 @@ def test_signal_freshness_validator() -> None:
     )
     
     result = signal_freshness_validator(evaluation_stale, {"max_signal_age_hours": 24})
-    assert result.is_valid == False
+    assert not result.is_valid
     assert result.reasons == ["stale_signals"]
     assert result.metrics["signal_age_hours"] > 24
 
@@ -257,7 +238,7 @@ def test_duplicate_exposure_validator_no_repo() -> None:
     
     # Should be valid when no repository provided
     result = duplicate_exposure_validator(evaluation, {})
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     # The note is in metrics only when repository is None
     assert "note" in result.metrics or len(result.metrics) == 0  # Either way is acceptable
@@ -312,7 +293,7 @@ def test_validation_engine_integration() -> None:
     )
     
     # Should be valid with all checks passing
-    assert result.is_valid == True
+    assert result.is_valid
     assert result.reasons == []
     assert "confidence.actual_confidence" in result.metrics
     assert "hypothesis_status.hypothesis_status" in result.metrics
@@ -370,6 +351,6 @@ def test_validation_engine_with_failing_conditions() -> None:
     )
     
     # Should be invalid due to low confidence
-    assert result.is_valid == False
+    assert not result.is_valid
     assert "low_confidence" in result.reasons
     assert len(result.reasons) == 1  # Only one failure reason

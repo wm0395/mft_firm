@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from project.common.models import Signal, TradeOutcome
 from project.data.db import DuckDBAccess
 from project.data.ingestion import build_raw_price_point
 from project.data.repository import DataRepository
 from project.data.schema import REQUIRED_TABLES
 from project.hypotheses.engine import evaluate_hypotheses
 from project.hypotheses.rsi_mean_reversion import RSIMeanReversionHypothesis
-from project.learning.engine import analyze_hypothesis_performance
 from project.signals.compute import moving_average, rsi, volatility
 from project.signals.pipeline import compute_latest_price_signals
 from project.signals.registry import default_signal_registry
@@ -119,7 +117,7 @@ def test_hypothesis_evaluation_persistence(tmp_path: Path) -> None:
     assert retrieved.hypothesis_version == outputs[0].version
     assert retrieved.direction == "long"
     assert retrieved.confidence == 1.0
-    assert retrieved.generated_trade_idea == False
+    assert not retrieved.generated_trade_idea
     assert retrieved.validation_result_json is None
     
     # Verify JSON fields can be parsed

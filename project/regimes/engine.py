@@ -1,9 +1,7 @@
 from __future__ import annotations
 import math
 import statistics
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
 
 from project.regimes.models import (
     VolatilityRegime, TrendRegime, LiquidityRegime, MomentumRegime, MarketRegimeSnapshot
@@ -60,10 +58,14 @@ class RegimeEngine:
         
         # Simplified state mapping based on fixed thresholds for this implementation
         # In a production system, these would be based on historical percentiles
-        if realized_vol < 0.001: state = "low"
-        elif realized_vol < 0.003: state = "normal"
-        elif realized_vol < 0.006: state = "high"
-        else: state = "extreme"
+        if realized_vol < 0.001:
+            state = "low"
+        elif realized_vol < 0.003:
+            state = "normal"
+        elif realized_vol < 0.006:
+            state = "high"
+        else:
+            state = "extreme"
         
         return VolatilityRegime(
             state=state,
@@ -88,9 +90,12 @@ class RegimeEngine:
         # Strength based on R-squared (simplified)
         strength = abs(slope) / (statistics.stdev(prices) / n) if statistics.stdev(prices) != 0 else 0.0
         
-        if slope > 0.01 * prices[-1]: state = "strong_bull" if strength > 2 else "weak_bull"
-        elif slope < -0.01 * prices[-1]: state = "strong_bear" if strength > 2 else "weak_bear"
-        else: state = "sideways"
+        if slope > 0.01 * prices[-1]:
+            state = "strong_bull" if strength > 2 else "weak_bull"
+        elif slope < -0.01 * prices[-1]:
+            state = "strong_bear" if strength > 2 else "weak_bear"
+        else:
+            state = "sideways"
         
         return TrendRegime(state=state, slope=slope, strength=strength)
 
@@ -100,9 +105,12 @@ class RegimeEngine:
         
         ratio = current_vol / avg_vol if avg_vol != 0 else 1.0
         
-        if ratio < 0.5: state = "low"
-        elif ratio < 1.5: state = "normal"
-        else: state = "high"
+        if ratio < 0.5:
+            state = "low"
+        elif ratio < 1.5:
+            state = "normal"
+        else:
+            state = "high"
         
         return LiquidityRegime(
             state=state,
@@ -128,9 +136,12 @@ class RegimeEngine:
             rs = avg_gain / avg_loss
             rsi = 100.0 - (100.0 / (1.0 + rs))
             
-        if rsi > 70: state = "overbought"
-        elif rsi < 30: state = "oversold"
-        else: state = "neutral"
+        if rsi > 70:
+            state = "overbought"
+        elif rsi < 30:
+            state = "oversold"
+        else:
+            state = "neutral"
         
         return MomentumRegime(
             state=state,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass, field, replace
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -10,81 +10,209 @@ COMPLETED = "completed"
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-@dataclass
+@dataclass(frozen=True)
 class Subtask:
     id: int
-    desc: str
+    objective: str
     layer: str = ""
-    inputs: list[str] = field(default_factory=list)
-    outputs: list[str] = field(default_factory=list)
-    files: list[str] = field(default_factory=list)
+    files: tuple[str, ...] = ()
+    inputs: tuple[str, ...] = ()
+    outputs: tuple[str, ...] = ()
     status: str = "pending"
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Subtask":
+        objective = str(data.get("objective") or data.get("desc") or "")
         return cls(
             id=int(data["id"]),
-            desc=str(data["desc"]),
+            objective=objective,
             layer=str(data.get("layer", "")),
-            inputs=list(data.get("inputs", [])),
-            outputs=list(data.get("outputs", [])),
-            files=list(data.get("files", [])),
+            files=tuple(data.get("files", ())),
+            inputs=tuple(data.get("inputs", ())),
+            outputs=tuple(data.get("outputs", ())),
             status=str(data.get("status", "pending")),
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "desc": self.desc,
-            "layer": self.layer,
-            "inputs": self.inputs,
-            "outputs": self.outputs,
-            "files": self.files,
-            "status": self.status,
-        }
+        return asdict(self)
 
 
-@dataclass
+@dataclass(frozen=True)
 class Task:
     id: str
-    description: str
+    objective: str
+    files: tuple[str, ...]
+    constraints: tuple[str, ...]
+    done_conditions: tuple[str, ...]
     status: str = ACTIVE
-    subtasks: list[Subtask] = field(default_factory=list)
-    files: list[str] = field(default_factory=list)
+    route: str = "executor"
+    recommended_provider: str = "codex"
+    subtasks: tuple[Subtask, ...] = ()
+    review_status: str = "pending"
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
-    route: str = "executor"
-    review: dict[str, Any] | None = None
+    packet_history: tuple[dict[str, Any], ...] = ()
+    memory_refs: tuple[str, ...] = ()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Task":
+        objective = str(data.get("objective") or data.get("description") or "")
         return cls(
             id=str(data["id"]),
-            description=str(data["description"]),
+            objective=objective,
+            files=tuple(data.get("files", ())),
+            constraints=tuple(data.get("constraints", ())),
+            done_conditions=tuple(data.get("done_conditions", ())),
             status=str(data.get("status", ACTIVE)),
-            subtasks=[Subtask.from_dict(item) for item in data.get("subtasks", [])],
-            files=list(data.get("files", [])),
+            route=str(data.get("route", "executor")),
+            recommended_provider=str(data.get("recommended_provider", "codex")),
+            subtasks=tuple(Subtask.from_dict(item) for item in data.get("subtasks", ())),
+            review_status=str(data.get("review_status", "pending")),
             created_at=str(data.get("created_at", utc_now())),
             updated_at=str(data.get("updated_at", utc_now())),
-            route=str(data.get("route", "executor")),
-            review=data.get("review"),
+            packet_history=tuple(data.get("packet_history", ())),
+            memory_refs=tuple(data.get("memory_refs", ())),
         )
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "id": self.id,
-            "description": self.description,
-            "status": self.status,
+            **asdict(self),
             "subtasks": [subtask.to_dict() for subtask in self.subtasks],
-            "files": self.files,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "route": self.route,
-            "review": self.review,
         }
 
-    def touch(self) -> None:
-        self.updated_at = utc_now()
+    def touch(self) -> "Task":
+        return replace(self, updated_at=utc_now())
+
+    def with_subtasks(self, subtasks: tuple[Subtask, ...]) -> "Task":
+        return replace(self, subtasks=subtasks, updated_at=utc_now())
+
+    def with_review_status(self, review_status: str) -> "Task":
+        return replace(self, review_status=review_status, updated_at=utc_now())
+
+    def with_packet(self, packet: dict[str, Any]) -> "Task":
+        return replace(
+            self,
+            packet_history=(*self.packet_history, packet),
+            updated_at=utc_now(),
+        )
+
+    def with_launch(self, launch: dict[str, Any]) -> "Task":
+        return replace(
+            self,
+            packet_history=(*self.packet_history, launch),
+            updated_at=utc_now(),
+        )
+
+    def with_memory_ref(self, memory_ref: str) -> "Task":
+        return replace(
+            self,
+            memory_refs=(*self.memory_refs, memory_ref),
+            updated_at=utc_now(),
+        )
+
+    def complete(self) -> "Task":
+        return replace(self, status=COMPLETED, updated_at=utc_now())
+
+
+@dataclass(frozen=True)
+class PacketBlock:
+    name: str
+    content: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {"name": self.name, "content": self.content}
+
+
+@dataclass(frozen=True)
+class ExecutionPacket:
+    task_id: str
+    provider: str
+    role: str
+    budget: int
+    prompt: str
+    prompt_blocks: tuple[PacketBlock, ...]
+    retrieved_context: tuple[str, ...]
+    token_estimate: int
+    command_hint: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "provider": self.provider,
+            "role": self.role,
+            "budget": self.budget,
+            "prompt": self.prompt,
+            "prompt_blocks": [block.to_dict() for block in self.prompt_blocks],
+            "retrieved_context": list(self.retrieved_context),
+            "token_estimate": self.token_estimate,
+            "command_hint": self.command_hint,
+        }
+
+
+@dataclass(frozen=True)
+class ReviewPacket:
+    task_id: str
+    provider: str
+    persona: str
+    budget: int
+    prompt: str
+    prompt_blocks: tuple[PacketBlock, ...]
+    retrieved_context: tuple[str, ...]
+    token_estimate: int
+    command_hint: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "provider": self.provider,
+            "persona": self.persona,
+            "budget": self.budget,
+            "prompt": self.prompt,
+            "prompt_blocks": [block.to_dict() for block in self.prompt_blocks],
+            "retrieved_context": list(self.retrieved_context),
+            "token_estimate": self.token_estimate,
+            "command_hint": self.command_hint,
+        }
+
+
+@dataclass(frozen=True)
+class MemoryEntry:
+    kind: str
+    title: str
+    body: str
+    tags: tuple[str, ...]
+    source_task_id: str
+    created_at: str = field(default_factory=utc_now)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IndexEntry:
+    path: str
+    sha256: str
+    symbols: tuple[str, ...]
+    summary: str
+    tags: tuple[str, ...]
+    mtime: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class TokenLedgerEntry:
+    kind: str
+    source: str
+    provider: str
+    content_hash: str
+    tokenizer: str
+    token_count: int
+    created_at: str = field(default_factory=utc_now)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)

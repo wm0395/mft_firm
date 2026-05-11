@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, UTC
-from typing import List, Tuple, Optional
+from typing import Tuple
 
 from project.common.models import Direction
 from project.data.models import SignalEvaluation
@@ -21,7 +21,7 @@ class ReplayEngine:
         asset_symbol: str, 
         timestamp: datetime, 
         direction: Direction,
-        hypothesis_id: str
+        hypothesis_id: str = "unknown"
     ) -> SignalEvaluation:
         """
         Evaluates the forward returns for a signal at a given timestamp.
