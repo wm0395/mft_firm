@@ -68,7 +68,8 @@ class TaskStore:
             other_path.unlink()
 
     def _list(self, directory: Path) -> list[Task]:
-        return [self._read_task(path) for path in sorted(directory.glob("task_*.json"))]
+        tasks = [self._read_task(path) for path in directory.glob("task_*.json")]
+        return sorted(tasks, key=_task_sort_key)
 
     def _read_task(self, path: Path) -> Task:
         return Task.from_dict(json.loads(path.read_text(encoding="utf-8")))
@@ -81,3 +82,15 @@ class TaskStore:
                 if len(parts) == 2 and parts[1].isdigit():
                     numbers.append(int(parts[1]))
         return f"task_{max(numbers, default=0) + 1:03d}"
+
+
+def _task_sort_key(task: Task) -> tuple[int, int, str]:
+    queue_position = task.queue_position if task.queue_position is not None else 10_000
+    return (queue_position, _task_number(task.id), task.id)
+
+
+def _task_number(task_id: str) -> int:
+    prefix, _, suffix = task_id.partition("_")
+    if prefix == "task" and suffix.isdigit():
+        return int(suffix)
+    return 10_000

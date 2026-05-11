@@ -14,6 +14,7 @@ from .managed_runner import RunTaskOptions, run_task_command
 from .memory_store import MemoryStore
 from .paths import ProjectPaths
 from .planner import plan_task
+from .queue_runner import QueueRunOptions, run_task_queue
 from .reviewer import review_task
 from .router import recommend_provider, route
 from .scratchpad import ScratchpadStore
@@ -62,6 +63,15 @@ def build_parser() -> argparse.ArgumentParser:
     run_task_parser.add_argument("--no-review", action="store_true")
     run_task_parser.add_argument("--no-checks", action="store_true")
     run_task_parser.add_argument("--dry-run", action="store_true")
+    queue_parser = subcommands.add_parser("run-queue", help="Run active tasks sequentially with Codex cooldown handling")
+    queue_parser.add_argument("--provider", choices=LAUNCH_PROVIDERS)
+    queue_parser.add_argument("--budget", type=int, default=DEFAULT_EXEC_BUDGET)
+    queue_parser.add_argument("--json", action="store_true")
+    queue_parser.add_argument("--model")
+    queue_parser.add_argument("--resume", action="store_true")
+    queue_parser.add_argument("--no-review", action="store_true")
+    queue_parser.add_argument("--no-checks", action="store_true")
+    queue_parser.add_argument("--cooldown-hours", type=float, default=5.0)
     review_parser = subcommands.add_parser("review", help="Build review packet for a task")
     review_parser.add_argument("task_id")
     review_parser.add_argument("--provider", choices=("codex", "gemini", "opencode"))
@@ -114,6 +124,8 @@ def _dispatch(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: Scratchp
         return _execute_command(args, paths, tasks, scratchpads)
     if args.command == "run-task":
         return _run_task(args, paths, tasks, scratchpads, memory)
+    if args.command == "run-queue":
+        return _run_queue(args, paths, tasks, scratchpads, memory)
     if args.command == "review":
         return _print_json({"status": "ready", "review": _review_payload(args, tasks, scratchpads, paths)})
     if args.command == "scratch":
@@ -279,6 +291,35 @@ def _run_task(
     return _run_task_exit_code(payload)
 
 
+def _run_queue(
+    args,
+    paths: ProjectPaths,
+    tasks: TaskStore,
+    scratchpads: ScratchpadStore,
+    memory: MemoryStore,
+) -> int:
+    cooldown_seconds = _cooldown_seconds(args.cooldown_hours)
+    payload = run_task_queue(
+        paths,
+        tasks,
+        scratchpads,
+        memory,
+        DEFAULT_REVIEW_BUDGET,
+        QueueRunOptions(
+            provider=args.provider,
+            budget=args.budget,
+            json_output=args.json,
+            model=args.model,
+            resume=args.resume,
+            review_enabled=not args.no_review,
+            checks_enabled=not args.no_checks,
+            cooldown_seconds=cooldown_seconds,
+        ),
+    )
+    _print_json(payload)
+    return 0 if payload["status"] == "completed" else 1
+
+
 def _print_scratch(task_id: str, tasks: TaskStore, scratchpads: ScratchpadStore) -> int:
     task = tasks.get(task_id)
     try:
@@ -329,6 +370,12 @@ def _cache_command(args, paths: ProjectPaths) -> int:
 def _add_task_parser(subcommands, name: str, help_text: str) -> None:
     parser = subcommands.add_parser(name, help=help_text)
     parser.add_argument("task", help="Task objective")
+
+
+def _cooldown_seconds(hours: float) -> int:
+    if hours <= 0:
+        raise ValueError("cooldown hours must be positive")
+    return int(hours * 3600)
 
 
 def _infer_files(objective: str) -> tuple[str, ...]:

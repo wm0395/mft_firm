@@ -47,6 +47,7 @@ class Task:
     files: tuple[str, ...]
     constraints: tuple[str, ...]
     done_conditions: tuple[str, ...]
+    queue_position: int | None = None
     status: str = ACTIVE
     route: str = "executor"
     recommended_provider: str = "codex"
@@ -70,6 +71,7 @@ class Task:
             files=tuple(data.get("files", ())),
             constraints=tuple(data.get("constraints", ())),
             done_conditions=tuple(data.get("done_conditions", ())),
+            queue_position=_queue_position(data.get("queue_position")),
             status=str(data.get("status", ACTIVE)),
             route=str(data.get("route", "executor")),
             recommended_provider=str(data.get("recommended_provider", "codex")),
@@ -153,6 +155,12 @@ class Task:
 
     def complete(self) -> "Task":
         return replace(self, status=COMPLETED, updated_at=utc_now())
+
+
+def _queue_position(value: object) -> int | None:
+    if value is None:
+        return None
+    return int(value)
 
 
 @dataclass(frozen=True)
