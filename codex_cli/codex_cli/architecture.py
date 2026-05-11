@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -7,15 +8,20 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from layer_linter.contract import Contract, ContractParseError, contract_from_yaml  # type: ignore[import-untyped]
+from layer_linter.dependencies import DependencyGraph  # type: ignore[import-untyped]
+from layer_linter.module import SafeFilenameModule  # type: ignore[import-untyped]
+
 from .paths import ProjectPaths
 
 
 MAX_RETRIES = 3
 VENV_BIN = Path(sys.executable).parent
 ARCHITECTURE_COMMANDS = (
-    ("layer-lint", (str(VENV_BIN / "layer-lint"), "project")),
     ("architecture-tests", ("pytest", "tests/architecture/")),
 )
+LAYER_LINT_NAME = "layer-lint"
+LAYER_LINT_COMMAND = (str(VENV_BIN / "layer-lint"), "project")
 CONTRACT_MARKERS = (
     "data → signals → hypotheses → trade_engine → decision",
     "no upward imports",
@@ -46,7 +52,8 @@ class CommandResult:
 
 def check_architecture(root: Path | None = None) -> dict[str, object]:
     working_dir = root or Path.cwd()
-    results = [_run_command(name, command, working_dir) for name, command in ARCHITECTURE_COMMANDS]
+    results = [_run_layer_lint(working_dir)]
+    results.extend(_run_command(name, command, working_dir) for name, command in ARCHITECTURE_COMMANDS)
     status = "pass" if all(result.status in {"pass", "skipped"} for result in results) else "fail"
     return {"status": status, "checks": [result.to_dict() for result in results]}
 
@@ -111,6 +118,98 @@ def _run_command(name: str, command: tuple[str, ...], working_dir: Path) -> Comm
         return CommandResult(name, list(command), "fail", None, "", str(error))
     status = "pass" if result.returncode == 0 else "fail"
     return CommandResult(name, list(resolved), status, result.returncode, result.stdout, result.stderr)
+
+
+def _run_layer_lint(working_dir: Path) -> CommandResult:
+    try:
+        package = _resolve_package("project", working_dir)
+        contracts = _load_contracts(working_dir / "layers.yml", "project")
+        graph = DependencyGraph(package=package)
+        broken = _broken_contracts(contracts, graph)
+    except (ContractParseError, FileNotFoundError, RuntimeError, ValueError) as error:
+        return CommandResult(LAYER_LINT_NAME, list(LAYER_LINT_COMMAND), "fail", None, "", str(error))
+    stdout = _layer_lint_stdout(graph, contracts)
+    stderr = _layer_lint_stderr(broken)
+    status = "pass" if not broken else "fail"
+    returncode = 0 if status == "pass" else 1
+    return CommandResult(LAYER_LINT_NAME, list(LAYER_LINT_COMMAND), status, returncode, stdout, stderr)
+
+
+def _resolve_package(package_name: str, working_dir: Path) -> SafeFilenameModule:
+    if str(working_dir) not in sys.path:
+        sys.path.insert(0, str(working_dir))
+    package_spec = importlib.util.find_spec(package_name)
+    if package_spec is None or package_spec.origin is None:
+        raise ValueError(f"Could not find package '{package_name}' in {working_dir}.")
+    return SafeFilenameModule(name=package_name, filename=package_spec.origin)
+
+
+def _load_contracts(path: Path, package_name: str) -> list[Contract]:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing layer contract: {path}")
+    data = _parse_contract_yaml(path)
+    return [contract_from_yaml(key, value, package_name) for key, value in data.items()]
+
+
+def _parse_contract_yaml(path: Path) -> dict[str, dict[str, list[str]]]:
+    contracts: dict[str, dict[str, list[str]]] = {}
+    current_contract = ""
+    current_section = ""
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        current_contract, current_section = _parse_contract_line(raw_line, contracts, current_contract, current_section)
+    if not contracts:
+        raise ContractParseError(f"Could not parse {path}.")
+    return contracts
+
+
+def _parse_contract_line(
+    raw_line: str,
+    contracts: dict[str, dict[str, list[str]]],
+    current_contract: str,
+    current_section: str,
+) -> tuple[str, str]:
+    if not raw_line.strip() or raw_line.lstrip().startswith("#"):
+        return current_contract, current_section
+    indent = len(raw_line) - len(raw_line.lstrip(" "))
+    stripped = raw_line.strip()
+    if indent == 0 and stripped.endswith(":"):
+        contracts[stripped[:-1]] = {}
+        return stripped[:-1], ""
+    if indent == 2 and stripped.endswith(":") and current_contract:
+        contracts[current_contract][stripped[:-1]] = []
+        return current_contract, stripped[:-1]
+    if indent == 4 and stripped.startswith("- ") and current_contract and current_section:
+        contracts[current_contract][current_section].append(stripped[2:].strip())
+        return current_contract, current_section
+    raise ContractParseError(f"Could not parse {raw_line!r}.")
+
+
+def _broken_contracts(contracts: list[Contract], graph: DependencyGraph) -> list[Contract]:
+    broken: list[Contract] = []
+    for contract in contracts:
+        contract.check_dependencies(graph)
+        if not contract.is_kept:
+            broken.append(contract)
+    return broken
+
+
+def _layer_lint_stdout(graph: DependencyGraph, contracts: list[Contract]) -> str:
+    kept = sum(1 for contract in contracts if contract.is_kept)
+    broken = len(contracts) - kept
+    lines = [
+        "Layer Linter",
+        f"Analyzed {graph.module_count} files, {graph.dependency_count} dependencies.",
+        f"Contracts: {kept} kept, {broken} broken.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _layer_lint_stderr(contracts: list[Contract]) -> str:
+    lines: list[str] = []
+    for contract in contracts:
+        for path in contract.illegal_dependencies:
+            lines.append(f"{path[0]} imports {path[-1]}")
+    return "\n".join(lines) + ("\n" if lines else "")
 
 
 def _resolve_command(command: tuple[str, ...], working_dir: Path) -> tuple[str, ...]:

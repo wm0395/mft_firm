@@ -14,6 +14,7 @@ class ProjectPaths:
         self.completed_tasks = self.tasks / "completed"
         self.memory = self.root / "memory"
         self.scratchpads = self.memory / "scratchpads"
+        self.runs = self.memory / "runs"
         self.decisions = self.memory / "decisions"
         self.lessons = self.memory / "lessons"
         self.patterns = self.memory / "patterns"
@@ -42,6 +43,7 @@ class ProjectPaths:
             self.active_tasks,
             self.completed_tasks,
             self.scratchpads,
+            self.runs,
             self.decisions,
             self.lessons,
             self.patterns,
@@ -51,3 +53,8 @@ class ProjectPaths:
             self.cache_index,
             self.cache_tokens,
         )
+
+    def run_directory(self, task_id: str) -> Path:
+        path = self.runs / task_id
+        path.mkdir(parents=True, exist_ok=True)
+        return path

@@ -49,16 +49,22 @@ def launch_task(
     command = build_launch_command(provider, mode, prompt, workspace, model, json_output)
     env = _build_env(workspace)
     if mode == INTERACTIVE:
-        result = subprocess.run(command, check=False, env=env)
-        return LaunchResult(provider, mode, tuple(command), result.returncode, "", "", json_output, model)
-    result = subprocess.run(command, check=False, capture_output=True, text=True, env=env)
+        interactive_result: subprocess.CompletedProcess[str] = subprocess.run(command, check=False, env=env, text=True)
+        return LaunchResult(provider, mode, tuple(command), interactive_result.returncode, "", "", json_output, model)
+    oneshot_result: subprocess.CompletedProcess[str] = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
     return LaunchResult(
         provider,
         mode,
         tuple(command),
-        result.returncode,
-        result.stdout,
-        result.stderr,
+        oneshot_result.returncode,
+        oneshot_result.stdout,
+        oneshot_result.stderr,
         json_output,
         model,
     )

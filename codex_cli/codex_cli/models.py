@@ -55,6 +55,10 @@ class Task:
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
     packet_history: tuple[dict[str, Any], ...] = ()
+    run_history: tuple[dict[str, Any], ...] = ()
+    review_history: tuple[dict[str, Any], ...] = ()
+    check_history: tuple[dict[str, Any], ...] = ()
+    completion_history: tuple[dict[str, Any], ...] = ()
     memory_refs: tuple[str, ...] = ()
 
     @classmethod
@@ -74,6 +78,10 @@ class Task:
             created_at=str(data.get("created_at", utc_now())),
             updated_at=str(data.get("updated_at", utc_now())),
             packet_history=tuple(data.get("packet_history", ())),
+            run_history=tuple(data.get("run_history", ())),
+            review_history=tuple(data.get("review_history", ())),
+            check_history=tuple(data.get("check_history", ())),
+            completion_history=tuple(data.get("completion_history", ())),
             memory_refs=tuple(data.get("memory_refs", ())),
         )
 
@@ -93,16 +101,46 @@ class Task:
         return replace(self, review_status=review_status, updated_at=utc_now())
 
     def with_packet(self, packet: dict[str, Any]) -> "Task":
+        record = packet if "kind" in packet else {"kind": "packet", **packet}
         return replace(
             self,
-            packet_history=(*self.packet_history, packet),
+            packet_history=(*self.packet_history, record),
             updated_at=utc_now(),
         )
 
     def with_launch(self, launch: dict[str, Any]) -> "Task":
+        record = launch if "kind" in launch else {"kind": "launch", **launch}
         return replace(
             self,
-            packet_history=(*self.packet_history, launch),
+            packet_history=(*self.packet_history, record),
+            updated_at=utc_now(),
+        )
+
+    def with_run(self, run: dict[str, Any]) -> "Task":
+        return replace(
+            self,
+            run_history=(*self.run_history, run),
+            updated_at=utc_now(),
+        )
+
+    def with_review(self, review: dict[str, Any]) -> "Task":
+        return replace(
+            self,
+            review_history=(*self.review_history, review),
+            updated_at=utc_now(),
+        )
+
+    def with_checks(self, checks: dict[str, Any]) -> "Task":
+        return replace(
+            self,
+            check_history=(*self.check_history, checks),
+            updated_at=utc_now(),
+        )
+
+    def with_completion_record(self, record: dict[str, Any]) -> "Task":
+        return replace(
+            self,
+            completion_history=(*self.completion_history, record),
             updated_at=utc_now(),
         )
 
@@ -185,6 +223,7 @@ class MemoryEntry:
     body: str
     tags: tuple[str, ...]
     source_task_id: str
+    ref: str = ""
     created_at: str = field(default_factory=utc_now)
 
     def to_dict(self) -> dict[str, Any]:

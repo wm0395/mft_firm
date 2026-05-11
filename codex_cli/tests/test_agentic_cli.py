@@ -29,7 +29,7 @@ def test_run_creates_structured_task_packets_and_memory(tmp_path: Path, monkeypa
     assert task["done_conditions"][-1] == "no architecture violations"
     assert output["execution"]["provider"] == "codex"
     assert output["review"]["provider"] == "gemini"
-    assert output["memory"]["summary"]["kind"] == "summary"
+    assert output["memory"]["summary"]["kind"] == "summaries"
 
 
 def test_plan_routes_complex_work_to_planner(tmp_path: Path, monkeypatch, capsys) -> None:

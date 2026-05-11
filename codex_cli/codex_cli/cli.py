@@ -10,6 +10,7 @@ from .cache import build_index, cache_status, retrieve_context
 from .diagnosis import build_fix_prompt, diagnose_task
 from .executor import execute_task
 from .launcher import INTERACTIVE, LAUNCH_PROVIDERS, ONESHOT, build_launch_command, launch_task
+from .managed_runner import RunTaskOptions, run_task_command
 from .memory_store import MemoryStore
 from .paths import ProjectPaths
 from .planner import plan_task
@@ -51,6 +52,16 @@ def build_parser() -> argparse.ArgumentParser:
     execute_parser.add_argument("--json", action="store_true")
     execute_parser.add_argument("--model")
     execute_parser.add_argument("--dry-run", action="store_true")
+    run_task_parser = subcommands.add_parser("run-task", help="Run a task through the managed oneshot workflow")
+    run_task_parser.add_argument("task_id")
+    run_task_parser.add_argument("--provider", choices=LAUNCH_PROVIDERS)
+    run_task_parser.add_argument("--budget", type=int, default=DEFAULT_EXEC_BUDGET)
+    run_task_parser.add_argument("--json", action="store_true")
+    run_task_parser.add_argument("--model")
+    run_task_parser.add_argument("--resume", action="store_true")
+    run_task_parser.add_argument("--no-review", action="store_true")
+    run_task_parser.add_argument("--no-checks", action="store_true")
+    run_task_parser.add_argument("--dry-run", action="store_true")
     review_parser = subcommands.add_parser("review", help="Build review packet for a task")
     review_parser.add_argument("task_id")
     review_parser.add_argument("--provider", choices=("codex", "gemini", "opencode"))
@@ -101,6 +112,8 @@ def _dispatch(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: Scratchp
         return _print_json({"status": "ready", "execution": _execution_payload(args, tasks, scratchpads, paths)})
     if args.command == "execute":
         return _execute_command(args, paths, tasks, scratchpads)
+    if args.command == "run-task":
+        return _run_task(args, paths, tasks, scratchpads, memory)
     if args.command == "review":
         return _print_json({"status": "ready", "review": _review_payload(args, tasks, scratchpads, paths)})
     if args.command == "scratch":
@@ -134,7 +147,7 @@ def _run_or_plan(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: Scrat
     execution = _build_packet(planned_task, paths, scratchpad, context, planned_task.recommended_provider, DEFAULT_EXEC_BUDGET)
     review = _build_review(planned_task, paths, scratchpad, context, "gemini", "architecture", DEFAULT_REVIEW_BUDGET)
     summary = memory.create_summary(planned_task, planned_task.objective, f"Prepared {planned_task.route} workflow.", ("task", planned_task.route))
-    persisted = planned_task.with_packet(execution).with_memory_ref(summary.title)
+    persisted = planned_task.with_packet(execution).with_memory_ref(summary.ref)
     tasks.save(persisted)
     return _print_json(
         {
@@ -235,6 +248,37 @@ def _build_review(task, paths, scratchpad, context, provider: str, persona: str,
     return review_task(task, paths, scratchpad, context, provider, persona, budget).to_dict()
 
 
+def _run_task(
+    args,
+    paths: ProjectPaths,
+    tasks: TaskStore,
+    scratchpads: ScratchpadStore,
+    memory: MemoryStore,
+) -> int:
+    payload = run_task_command(
+        args.task_id,
+        RunTaskOptions(
+            provider=args.provider,
+            budget=args.budget,
+            json_output=args.json,
+            model=args.model,
+            resume=args.resume,
+            review_enabled=not args.no_review,
+            checks_enabled=not args.no_checks,
+            dry_run=args.dry_run,
+        ),
+        paths,
+        tasks,
+        scratchpads,
+        memory,
+        DEFAULT_REVIEW_BUDGET,
+    )
+    _print_json(payload)
+    if args.dry_run:
+        return 0
+    return _run_task_exit_code(payload)
+
+
 def _print_scratch(task_id: str, tasks: TaskStore, scratchpads: ScratchpadStore) -> int:
     task = tasks.get(task_id)
     try:
@@ -242,6 +286,16 @@ def _print_scratch(task_id: str, tasks: TaskStore, scratchpads: ScratchpadStore)
     except FileNotFoundError:
         text = scratchpads.create(task)
     print(text, end="" if text.endswith("\n") else "\n")
+    return 0
+
+
+def _run_task_exit_code(payload: dict[str, object]) -> int:
+    run = payload["run"]
+    if isinstance(run, dict) and int(run.get("exit_code", 0)) != 0:
+        return int(run["exit_code"])
+    checks = payload.get("checks")
+    if isinstance(checks, dict) and checks.get("status") == "fail":
+        return 1
     return 0
 
 

@@ -34,13 +34,36 @@ def cache_status(paths: ProjectPaths) -> dict[str, object]:
 
 
 def retrieve_context(paths: ProjectPaths, query: str, limit: int = 5) -> tuple[str, ...]:
+    entries = retrieve_context_entries(paths, query, (), limit)
+    return tuple(entry.path for entry in entries)
+
+
+def retrieve_context_entries(
+    paths: ProjectPaths,
+    query: str,
+    declared_files: tuple[str, ...],
+    limit: int = 5,
+) -> tuple[IndexEntry, ...]:
     scored = []
     for entry in _load_index(paths):
-        score = _score(query.lower(), entry)
+        score = _score(query.lower(), entry, declared_files)
         if score > 0:
-            scored.append((score, entry.path))
-    scored.sort(key=lambda item: (-item[0], item[1]))
-    return tuple(path for _, path in scored[:limit])
+            scored.append((score, entry))
+    scored.sort(key=lambda item: (-item[0], item[1].path))
+    return tuple(entry for _, entry in scored[:limit])
+
+
+def render_context_document(paths: ProjectPaths, entry: IndexEntry, max_lines: int = 20) -> str:
+    target = paths.workspace_root / entry.path
+    if not target.exists():
+        return f"File: {entry.path}\nSummary: {entry.summary}"
+    snippet = "\n".join(target.read_text(encoding="utf-8").splitlines()[:max_lines]).strip()
+    lines = [f"File: {entry.path}", f"Summary: {entry.summary}"]
+    if entry.symbols:
+        lines.append("Symbols: " + ", ".join(entry.symbols))
+    if snippet:
+        lines.extend(("Snippet:", snippet))
+    return "\n".join(lines)
 
 
 def estimate_tokens(paths: ProjectPaths, provider: str, blocks: tuple[tuple[str, str], ...]) -> tuple[int, list[dict[str, object]]]:
@@ -90,9 +113,21 @@ def _tags(relative: str) -> tuple[str, ...]:
     return tuple(relative.split("/")[:2])
 
 
-def _score(query: str, entry: IndexEntry) -> int:
+def _score(query: str, entry: IndexEntry, declared_files: tuple[str, ...]) -> int:
     haystacks = (entry.path.lower(), entry.summary.lower(), " ".join(entry.symbols).lower())
-    return sum(2 for haystack in haystacks if any(token in haystack for token in query.split()))
+    score = sum(2 for haystack in haystacks if any(token in haystack for token in query.split()))
+    score += _declared_file_bonus(entry.path, declared_files)
+    return score
+
+
+def _declared_file_bonus(path: str, declared_files: tuple[str, ...]) -> int:
+    bonus = 0
+    for declared in declared_files:
+        if path == declared:
+            bonus = max(bonus, 100)
+        elif declared and path.startswith(f"{declared.rstrip('/')}/"):
+            bonus = max(bonus, 80)
+    return bonus
 
 
 def _load_index(paths: ProjectPaths) -> list[IndexEntry]:
