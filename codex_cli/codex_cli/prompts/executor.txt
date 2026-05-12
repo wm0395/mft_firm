@@ -1,13 +1,15 @@
 Goal:
-Prepare an implementation packet for the assigned task.
+Implement the assigned task by editing the declared files and validating the result.
 
 Requirements:
 - honor the declared files and constraints
 - keep the solution minimal
 - prefer explicit changes over abstraction
-- document only the context needed to execute
+- make the requested code and test changes directly
+- run only the required validation for the task scope
+- if blocked, report the concrete blocker instead of returning implementation guidance
 
 Done when:
-- the packet is actionable
-- the context is bounded
-- the task schema is complete
+- the declared files contain the required implementation
+- validation has been run or a concrete blocker is recorded
+- the task is ready for review rather than further planning

@@ -12,13 +12,16 @@ from .executor import execute_task
 from .launcher import INTERACTIVE, LAUNCH_PROVIDERS, ONESHOT, build_launch_command, launch_task
 from .managed_runner import RunTaskOptions, run_task_command
 from .memory_store import MemoryStore
+from .managed_state import build_completion_record
 from .paths import ProjectPaths
 from .planner import plan_task
 from .queue_runner import QueueRunOptions, run_task_queue
+from .review_runner import RunReviewOptions, run_review_command
 from .reviewer import review_task
 from .router import recommend_provider, route
 from .scratchpad import ScratchpadStore
 from .tasks import TaskStore
+from .workflow import can_complete
 
 
 DEFAULT_CONSTRAINTS = (
@@ -63,6 +66,21 @@ def build_parser() -> argparse.ArgumentParser:
     run_task_parser.add_argument("--no-review", action="store_true")
     run_task_parser.add_argument("--no-checks", action="store_true")
     run_task_parser.add_argument("--dry-run", action="store_true")
+    run_fix_parser = subcommands.add_parser("run-fix", help="Re-run implementation for a task after review changes are requested")
+    run_fix_parser.add_argument("task_id")
+    run_fix_parser.add_argument("--provider", choices=LAUNCH_PROVIDERS)
+    run_fix_parser.add_argument("--budget", type=int, default=DEFAULT_EXEC_BUDGET)
+    run_fix_parser.add_argument("--json", action="store_true")
+    run_fix_parser.add_argument("--model")
+    run_fix_parser.add_argument("--no-review", action="store_true")
+    run_fix_parser.add_argument("--no-checks", action="store_true")
+    run_fix_parser.add_argument("--dry-run", action="store_true")
+    run_review_parser = subcommands.add_parser("run-review", help="Run the review step for an implemented task")
+    run_review_parser.add_argument("task_id")
+    run_review_parser.add_argument("--provider", choices=LAUNCH_PROVIDERS, default="codex")
+    run_review_parser.add_argument("--budget", type=int, default=DEFAULT_REVIEW_BUDGET)
+    run_review_parser.add_argument("--json", action="store_true")
+    run_review_parser.add_argument("--model")
     queue_parser = subcommands.add_parser("run-queue", help="Run active tasks sequentially with Codex cooldown handling")
     queue_parser.add_argument("--provider", choices=LAUNCH_PROVIDERS)
     queue_parser.add_argument("--budget", type=int, default=DEFAULT_EXEC_BUDGET)
@@ -124,6 +142,10 @@ def _dispatch(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: Scratchp
         return _execute_command(args, paths, tasks, scratchpads)
     if args.command == "run-task":
         return _run_task(args, paths, tasks, scratchpads, memory)
+    if args.command == "run-fix":
+        return _run_fix(args, paths, tasks, scratchpads, memory)
+    if args.command == "run-review":
+        return _run_review(args, paths, tasks, scratchpads, memory)
     if args.command == "run-queue":
         return _run_queue(args, paths, tasks, scratchpads, memory)
     if args.command == "review":
@@ -131,7 +153,7 @@ def _dispatch(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: Scratchp
     if args.command == "scratch":
         return _print_scratch(args.task_id, tasks, scratchpads)
     if args.command == "complete":
-        return _print_json({"status": "ready", "task": tasks.complete(args.task_id).to_dict()})
+        return _complete_task(args.task_id, tasks, scratchpads)
     if args.command == "check":
         return _check_command(args, paths)
     if args.command == "diagnose":
@@ -155,6 +177,7 @@ def _run_or_plan(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: Scrat
     planned_task = task
     if task.route == "planner" or args.command == "plan":
         planned_task, plan = plan_task(task)
+        planned_task = planned_task.with_workflow_stage("planned")
         tasks.save(planned_task)
     execution = _build_packet(planned_task, paths, scratchpad, context, planned_task.recommended_provider, DEFAULT_EXEC_BUDGET)
     review = _build_review(planned_task, paths, scratchpad, context, "gemini", "architecture", DEFAULT_REVIEW_BUDGET)
@@ -291,6 +314,67 @@ def _run_task(
     return _run_task_exit_code(payload)
 
 
+def _run_fix(
+    args,
+    paths: ProjectPaths,
+    tasks: TaskStore,
+    scratchpads: ScratchpadStore,
+    memory: MemoryStore,
+) -> int:
+    task = tasks.get(args.task_id)
+    if task.workflow_stage != "fix_ready":
+        raise ValueError("run-fix requires a task in fix_ready stage")
+    payload = run_task_command(
+        args.task_id,
+        RunTaskOptions(
+            provider=args.provider,
+            budget=args.budget,
+            json_output=args.json,
+            model=args.model,
+            resume=True,
+            review_enabled=not args.no_review,
+            checks_enabled=not args.no_checks,
+            dry_run=args.dry_run,
+        ),
+        paths,
+        tasks,
+        scratchpads,
+        memory,
+        DEFAULT_REVIEW_BUDGET,
+    )
+    _print_json(payload)
+    if args.dry_run:
+        return 0
+    return _run_task_exit_code(payload)
+
+
+def _run_review(
+    args,
+    paths: ProjectPaths,
+    tasks: TaskStore,
+    scratchpads: ScratchpadStore,
+    memory: MemoryStore,
+) -> int:
+    task = tasks.get(args.task_id)
+    if task.workflow_stage != "implemented":
+        raise ValueError("run-review requires a task in implemented stage")
+    payload = run_review_command(
+        args.task_id,
+        RunReviewOptions(
+            provider=args.provider,
+            budget=args.budget,
+            model=args.model,
+            json_output=args.json,
+        ),
+        paths,
+        tasks,
+        scratchpads,
+        memory,
+    )
+    _print_json(payload)
+    return 0 if payload["status"] in {"active", "completed"} else 1
+
+
 def _run_queue(
     args,
     paths: ProjectPaths,
@@ -330,10 +414,22 @@ def _print_scratch(task_id: str, tasks: TaskStore, scratchpads: ScratchpadStore)
     return 0
 
 
+def _complete_task(task_id: str, tasks: TaskStore, scratchpads: ScratchpadStore) -> int:
+    task = tasks.get(task_id)
+    if not can_complete(task):
+        raise ValueError("task cannot be completed before verified implementation and approved review")
+    completed = build_completion_record(task)
+    tasks.save(completed)
+    scratchpads.refresh(completed)
+    return _print_json({"status": "ready", "task": completed.to_dict()})
+
+
 def _run_task_exit_code(payload: dict[str, object]) -> int:
     run = payload["run"]
     if isinstance(run, dict) and int(run.get("exit_code", 0)) != 0:
         return int(run["exit_code"])
+    if isinstance(run, dict) and str(run.get("status")) == "no_changes":
+        return 1
     checks = payload.get("checks")
     if isinstance(checks, dict) and checks.get("status") == "fail":
         return 1

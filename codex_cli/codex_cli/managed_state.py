@@ -8,6 +8,7 @@ from .models import ExecutionPacket, Task
 from .paths import ProjectPaths
 from .scratchpad import ScratchpadStore
 from .tasks import TaskStore
+from .workflow import REVIEW_APPROVED, REVIEW_CHANGES_REQUESTED
 
 
 def persist_managed_state(
@@ -26,10 +27,26 @@ def persist_managed_state(
     if check_record:
         updated = updated.with_checks(check_record)
     updated = _persist_memory(updated, memory, run_record)
-    updated = _apply_completion(updated, str(run_record["status"]))
+    updated = _apply_implementation_transition(updated, run_record)
     tasks.save(updated)
     scratchpads.refresh(updated)
     write_latest_run(tasks.paths, updated.id, run_record, review_record, check_record)
+    return updated
+
+
+def persist_review_state(
+    task: Task,
+    tasks: TaskStore,
+    scratchpads: ScratchpadStore,
+    memory: MemoryStore,
+    review_record: dict[str, object],
+) -> Task:
+    updated = task.with_review(review_record).with_review_status(str(review_record["decision"]))
+    updated = _persist_memory(updated, memory, review_record)
+    updated = _apply_review_transition(updated, review_record)
+    tasks.save(updated)
+    scratchpads.refresh(updated)
+    write_latest_run(tasks.paths, updated.id, review_record, review_record, None)
     return updated
 
 
@@ -73,7 +90,28 @@ def _durable_entries(task: Task, run_record: dict[str, object]) -> dict[str, lis
     return {kind: values for kind, values in durable.items() if values}
 
 
-def _apply_completion(task: Task, status: str) -> Task:
-    record = {"kind": "completion", "status": status, "completed": status == "completed"}
+def _apply_implementation_transition(task: Task, run_record: dict[str, object]) -> Task:
+    status = str(run_record["status"])
+    files = tuple(str(item) for item in run_record.get("files_changed", ()))
+    implementation_status = str(run_record.get("implementation_status", "missing"))
+    updated = task.with_implementation(implementation_status, files)
+    if status == "implemented":
+        return updated.with_workflow_stage("implemented")
+    if status in {"checks_failed", "provider_failed", "no_changes"}:
+        return updated
+    return updated
+
+
+def _apply_review_transition(task: Task, review_record: dict[str, object]) -> Task:
+    decision = str(review_record["decision"])
+    if decision == REVIEW_APPROVED:
+        return task.with_workflow_stage("reviewed")
+    if decision == REVIEW_CHANGES_REQUESTED:
+        return task.with_workflow_stage("fix_ready")
+    return task
+
+
+def build_completion_record(task: Task) -> Task:
+    record = {"kind": "completion", "status": "completed", "completed": True}
     updated = task.with_completion_record(record)
-    return updated.complete() if status == "completed" else updated
+    return updated.complete()

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from typing import cast
 
@@ -16,11 +15,11 @@ from .paths import ProjectPaths
 from .reviewer import review_task
 from .scratchpad import ScratchpadStore
 from .tasks import TaskStore
+from .workflow import changed_files, snapshot_task_files
 
 
 REVIEW_PROVIDER = "gemini"
 REVIEW_PERSONA = "architecture"
-FILE_PATTERN = re.compile(r"\b[A-Za-z0-9_./-]+\.(?:py|md|toml|yml|yaml|json|txt)\b")
 
 
 @dataclass(frozen=True)
@@ -163,6 +162,7 @@ def _run_managed_task(
     review_budget: int,
 ) -> dict[str, object]:
     started_at = utc_now()
+    before_snapshot = snapshot_task_files(paths.workspace_root, task.files)
     launch = launch_task(
         provider,
         ONESHOT,
@@ -172,14 +172,40 @@ def _run_managed_task(
         options.json_output,
     )
     finished_at = utc_now()
+    after_snapshot = snapshot_task_files(paths.workspace_root, task.files)
     artifact_refs = _persist_run_artifacts(paths, task.id, launch.stdout, launch.stderr, options.json_output)
     events = _parse_json_events(launch.stdout) if options.json_output else ()
+    implementation_files = changed_files(before_snapshot, after_snapshot)
     review_record = None
     check_record = None
-    if launch.exit_code == 0:
-        review_record = _maybe_create_review(task, paths, review_budget, options.review_enabled, scratchpads, context, launch.stdout)
+    if launch.exit_code == 0 and implementation_files:
         check_record = _maybe_run_checks(paths, options.checks_enabled)
-    run_record = _build_run_record(task, provider, options, command, launch, artifact_refs, events, check_record, review_record, started_at, finished_at)
+    run_record = _build_run_record(
+        task,
+        provider,
+        options,
+        command,
+        launch,
+        artifact_refs,
+        events,
+        check_record,
+        review_record,
+        implementation_files,
+        started_at,
+        finished_at,
+    )
+    if run_record["status"] == "implemented":
+        review_record = _maybe_create_review(
+            task,
+            paths,
+            review_budget,
+            options.review_enabled,
+            scratchpads,
+            context,
+            launch.stdout,
+        )
+        if review_record is not None:
+            run_record["actions_taken"].append("Generated review packet.")
     updated = persist_managed_state(task, tasks, scratchpads, memory, packet, run_record, review_record, check_record)
     return _result_payload(updated, packet, run_record, review_record, check_record)
 
@@ -257,12 +283,12 @@ def _build_run_record(
     events: tuple[dict[str, object], ...],
     check_record: dict[str, object] | None,
     review_record: dict[str, object] | None,
+    implementation_files: tuple[str, ...],
     started_at: str,
     finished_at: str,
 ) -> dict[str, object]:
-    status = _run_status(launch.exit_code, check_record, options.checks_enabled)
+    status = _run_status(launch.exit_code, check_record, options.checks_enabled, implementation_files)
     summary = _extract_summary(launch.stdout, launch.stderr, events)
-    files_changed = _extract_files(launch.stdout + "\n" + launch.stderr, task.files)
     return {
         "kind": "managed_run",
         "task_id": task.id,
@@ -282,8 +308,9 @@ def _build_run_record(
         "summary": summary,
         "understanding": f"Objective: {task.objective}",
         "plan": "Execute the prepared packet, persist results, and validate required checks.",
-        "actions_taken": _actions_taken(launch.exit_code, review_record, check_record),
-        "files_changed": files_changed,
+        "actions_taken": _actions_taken(launch.exit_code, check_record),
+        "files_changed": list(implementation_files),
+        "implementation_status": "verified" if implementation_files else "missing",
         "checks_run": _check_names(check_record),
         "open_issues": _open_issues(status, launch.stderr, check_record),
         "final_decision": _final_decision(status),
@@ -292,12 +319,19 @@ def _build_run_record(
     }
 
 
-def _run_status(exit_code: int, check_record: dict[str, object] | None, checks_enabled: bool) -> str:
+def _run_status(
+    exit_code: int,
+    check_record: dict[str, object] | None,
+    checks_enabled: bool,
+    implementation_files: tuple[str, ...],
+) -> str:
     if exit_code != 0:
         return "provider_failed"
+    if not implementation_files:
+        return "no_changes"
     if not checks_enabled:
-        return "awaiting_checks"
-    return "completed" if check_record and check_record.get("status") == "pass" else "checks_failed"
+        return "implemented"
+    return "implemented" if check_record and check_record.get("status") == "pass" else "checks_failed"
 
 
 def _extract_summary(stdout: str, stderr: str, events: tuple[dict[str, object], ...]) -> str:
@@ -311,23 +345,11 @@ def _extract_summary(stdout: str, stderr: str, events: tuple[dict[str, object], 
         if lines:
             return " ".join(lines[-3:])[:240]
     return "Provider completed without a textual summary."
-
-
-def _extract_files(text: str, declared_files: tuple[str, ...]) -> list[str]:
-    matches = list(dict.fromkeys(FILE_PATTERN.findall(text)))
-    if matches:
-        return matches[:8]
-    return list(declared_files[:8])
-
-
 def _actions_taken(
     exit_code: int,
-    review_record: dict[str, object] | None,
     check_record: dict[str, object] | None,
 ) -> list[str]:
     actions = [f"Provider exited with code {exit_code}."]
-    if review_record:
-        actions.append("Generated review packet.")
     if check_record:
         actions.append("Ran required checks.")
     return actions
@@ -341,9 +363,11 @@ def _check_names(check_record: dict[str, object] | None) -> list[str]:
 
 
 def _open_issues(status: str, stderr: str, check_record: dict[str, object] | None) -> list[str]:
-    if status == "completed":
+    if status == "implemented":
         return []
     issues = []
+    if status == "no_changes":
+        issues.append("No implementation changes were detected in the declared task scope.")
     if stderr.strip():
         issues.append(stderr.strip().splitlines()[-1])
     if check_record and check_record.get("status") != "pass":
@@ -352,12 +376,12 @@ def _open_issues(status: str, stderr: str, check_record: dict[str, object] | Non
 
 
 def _final_decision(status: str) -> str:
-    if status == "completed":
-        return "Task completed after provider success and green checks."
-    if status == "awaiting_checks":
-        return "Task remains active because checks were skipped."
+    if status == "implemented":
+        return "Implementation completed with verified file changes."
     if status == "checks_failed":
         return "Task remains active until failing checks are resolved."
+    if status == "no_changes":
+        return "Task remains active because no implementation changes were detected."
     return "Task remains active because provider execution failed."
 
 

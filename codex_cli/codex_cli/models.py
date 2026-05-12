@@ -49,10 +49,13 @@ class Task:
     done_conditions: tuple[str, ...]
     queue_position: int | None = None
     status: str = ACTIVE
+    workflow_stage: str = "tasked"
     route: str = "executor"
     recommended_provider: str = "codex"
     subtasks: tuple[Subtask, ...] = ()
     review_status: str = "pending"
+    implementation_status: str = "pending"
+    implementation_files: tuple[str, ...] = ()
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
     packet_history: tuple[dict[str, Any], ...] = ()
@@ -73,10 +76,13 @@ class Task:
             done_conditions=tuple(data.get("done_conditions", ())),
             queue_position=_queue_position(data.get("queue_position")),
             status=str(data.get("status", ACTIVE)),
+            workflow_stage=str(data.get("workflow_stage", "tasked")),
             route=str(data.get("route", "executor")),
             recommended_provider=str(data.get("recommended_provider", "codex")),
             subtasks=tuple(Subtask.from_dict(item) for item in data.get("subtasks", ())),
             review_status=str(data.get("review_status", "pending")),
+            implementation_status=str(data.get("implementation_status", "pending")),
+            implementation_files=tuple(data.get("implementation_files", ())),
             created_at=str(data.get("created_at", utc_now())),
             updated_at=str(data.get("updated_at", utc_now())),
             packet_history=tuple(data.get("packet_history", ())),
@@ -99,8 +105,19 @@ class Task:
     def with_subtasks(self, subtasks: tuple[Subtask, ...]) -> "Task":
         return replace(self, subtasks=subtasks, updated_at=utc_now())
 
+    def with_workflow_stage(self, workflow_stage: str) -> "Task":
+        return replace(self, workflow_stage=workflow_stage, updated_at=utc_now())
+
     def with_review_status(self, review_status: str) -> "Task":
         return replace(self, review_status=review_status, updated_at=utc_now())
+
+    def with_implementation(self, status: str, files: tuple[str, ...]) -> "Task":
+        return replace(
+            self,
+            implementation_status=status,
+            implementation_files=files,
+            updated_at=utc_now(),
+        )
 
     def with_packet(self, packet: dict[str, Any]) -> "Task":
         record = packet if "kind" in packet else {"kind": "packet", **packet}

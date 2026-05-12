@@ -8,5 +8,6 @@ Review focus:
 - unnecessary abstractions
 
 Output:
+- first line: `Review Decision: approve` or `Review Decision: changes_requested`
 - findings first
 - concise remediation steps

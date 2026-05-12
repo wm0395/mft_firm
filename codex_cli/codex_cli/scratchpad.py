@@ -92,7 +92,9 @@ class ScratchpadStore:
         return "\n".join(
             (
                 f"- Task Status: {task.status}",
+                f"- Workflow Stage: {task.workflow_stage}",
                 f"- Review Status: {task.review_status}",
+                f"- Implementation Status: {task.implementation_status}",
                 f"- Last Outcome: {latest_run.get('status', 'pending')}",
                 f"- Open Issues: {self._inline_items(latest_run.get('open_issues'))}",
             )

@@ -10,8 +10,8 @@ from codex_cli.launcher import LaunchResult, ONESHOT
 def _prepare_task(tmp_path: Path, monkeypatch, objective: str = "implement signal registry") -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "AGENTS.md").write_text("# Rules\n- bounded\n", encoding="utf-8")
-    (tmp_path / "project").mkdir()
-    (tmp_path / "project" / "signals.py").write_text("def signal():\n    return 1\n", encoding="utf-8")
+    (tmp_path / "project" / "signals").mkdir(parents=True)
+    (tmp_path / "project" / "signals" / "__init__.py").write_text("def signal():\n    return 1\n", encoding="utf-8")
     assert main(["run", objective]) == 0
 
 
@@ -20,25 +20,47 @@ def _patch_checks(monkeypatch, status: str = "pass") -> None:
     monkeypatch.setattr("codex_cli.managed_runner.run_required_checks", lambda root: {"status": status, "checks": checks})
 
 
+def _patch_impl_provider(monkeypatch, results: list[LaunchResult]) -> None:
+    monkeypatch.setattr("codex_cli.managed_runner.build_launch_command", lambda *args: ["/usr/bin/provider", "run"])
+    launches = iter(results)
+    counter = {"value": 1}
+
+    def _launch(provider, mode, prompt, workspace, model, json_output):
+        result = next(launches)
+        if result.exit_code == 0:
+            counter["value"] += 1
+            target = workspace / "project" / "signals" / "__init__.py"
+            target.write_text(f"def signal():\n    return {counter['value']}\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr("codex_cli.managed_runner.launch_task", _launch)
+
+
+def _patch_review_provider(monkeypatch, results: list[LaunchResult]) -> None:
+    monkeypatch.setattr("codex_cli.review_runner.build_launch_command", lambda *args: ["/usr/bin/reviewer", "run"])
+    launches = iter(results)
+    monkeypatch.setattr("codex_cli.review_runner.launch_task", lambda *args: next(launches))
+
+
 def test_run_queue_completes_active_tasks_in_order(tmp_path: Path, monkeypatch, capsys) -> None:
     _prepare_task(tmp_path, monkeypatch)
     capsys.readouterr()
     assert main(["run", "implement another signal registry"]) == 0
     capsys.readouterr()
     _patch_checks(monkeypatch, "pass")
-    monkeypatch.setattr("codex_cli.managed_runner.build_launch_command", lambda *args: ["/usr/bin/provider", "run"])
-    monkeypatch.setattr(
-        "codex_cli.managed_runner.launch_task",
-        lambda provider, mode, prompt, workspace, model, json_output: LaunchResult(
-            provider,
-            mode,
-            ("/usr/bin/provider", "run"),
-            0,
-            "Implemented project/signals.py\n",
-            "",
-            json_output,
-            model,
-        ),
+    _patch_impl_provider(
+        monkeypatch,
+        [
+            LaunchResult("codex", ONESHOT, ("/usr/bin/provider", "run"), 0, "Implemented project/signals.py\n", "", False, None),
+            LaunchResult("codex", ONESHOT, ("/usr/bin/provider", "run"), 0, "Implemented project/signals.py\n", "", False, None),
+        ],
+    )
+    _patch_review_provider(
+        monkeypatch,
+        [
+            LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, "Review Decision: approve\nNo findings.\n", "", False, None),
+            LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, "Review Decision: approve\nNo findings.\n", "", False, None),
+        ],
     )
 
     assert main(["run-queue"]) == 0
@@ -47,21 +69,24 @@ def test_run_queue_completes_active_tasks_in_order(tmp_path: Path, monkeypatch, 
     assert output["status"] == "completed"
     assert output["processed_tasks"] == 2
     assert output["cooldowns"] == 0
-    assert [entry["task_id"] for entry in output["history"]] == ["task_001", "task_002"]
+    assert [entry["task_id"] for entry in output["history"] if entry["step"] == "complete"] == ["task_001", "task_002"]
 
 
 def test_run_queue_cools_down_and_retries_codex_limit(tmp_path: Path, monkeypatch, capsys) -> None:
     _prepare_task(tmp_path, monkeypatch)
     capsys.readouterr()
     _patch_checks(monkeypatch, "pass")
-    monkeypatch.setattr("codex_cli.managed_runner.build_launch_command", lambda *args: ["/usr/bin/provider", "run"])
-    launches = iter(
-        (
+    _patch_impl_provider(
+        monkeypatch,
+        [
             LaunchResult("codex", ONESHOT, ("/usr/bin/provider", "run"), 1, "", "Usage limit reached. Try again in 5h\n", False, None),
             LaunchResult("codex", ONESHOT, ("/usr/bin/provider", "run"), 0, "Implemented project/signals.py\n", "", False, None),
-        )
+        ],
     )
-    monkeypatch.setattr("codex_cli.managed_runner.launch_task", lambda *args: next(launches))
+    _patch_review_provider(
+        monkeypatch,
+        [LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, "Review Decision: approve\nNo findings.\n", "", False, None)],
+    )
     sleeps: list[int] = []
     monkeypatch.setattr("codex_cli.queue_runner.time.sleep", lambda seconds: sleeps.append(seconds))
 
@@ -72,21 +97,24 @@ def test_run_queue_cools_down_and_retries_codex_limit(tmp_path: Path, monkeypatc
     assert output["processed_tasks"] == 1
     assert output["cooldowns"] == 1
     assert sleeps == [18000]
-    assert output["history"][1]["status"] == "cooldown"
+    assert output["history"][0]["status"] == "cooldown"
 
 
 def test_run_queue_cools_down_on_codex_429_error(tmp_path: Path, monkeypatch, capsys) -> None:
     _prepare_task(tmp_path, monkeypatch)
     capsys.readouterr()
     _patch_checks(monkeypatch, "pass")
-    monkeypatch.setattr("codex_cli.managed_runner.build_launch_command", lambda *args: ["/usr/bin/provider", "run"])
-    launches = iter(
-        (
+    _patch_impl_provider(
+        monkeypatch,
+        [
             LaunchResult("codex", ONESHOT, ("/usr/bin/provider", "run"), 1, "", "HTTP 429 from provider\n", False, None),
             LaunchResult("codex", ONESHOT, ("/usr/bin/provider", "run"), 0, "Implemented project/signals.py\n", "", False, None),
-        )
+        ],
     )
-    monkeypatch.setattr("codex_cli.managed_runner.launch_task", lambda *args: next(launches))
+    _patch_review_provider(
+        monkeypatch,
+        [LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, "Review Decision: approve\nNo findings.\n", "", False, None)],
+    )
     sleeps: list[int] = []
     monkeypatch.setattr("codex_cli.queue_runner.time.sleep", lambda seconds: sleeps.append(seconds))
 
@@ -96,26 +124,16 @@ def test_run_queue_cools_down_on_codex_429_error(tmp_path: Path, monkeypatch, ca
     assert output["status"] == "completed"
     assert output["cooldowns"] == 1
     assert sleeps == [18000]
-    assert output["history"][1]["status"] == "cooldown"
+    assert output["history"][0]["status"] == "cooldown"
 
 
 def test_run_queue_stops_on_non_limit_failure(tmp_path: Path, monkeypatch, capsys) -> None:
     _prepare_task(tmp_path, monkeypatch)
     capsys.readouterr()
     _patch_checks(monkeypatch, "pass")
-    monkeypatch.setattr("codex_cli.managed_runner.build_launch_command", lambda *args: ["/usr/bin/provider", "run"])
-    monkeypatch.setattr(
-        "codex_cli.managed_runner.launch_task",
-        lambda provider, mode, prompt, workspace, model, json_output: LaunchResult(
-            provider,
-            mode,
-            ("/usr/bin/provider", "run"),
-            7,
-            "",
-            "boom\n",
-            json_output,
-            model,
-        ),
+    _patch_impl_provider(
+        monkeypatch,
+        [LaunchResult("codex", ONESHOT, ("/usr/bin/provider", "run"), 7, "", "boom\n", False, None)],
     )
 
     assert main(["run-queue"]) == 1

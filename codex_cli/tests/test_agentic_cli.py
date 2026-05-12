@@ -242,6 +242,32 @@ def test_execution_packet_trims_context_when_budget_is_small(tmp_path: Path, mon
     assert "retrieved_context" not in names
 
 
+def test_execution_packet_requests_direct_implementation(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "AGENTS.md").write_text("# Rules\n- bounded\n", encoding="utf-8")
+    paths = ProjectPaths()
+    paths.ensure()
+    task = Task(
+        id="task_001",
+        objective="implement signal registry",
+        files=("project/signals.py",),
+        constraints=("No upward imports",),
+        done_conditions=("pytest passes",),
+    )
+
+    packet = build_execution_packet(
+        task,
+        paths,
+        "# Task\n",
+        ("project/signals.py",),
+        "codex",
+        400,
+    )
+
+    assert "Implement the assigned task by editing the declared files" in packet.prompt
+    assert "Prepare an implementation packet" not in packet.prompt
+
+
 def test_self_heal_loop_runs_executor_before_architecture_check() -> None:
     calls = []
 

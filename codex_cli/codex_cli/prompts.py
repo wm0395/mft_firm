@@ -112,6 +112,9 @@ def _task_block(task: Task) -> str:
         "files": list(task.files),
         "constraints": list(task.constraints),
         "done_conditions": list(task.done_conditions),
+        "workflow_stage": task.workflow_stage,
+        "review_status": task.review_status,
+        "implementation_status": task.implementation_status,
         "route": task.route,
         "recommended_provider": task.recommended_provider,
     }
