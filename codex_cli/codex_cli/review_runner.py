@@ -8,10 +8,11 @@ from .managed_state import persist_review_state
 from .memory_store import MemoryStore
 from .models import Task, utc_now
 from .paths import ProjectPaths
+from .review_schema import REVIEW_FAILED, parse_review_output, review_status, reviewer_name
 from .reviewer import review_task
 from .scratchpad import ScratchpadStore
 from .tasks import TaskStore
-from .workflow import can_complete, review_decision
+from .workflow import can_complete
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class RunReviewOptions:
     budget: int
     model: str | None
     json_output: bool
+    persona: str
 
 
 def run_review_command(
@@ -33,12 +35,13 @@ def run_review_command(
     task = tasks.get(task_id)
     scratchpad = scratchpads.read(task.id)
     context = _build_context(task, paths, scratchpad)
-    packet = review_task(task, paths, scratchpad, context, options.provider, "architecture", options.budget)
+    persona = options.persona
+    packet = review_task(task, paths, scratchpad, context, options.provider, persona, options.budget)
     command = build_launch_command(options.provider, ONESHOT, packet.prompt, paths.workspace_root, options.model, options.json_output)
     started_at = utc_now()
     launch = launch_task(options.provider, ONESHOT, packet.prompt, paths.workspace_root, options.model, options.json_output)
     finished_at = utc_now()
-    record = _review_record(task, launch.exit_code, launch.stdout, launch.stderr, options, command, started_at, finished_at)
+    record = _review_record(task, launch.exit_code, launch.stdout, launch.stderr, options, command, started_at, finished_at, persona)
     updated = persist_review_state(task, tasks, scratchpads, memory, record)
     return {
         "status": "completed" if can_complete(updated) else "active",
@@ -65,10 +68,16 @@ def _review_record(
     command: list[str],
     started_at: str,
     finished_at: str,
+    persona: str,
 ) -> dict[str, object]:
     text = "\n".join(part for part in (stdout, stderr) if part.strip())
-    decision = "review_failed" if exit_code != 0 or not text.strip() else review_decision(text)
-    summary = _summary(text)
+    reviewer = reviewer_name(persona)
+    if exit_code != 0 or not text.strip():
+        return _failed_record(task, exit_code, stdout, stderr, options, command, started_at, finished_at, reviewer, "Review provider did not return valid output.")
+    try:
+        parsed = parse_review_output(text, reviewer)
+    except ValueError as error:
+        return _failed_record(task, exit_code, stdout, stderr, options, command, started_at, finished_at, reviewer, str(error))
     return {
         "kind": "review_run",
         "task_id": task.id,
@@ -80,15 +89,58 @@ def _review_record(
         "started_at": started_at,
         "finished_at": finished_at,
         "exit_code": exit_code,
-        "decision": decision,
-        "summary": summary,
+        "decision": parsed.decision,
+        "review_status": review_status(parsed.decision),
+        "reviewer": parsed.reviewer,
+        "violations": [item.to_dict() for item in parsed.violations],
+        "required_fixes": list(parsed.required_fixes),
+        "evidence": [item.to_dict() for item in parsed.evidence],
+        "summary": _summary(parsed),
         "stdout": stdout,
         "stderr": stderr,
     }
 
 
-def _summary(text: str) -> str:
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if not lines:
-        return "Review provider did not return output."
-    return " ".join(lines[:3])[:240]
+def _failed_record(
+    task: Task,
+    exit_code: int,
+    stdout: str,
+    stderr: str,
+    options: RunReviewOptions,
+    command: list[str],
+    started_at: str,
+    finished_at: str,
+    reviewer: str,
+    reason: str,
+) -> dict[str, object]:
+    return {
+        "kind": "review_run",
+        "task_id": task.id,
+        "provider": options.provider,
+        "command": command,
+        "budget": options.budget,
+        "model": options.model,
+        "json_output": options.json_output,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "exit_code": exit_code,
+        "decision": REVIEW_FAILED,
+        "review_status": REVIEW_FAILED,
+        "reviewer": reviewer,
+        "violations": [],
+        "required_fixes": [],
+        "evidence": [],
+        "summary": reason,
+        "stdout": stdout,
+        "stderr": stderr,
+    }
+
+
+def _summary(review) -> str:
+    if review.decision == "approve":
+        return f"{review.reviewer} approved the implementation."
+    if review.required_fixes:
+        return review.required_fixes[0][:240]
+    if review.violations:
+        return review.violations[0].evidence[:240]
+    return f"{review.reviewer} requested changes."

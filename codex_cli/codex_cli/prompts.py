@@ -6,6 +6,7 @@ from pathlib import Path
 from .cache import estimate_tokens
 from .models import ExecutionPacket, PacketBlock, ReviewPacket, Task
 from .paths import ProjectPaths
+from .review_schema import reviewer_name
 
 
 PROMPTS_DIR = "prompts"
@@ -58,7 +59,7 @@ def build_review_packet(
     persona: str,
     budget: int,
 ) -> ReviewPacket:
-    blocks = _build_blocks(task, paths, scratchpad, retrieved_context, REVIEWER_PROMPT)
+    blocks = _build_blocks(task, paths, scratchpad, retrieved_context, REVIEWER_PROMPT, persona)
     trimmed = _trim_blocks(blocks, provider, budget, paths)
     prompt = "\n\n".join(block.content for block in trimmed)
     token_estimate, _ = estimate_tokens(paths, provider, _as_pairs(trimmed))
@@ -88,17 +89,22 @@ def _build_blocks(
     scratchpad: str,
     retrieved_context: tuple[str, ...],
     prompt_name: str,
+    persona: str | None = None,
 ) -> tuple[PacketBlock, ...]:
-    return (
+    blocks = [
         PacketBlock("system_rules", read_prompt(SYSTEM_PROMPT)),
         PacketBlock("agents_rules", _read_agents(paths)),
         PacketBlock("task", _task_block(task)),
         PacketBlock("scratchpad", scratchpad),
         PacketBlock("retrieved_context", _context_block(retrieved_context)),
         PacketBlock("relevant_files", _files_block(task.files)),
+        PacketBlock("check_results", _check_results_block(task)),
         PacketBlock("known_failure_patterns", _known_failures()),
-        PacketBlock("instruction", read_prompt(prompt_name)),
-    )
+    ]
+    if persona:
+        blocks.append(PacketBlock("reviewer_persona", _reviewer_prompt(paths, persona)))
+    blocks.append(PacketBlock("instruction", read_prompt(prompt_name)))
+    return tuple(blocks)
 
 
 def _read_agents(paths: ProjectPaths) -> str:
@@ -112,6 +118,10 @@ def _task_block(task: Task) -> str:
         "files": list(task.files),
         "constraints": list(task.constraints),
         "done_conditions": list(task.done_conditions),
+        "risk_level": task.risk_level,
+        "allowed_change_set": list(task.allowed_change_set),
+        "required_checks": list(task.required_checks),
+        "required_reviewers": list(task.required_reviewers),
         "workflow_stage": task.workflow_stage,
         "review_status": task.review_status,
         "implementation_status": task.implementation_status,
@@ -133,6 +143,37 @@ def _files_block(files: tuple[str, ...]) -> str:
 
 def _known_failures() -> str:
     return "KNOWN FAILURE PATTERNS:\n" + "\n".join(f"- {item}" for item in KNOWN_FAILURES)
+
+
+def _check_results_block(task: Task) -> str:
+    if not task.check_history:
+        return "Latest Managed Checks:\n- None recorded."
+    latest = task.check_history[-1]
+    lines = ["Latest Managed Checks:"]
+    lines.append(f"- Status: {latest.get('status', 'unknown')}")
+    for item in latest.get("checks", ()):
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name", "unknown")
+        status = item.get("status", "unknown")
+        lines.append(f"- {name}: {status}")
+    return "\n".join(lines)
+
+
+def _reviewer_prompt(paths: ProjectPaths, persona: str) -> str:
+    reviewer = reviewer_name(persona)
+    candidates = (
+        paths.workspace_root / "agents" / "prompts" / f"{reviewer}.md",
+        Path(__file__).resolve().parents[2] / "agents" / "prompts" / f"{reviewer}.md",
+    )
+    for target in candidates:
+        if not target.exists():
+            continue
+        text = target.read_text(encoding="utf-8").strip()
+        if not text:
+            raise ValueError(f"Reviewer prompt is empty: {reviewer}")
+        return text
+    raise FileNotFoundError(f"Reviewer prompt not found: {reviewer}")
 
 
 def _trim_blocks(

@@ -50,6 +50,16 @@ class ScratchpadStore:
                 "## Done Conditions",
                 self._render_lines(task.done_conditions),
                 "",
+                "## Task Contract",
+                self._render_lines(
+                    (
+                        f"Risk Level: {task.risk_level}",
+                        "Allowed Change Set: " + self._inline_items(task.allowed_change_set),
+                        "Required Checks: " + self._inline_items(task.required_checks),
+                        "Required Reviewers: " + self._inline_items(task.required_reviewers),
+                    )
+                ),
+                "",
                 "## Understanding",
                 self._render_text(latest_run.get("understanding")),
                 "",

@@ -167,6 +167,7 @@ def _review_step(
             budget=review_budget,
             model=options.model,
             json_output=options.json_output,
+            persona="architecture_reviewer",
         ),
         paths,
         tasks,
@@ -191,7 +192,7 @@ def _history_entry(run: dict[str, object]) -> dict[str, object]:
         "task_id": str(run["task_id"]),
         "provider": str(run["provider"]),
         "status": str(run["status"]),
-        "exit_code": int(run["exit_code"]),
+        "exit_code": _int_value(run["exit_code"]),
         "finished_at": str(run["finished_at"]),
         "step": "implement",
     }
@@ -211,7 +212,7 @@ def _review_history_entry(run: dict[str, object]) -> dict[str, object]:
         "task_id": str(run["task_id"]),
         "provider": str(run["provider"]),
         "status": str(run["decision"]),
-        "exit_code": int(run["exit_code"]),
+        "exit_code": _int_value(run["exit_code"]),
         "finished_at": str(run["finished_at"]),
         "step": "review",
     }
@@ -220,10 +221,18 @@ def _review_history_entry(run: dict[str, object]) -> dict[str, object]:
 def _is_codex_limit(run: dict[str, object]) -> bool:
     if str(run["provider"]) != "codex":
         return False
-    if int(run.get("exit_code", 0)) == 0 and str(run.get("status", "")) != "provider_failed":
+    if _int_value(run.get("exit_code", 0)) == 0 and str(run.get("status", "")) != "provider_failed":
         return False
     text = "\n".join(_run_text(run)).lower()
     return any(marker in text for marker in LIMIT_MARKERS)
+
+
+def _int_value(value: object) -> int:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        return int(value)
+    raise ValueError(f"Invalid integer value: {value!r}")
 
 
 def _run_text(run: dict[str, object]) -> tuple[str, ...]:

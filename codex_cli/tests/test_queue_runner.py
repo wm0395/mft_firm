@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from codex_cli.cli import main
@@ -10,8 +11,17 @@ from codex_cli.launcher import LaunchResult, ONESHOT
 def _prepare_task(tmp_path: Path, monkeypatch, objective: str = "implement signal registry") -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "AGENTS.md").write_text("# Rules\n- bounded\n", encoding="utf-8")
+    (tmp_path / ".gitignore").write_text(
+        "codex_cli/\n.pytest_cache/\n.mypy_cache/\n.ruff_cache/\n__pycache__/\n*.pyc\n",
+        encoding="utf-8",
+    )
     (tmp_path / "project" / "signals").mkdir(parents=True)
     (tmp_path / "project" / "signals" / "__init__.py").write_text("def signal():\n    return 1\n", encoding="utf-8")
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "tests@example.com")
+    _git(tmp_path, "config", "user.name", "Tests")
+    _git(tmp_path, "add", "AGENTS.md", ".gitignore", "project/signals/__init__.py")
+    _git(tmp_path, "commit", "-m", "initial")
     assert main(["run", objective]) == 0
 
 
@@ -42,7 +52,23 @@ def _patch_review_provider(monkeypatch, results: list[LaunchResult]) -> None:
     monkeypatch.setattr("codex_cli.review_runner.launch_task", lambda *args: next(launches))
 
 
-def test_run_queue_completes_active_tasks_in_order(tmp_path: Path, monkeypatch, capsys) -> None:
+def _approve_review() -> str:
+    return json.dumps(
+        {
+            "decision": "approve",
+            "reviewer": "architecture_reviewer",
+            "violations": [],
+            "required_fixes": [],
+            "evidence": [{"file": "project/signals/__init__.py", "reason": "Change stayed within scope."}],
+        }
+    )
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True)
+
+
+def test_run_queue_blocks_second_task_when_first_leaves_overlapping_scope_dirty(tmp_path: Path, monkeypatch, capsys) -> None:
     _prepare_task(tmp_path, monkeypatch)
     capsys.readouterr()
     assert main(["run", "implement another signal registry"]) == 0
@@ -58,18 +84,21 @@ def test_run_queue_completes_active_tasks_in_order(tmp_path: Path, monkeypatch, 
     _patch_review_provider(
         monkeypatch,
         [
-            LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, "Review Decision: approve\nNo findings.\n", "", False, None),
-            LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, "Review Decision: approve\nNo findings.\n", "", False, None),
+            LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, _approve_review(), "", False, None),
+            LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, _approve_review(), "", False, None),
         ],
     )
 
-    assert main(["run-queue"]) == 0
+    assert main(["run-queue"]) == 1
 
     output = json.loads(capsys.readouterr().out)
-    assert output["status"] == "completed"
-    assert output["processed_tasks"] == 2
+    assert output["status"] == "stopped"
+    assert output["processed_tasks"] == 1
     assert output["cooldowns"] == 0
-    assert [entry["task_id"] for entry in output["history"] if entry["step"] == "complete"] == ["task_001", "task_002"]
+    assert [entry["task_id"] for entry in output["history"] if entry["step"] == "complete"] == ["task_001"]
+    assert output["history"][-1]["task_id"] == "task_002"
+    assert output["history"][-1]["status"] == "preflight_blocked"
+    assert output["stop_reason"] == "preflight_blocked"
 
 
 def test_run_queue_cools_down_and_retries_codex_limit(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -85,7 +114,7 @@ def test_run_queue_cools_down_and_retries_codex_limit(tmp_path: Path, monkeypatc
     )
     _patch_review_provider(
         monkeypatch,
-        [LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, "Review Decision: approve\nNo findings.\n", "", False, None)],
+        [LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, _approve_review(), "", False, None)],
     )
     sleeps: list[int] = []
     monkeypatch.setattr("codex_cli.queue_runner.time.sleep", lambda seconds: sleeps.append(seconds))
@@ -113,7 +142,7 @@ def test_run_queue_cools_down_on_codex_429_error(tmp_path: Path, monkeypatch, ca
     )
     _patch_review_provider(
         monkeypatch,
-        [LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, "Review Decision: approve\nNo findings.\n", "", False, None)],
+        [LaunchResult("codex", ONESHOT, ("/usr/bin/reviewer", "run"), 0, _approve_review(), "", False, None)],
     )
     sleeps: list[int] = []
     monkeypatch.setattr("codex_cli.queue_runner.time.sleep", lambda seconds: sleeps.append(seconds))

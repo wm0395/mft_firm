@@ -10,4 +10,6 @@ codex_cli/codex_cli/memory/*
 codex_cli/memory/*
 codex_cli/tasks/*
 codex_cli/cache/*
+codex_cli/state/*
+codex_cli/runtime/*
 *.duckdb

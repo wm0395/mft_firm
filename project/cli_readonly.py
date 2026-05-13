@@ -5,7 +5,7 @@ from project.data.repository import DataRepository
 from project.learning.engine import aggregate_signal_performance, analyze_hypothesis_performance
 from project.regimes.engine import RegimeEngine
 
-from project.cli_support import emit, find_evaluation, load_json
+from project.cli_support import build_strategy_dossier, emit, find_evaluation, load_json
 
 
 def show_validation_failures(repository: DataRepository) -> int:
@@ -189,6 +189,7 @@ def advanced_report(repository: DataRepository, hypothesis_id: str, asset_id: st
         {
             "hypothesis_id": hypothesis_id,
             "asset_id": asset_id,
+            "dossier": build_strategy_dossier(repository, hypothesis_id),
             "evaluations": [
                 evaluation.__dict__
                 for evaluation in repository.get_hypothesis_evaluations(asset_id=asset_id, hypothesis_id=hypothesis_id)
@@ -206,4 +207,13 @@ def advanced_report(repository: DataRepository, hypothesis_id: str, asset_id: st
             ],
         }
     )
+    return 0
+
+
+def strategy_dossier(repository: DataRepository, hypothesis_id: str) -> int:
+    dossier = build_strategy_dossier(repository, hypothesis_id)
+    if dossier is None:
+        emit({"error": f"Strategy dossier for {hypothesis_id} not found"})
+        return 1
+    emit(dossier)
     return 0

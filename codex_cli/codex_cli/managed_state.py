@@ -41,7 +41,8 @@ def persist_review_state(
     memory: MemoryStore,
     review_record: dict[str, object],
 ) -> Task:
-    updated = task.with_review(review_record).with_review_status(str(review_record["decision"]))
+    review_status = str(review_record.get("review_status", review_record["decision"]))
+    updated = task.with_review(review_record).with_review_status(review_status)
     updated = _persist_memory(updated, memory, review_record)
     updated = _apply_review_transition(updated, review_record)
     tasks.save(updated)
@@ -92,7 +93,8 @@ def _durable_entries(task: Task, run_record: dict[str, object]) -> dict[str, lis
 
 def _apply_implementation_transition(task: Task, run_record: dict[str, object]) -> Task:
     status = str(run_record["status"])
-    files = tuple(str(item) for item in run_record.get("files_changed", ()))
+    files_changed = cast(list[object] | tuple[object, ...], run_record.get("files_changed", ()))
+    files = tuple(str(item) for item in files_changed)
     implementation_status = str(run_record.get("implementation_status", "missing"))
     updated = task.with_implementation(implementation_status, files)
     if status == "implemented":
@@ -103,10 +105,10 @@ def _apply_implementation_transition(task: Task, run_record: dict[str, object]) 
 
 
 def _apply_review_transition(task: Task, review_record: dict[str, object]) -> Task:
-    decision = str(review_record["decision"])
-    if decision == REVIEW_APPROVED:
+    review_status = str(review_record.get("review_status", review_record["decision"]))
+    if review_status == REVIEW_APPROVED:
         return task.with_workflow_stage("reviewed")
-    if decision == REVIEW_CHANGES_REQUESTED:
+    if review_status == REVIEW_CHANGES_REQUESTED:
         return task.with_workflow_stage("fix_ready")
     return task
 

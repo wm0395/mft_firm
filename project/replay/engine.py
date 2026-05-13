@@ -26,24 +26,8 @@ class ReplayEngine:
         """
         Evaluates the forward returns for a signal at a given timestamp.
         """
-        # 1. Fetch all OHLCV data for the asset starting from timestamp
-        # We need data up to timestamp + max(horizons)
-        # Since we don't know the exact end date, we fetch all and filter.
-        
-        # For simplicity in this first version, we assume we can query 
-        # the database for the data after the timestamp.
-        
-        # Note: raw_market_data has: asset_symbol, timestamp, open, high, low, close, volume
-        rows = self._repository._db.fetch_all(
-            """
-            select timestamp, close 
-            from raw_market_data 
-            where asset_symbol = ? and timestamp >= ? 
-            order by timestamp
-            """,
-            (asset_symbol, timestamp)
-        )
-        
+        rows = self._repository.get_market_data(asset_symbol, timestamp, None)
+
         if not rows:
             raise ValueError(f"No market data found for {asset_symbol} at or after {timestamp}")
         
@@ -54,7 +38,7 @@ class ReplayEngine:
             ts = row[0]
             if isinstance(ts, str):
                 ts = datetime.fromisoformat(ts)
-            price_map[ts] = row[1]
+            price_map[ts] = row[4]
             
         sorted_timestamps = sorted(price_map.keys())
         
@@ -95,5 +79,5 @@ class ReplayEngine:
             forward_return_1=returns[0] if len(returns) > 0 else float('nan'),
             forward_return_5=returns[1] if len(returns) > 1 else float('nan'),
             forward_return_20=returns[2] if len(returns) > 2 else float('nan'),
-            evaluation_timestamp=datetime.now(UTC).replace(microsecond=0).isoformat()
+            evaluation_timestamp=timestamp.astimezone(UTC).replace(microsecond=0).isoformat()
         )

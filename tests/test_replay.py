@@ -47,6 +47,7 @@ def test_replay_engine_returns(db_repo):
     assert eval_long.forward_return_5 == pytest.approx(0.10)
     # t20: 120. Return = (120-100)/100 = 0.20
     assert eval_long.forward_return_20 == pytest.approx(0.20)
+    assert eval_long.evaluation_timestamp == base_ts.isoformat()
     
     # Evaluate "short" at t0
     eval_short = engine.evaluate_signal(asset_symbol, base_ts, "short")

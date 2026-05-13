@@ -112,12 +112,12 @@ def _codex_command(
     json_output: bool,
 ) -> list[str]:
     if mode == INTERACTIVE:
-        command = [executable, "-C", workspace]
+        command = [executable, "--sandbox", "workspace-write", "-C", workspace]
         if model:
             command.extend(["-m", model])
         command.append(prompt)
         return command
-    command = [executable, "exec", "-C", workspace]
+    command = [executable, "exec", "--sandbox", "workspace-write", "-C", workspace]
     if model:
         command.extend(["-m", model])
     if json_output:
@@ -151,4 +151,29 @@ def _build_env(workspace: Path) -> dict[str, str]:
     root = str(workspace)
     existing = env.get("PYTHONPATH")
     env["PYTHONPATH"] = root if not existing else f"{root}{os.pathsep}{existing}"
+    env.update(_provider_runtime_env(workspace))
     return env
+
+
+def _provider_runtime_env(workspace: Path) -> dict[str, str]:
+    runtime_root = workspace / "codex_cli" / "runtime" / "codex"
+    home = runtime_root / "home"
+    config_home = runtime_root / "xdg" / "config"
+    state_home = runtime_root / "xdg" / "state"
+    cache_home = runtime_root / "xdg" / "cache"
+    codex_home = home / ".codex"
+    temp_home = runtime_root / "tmp"
+    mypy_cache = runtime_root / "mypy_cache"
+    for path in (home, config_home, state_home, cache_home, codex_home, temp_home, mypy_cache):
+        path.mkdir(parents=True, exist_ok=True)
+    return {
+        "HOME": str(home),
+        "XDG_CONFIG_HOME": str(config_home),
+        "XDG_STATE_HOME": str(state_home),
+        "XDG_CACHE_HOME": str(cache_home),
+        "CODEX_HOME": str(codex_home),
+        "TMPDIR": str(temp_home),
+        "TMP": str(temp_home),
+        "TEMP": str(temp_home),
+        "MYPY_CACHE_DIR": str(mypy_cache),
+    }

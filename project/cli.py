@@ -18,10 +18,12 @@ from project.cli_readonly import (
     show_competition,
     show_explanation,
     show_signal_lineage,
+    strategy_dossier,
     show_validation_failures,
     show_validation_path,
 )
 from project.cli_support import (
+    build_strategy_dossier,
     decision_action,
     decision_reason,
     emit,
@@ -29,6 +31,7 @@ from project.cli_support import (
     find_asset,
     hypotheses,
     parse_datetime,
+    run_research_batch,
     validate_outputs,
     validation_payload,
 )
@@ -49,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("init-db")
     run_parser = subcommands.add_parser("run-batch")
     run_parser.add_argument("asset_id")
+    subcommands.add_parser("run-research-batch")
     review_parser = subcommands.add_parser("review-trade-idea")
     review_parser.add_argument("trade_id")
     review_parser.add_argument("action", choices=["approve", "reject", "watchlist"])
@@ -98,6 +102,8 @@ def build_parser() -> argparse.ArgumentParser:
     advanced_report_parser = subcommands.add_parser("advanced-report")
     advanced_report_parser.add_argument("hypothesis_id")
     advanced_report_parser.add_argument("--asset-id")
+    dossier_parser = subcommands.add_parser("strategy-dossier")
+    dossier_parser.add_argument("hypothesis_id")
     for command in subcommands.choices.values():
         command.add_argument("--database", default="project_mft.duckdb")
     return parser
@@ -119,6 +125,8 @@ def dispatch(args: argparse.Namespace, repository: DataRepository) -> int:
         return 0
     if args.command == "run-batch":
         return run_batch(repository, args.asset_id, persist=True)
+    if args.command == "run-research-batch":
+        return research_batch(repository)
     if args.command == "summarize-batch":
         return run_batch(repository, args.asset_id, persist=False)
     if args.command == "review-trade-idea":
@@ -155,6 +163,8 @@ def dispatch(args: argparse.Namespace, repository: DataRepository) -> int:
         return lineage_trace(repository, args.signal_type, args.hypothesis_id)
     if args.command == "position-management":
         return position_management(repository, args.asset_id, args.hypothesis_id, args.status)
+    if args.command == "strategy-dossier":
+        return strategy_dossier(repository, args.hypothesis_id)
     return advanced_report(repository, args.hypothesis_id, args.asset_id)
 
 
@@ -185,6 +195,21 @@ def run_batch(repository: DataRepository, asset_ref: str, persist: bool) -> int:
             "persisted": persist,
         }
     )
+    return 0
+
+
+def research_batch(repository: DataRepository) -> int:
+    try:
+        result = run_research_batch(repository)
+    except ValueError as error:
+        emit({"error": str(error)})
+        return 1
+    result["dossiers"] = tuple(
+        dossier
+        for hypothesis_id in ("hypothesis:rsi_mean_reversion", "hypothesis:ma_crossover")
+        if (dossier := build_strategy_dossier(repository, hypothesis_id)) is not None
+    )
+    emit(result)
     return 0
 
 

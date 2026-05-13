@@ -10,7 +10,19 @@ from .paths import ProjectPaths
 
 
 SYMBOL_PATTERN = re.compile(r"^(?:def|class)\s+([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE)
-SKIP_PREFIXES = (".git", ".pytest_cache", ".ruff_cache", ".env", "__pycache__", "codex_cli/tasks", "codex_cli/cache")
+SKIP_PREFIXES = (
+    ".git",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".env",
+    "__pycache__",
+    "codex_cli/tasks",
+    "codex_cli/memory",
+    "codex_cli/runtime",
+    "codex_cli/state",
+    "codex_cli/mft_codex_cli.egg-info",
+)
 TEXT_SUFFIXES = {".py", ".md", ".toml", ".yml", ".yaml", ".json", ".txt"}
 
 

@@ -47,6 +47,10 @@ class Task:
     files: tuple[str, ...]
     constraints: tuple[str, ...]
     done_conditions: tuple[str, ...]
+    risk_level: str = "medium"
+    allowed_change_set: tuple[str, ...] = ()
+    required_checks: tuple[str, ...] = ()
+    required_reviewers: tuple[str, ...] = ()
     queue_position: int | None = None
     status: str = ACTIVE
     workflow_stage: str = "tasked"
@@ -74,6 +78,10 @@ class Task:
             files=tuple(data.get("files", ())),
             constraints=tuple(data.get("constraints", ())),
             done_conditions=tuple(data.get("done_conditions", ())),
+            risk_level=str(data.get("risk_level", "medium")),
+            allowed_change_set=tuple(data.get("allowed_change_set", data.get("files", ()))),
+            required_checks=tuple(data.get("required_checks", data.get("done_conditions", ()))),
+            required_reviewers=tuple(data.get("required_reviewers", ("architecture_reviewer",))),
             queue_position=_queue_position(data.get("queue_position")),
             status=str(data.get("status", ACTIVE)),
             workflow_stage=str(data.get("workflow_stage", "tasked")),
@@ -177,7 +185,11 @@ class Task:
 def _queue_position(value: object) -> int | None:
     if value is None:
         return None
-    return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        return int(value)
+    raise ValueError(f"Invalid queue position: {value!r}")
 
 
 @dataclass(frozen=True)

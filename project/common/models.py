@@ -8,6 +8,7 @@ from typing import Any, Literal
 Direction = Literal["long", "short", "flat"]
 HypothesisStatus = Literal["draft", "testing", "active", "deprecated", "archived"]
 DecisionAction = Literal["approve", "reject", "watch"]
+ResearchRunStatus = Literal["planned", "running", "completed", "failed"]
 DecisionReason = Literal[
     "low_confidence",
     "conflicting_signals",
@@ -51,6 +52,93 @@ class SignalDefinition:
     dependencies: tuple[str, ...]
     is_persistent: bool
     version: int
+
+
+@dataclass(frozen=True)
+class ResearchUniverse:
+    universe_id: str
+    name: str
+    market: str
+    description: str
+    asset_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DatasetSnapshot:
+    dataset_snapshot_id: str
+    universe_id: str
+    captured_at: str
+    data_start: str
+    data_end: str
+    asset_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class StrategySpec:
+    strategy_spec_id: str
+    universe_id: str
+    hypothesis_id: str
+    hypothesis_version: int
+    name: str
+    parameters: tuple[tuple[str, Any], ...]
+
+
+STRATEGY_SPEC_REQUIRED_PARAMETERS = (
+    "thesis",
+    "bar_timeframe",
+    "holding_horizon",
+    "required_signals",
+    "expected_failure_modes",
+    "evidence_standard",
+)
+
+
+def strategy_spec_parameters(strategy_spec: StrategySpec) -> dict[str, Any]:
+    return {key: value for key, value in strategy_spec.parameters}
+
+
+def strategy_spec_missing_fields(strategy_spec: StrategySpec) -> tuple[str, ...]:
+    missing = ["universe_id"] if not strategy_spec.universe_id else []
+    parameters = strategy_spec_parameters(strategy_spec)
+    for name in STRATEGY_SPEC_REQUIRED_PARAMETERS:
+        if parameters.get(name) in (None, "", (), []):
+            missing.append(name)
+    return tuple(missing)
+
+
+def strategy_spec_sequence_parameter(
+    strategy_spec: StrategySpec,
+    name: str,
+) -> tuple[str, ...]:
+    value = strategy_spec_parameters(strategy_spec).get(name)
+    if isinstance(value, tuple):
+        return tuple(str(item) for item in value)
+    if isinstance(value, list):
+        return tuple(str(item) for item in value)
+    msg = f"strategy spec {name} must be a sequence"
+    raise ValueError(msg)
+
+
+@dataclass(frozen=True)
+class StrategyEvidenceSummary:
+    evidence_summary_id: str
+    strategy_spec_id: str
+    research_run_id: str
+    dataset_snapshot_id: str
+    summary: str
+    metrics: tuple[tuple[str, Any], ...]
+    created_at: str
+
+
+@dataclass(frozen=True)
+class ResearchRun:
+    research_run_id: str
+    strategy_spec_id: str
+    dataset_snapshot_id: str
+    started_at: str
+    completed_at: str | None
+    status: ResearchRunStatus
+    notes: str
 
 
 @dataclass(frozen=True)

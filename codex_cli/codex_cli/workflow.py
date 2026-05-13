@@ -39,6 +39,8 @@ def can_complete(task: Task) -> bool:
         task.workflow_stage == "reviewed"
         and task.implementation_status == "verified"
         and task.review_status == REVIEW_APPROVED
+        and _required_reviewers_approved(task)
+        and _latest_diff_guard_passed(task)
     )
 
 
@@ -58,3 +60,24 @@ def _add_file(snapshot: dict[str, str], root: Path, path: Path) -> None:
 
 def _digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _required_reviewers_approved(task: Task) -> bool:
+    required = set(task.required_reviewers or ("architecture_reviewer",))
+    approved = {
+        str(review.get("reviewer"))
+        for review in task.review_history
+        if str(review.get("review_status", review.get("decision", ""))) == REVIEW_APPROVED
+    }
+    return required.issubset(approved)
+
+
+def _latest_diff_guard_passed(task: Task) -> bool:
+    for run in reversed(task.run_history):
+        if str(run.get("kind", "")) != "managed_run":
+            continue
+        diff_guard = run.get("diff_guard")
+        if isinstance(diff_guard, dict):
+            return bool(diff_guard.get("scope_ok"))
+        return False
+    return False

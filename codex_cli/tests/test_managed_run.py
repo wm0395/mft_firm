@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from codex_cli.cli import main
@@ -10,8 +11,17 @@ from codex_cli.launcher import LaunchResult, ONESHOT
 def _prepare_task(tmp_path: Path, monkeypatch, objective: str = "implement signal registry") -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "AGENTS.md").write_text("# Rules\n- bounded\n", encoding="utf-8")
+    (tmp_path / ".gitignore").write_text(
+        "codex_cli/\n.pytest_cache/\n.mypy_cache/\n.ruff_cache/\n__pycache__/\n*.pyc\n",
+        encoding="utf-8",
+    )
     (tmp_path / "project" / "signals").mkdir(parents=True)
     (tmp_path / "project" / "signals" / "__init__.py").write_text("def signal():\n    return 1\n", encoding="utf-8")
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "tests@example.com")
+    _git(tmp_path, "config", "user.name", "Tests")
+    _git(tmp_path, "add", "AGENTS.md", ".gitignore", "project/signals/__init__.py")
+    _git(tmp_path, "commit", "-m", "initial")
     assert main(["run", objective]) == 0
 
 
@@ -22,12 +32,17 @@ def _patch_provider(
     exit_code: int = 0,
     apply_change: bool = True,
     new_value: int = 2,
+    extra_change: str | None = None,
 ) -> None:
     monkeypatch.setattr("codex_cli.managed_runner.build_launch_command", lambda *args: ["/usr/bin/provider", "run"])
     def _launch(provider, mode, prompt, workspace, model, json_output):
         if apply_change and exit_code == 0:
             target = workspace / "project" / "signals" / "__init__.py"
             target.write_text(f"def signal():\n    return {new_value}\n", encoding="utf-8")
+            if extra_change is not None:
+                extra_target = workspace / extra_change
+                extra_target.parent.mkdir(parents=True, exist_ok=True)
+                extra_target.write_text("def leaked():\n    return 9\n", encoding="utf-8")
         return LaunchResult(
             provider,
             mode,
@@ -67,6 +82,10 @@ def _patch_review_provider(monkeypatch, stdout: str, stderr: str = "", exit_code
             model,
         ),
     )
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True)
 
 
 def test_run_task_moves_task_to_implemented_after_green_checks(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -202,6 +221,60 @@ def test_run_task_resume_includes_prior_memory_and_last_run_summary(tmp_path: Pa
     assert any("Memory Ref:" in item for item in context)
 
 
+def test_run_task_resume_does_not_adopt_existing_scope_changes(tmp_path: Path, monkeypatch, capsys) -> None:
+    _prepare_task(tmp_path, monkeypatch)
+    capsys.readouterr()
+    target = tmp_path / "project" / "signals" / "__init__.py"
+    target.write_text("def signal():\n    return 7\n", encoding="utf-8")
+    _patch_provider(monkeypatch, "Resume summary line\n", apply_change=False)
+    _patch_checks(monkeypatch, "pass")
+
+    assert main(["run-task", "task_001", "--resume"]) == 1
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["task"]["workflow_stage"] == "tasked"
+    assert output["task"]["implementation_status"] == "missing"
+    assert output["task"]["review_status"] == "pending"
+    assert output["task"]["run_history"][-1]["status"] == "no_changes"
+    assert output["review"] is None
+    assert output["checks"] is None
+
+
+def test_run_task_blocks_dirty_scope_before_launch(tmp_path: Path, monkeypatch, capsys) -> None:
+    _prepare_task(tmp_path, monkeypatch)
+    capsys.readouterr()
+    target = tmp_path / "project" / "signals" / "__init__.py"
+    target.write_text("def signal():\n    return 7\n", encoding="utf-8")
+    monkeypatch.setattr("codex_cli.managed_runner.launch_task", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("launch should not run")))
+
+    assert main(["run-task", "task_001"]) == 1
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["run"]["status"] == "preflight_blocked"
+    assert output["task"]["workflow_stage"] == "tasked"
+    assert output["task"]["implementation_status"] == "pending"
+    assert output["checks"] is None
+    assert output["review"] is None
+
+
+def test_run_task_blocks_scope_violation_after_provider_run(tmp_path: Path, monkeypatch, capsys) -> None:
+    _prepare_task(tmp_path, monkeypatch)
+    capsys.readouterr()
+    _patch_provider(monkeypatch, "Implemented project/signals.py\n", extra_change="project/decision/leak.py")
+    _patch_checks(monkeypatch, "pass")
+
+    assert main(["run-task", "task_001"]) == 1
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["run"]["status"] == "scope_violation"
+    assert output["run"]["diff_guard"]["scope_ok"] is False
+    assert "project/decision/leak.py" in output["run"]["diff_guard"]["undeclared_files"]
+    assert output["task"]["workflow_stage"] == "tasked"
+    assert output["task"]["implementation_status"] == "missing"
+    assert output["checks"] is None
+    assert output["review"] is None
+
+
 def test_run_task_creates_durable_memory_only_for_qualifying_markers(tmp_path: Path, monkeypatch, capsys) -> None:
     _prepare_task(tmp_path, monkeypatch)
     capsys.readouterr()
@@ -246,7 +319,18 @@ def test_run_review_approves_and_complete_requires_review(tmp_path: Path, monkey
     assert main(["complete", "task_001"]) == 2
     assert "task cannot be completed before verified implementation and approved review" in capsys.readouterr().err
 
-    _patch_review_provider(monkeypatch, "Review Decision: approve\nNo findings.\n")
+    _patch_review_provider(
+        monkeypatch,
+        json.dumps(
+            {
+                "decision": "approve",
+                "reviewer": "architecture_reviewer",
+                "violations": [],
+                "required_fixes": [],
+                "evidence": [{"file": "project/signals/__init__.py", "reason": "Change stayed within scope."}],
+            }
+        ),
+    )
     assert main(["run-review", "task_001"]) == 0
 
     output = json.loads(capsys.readouterr().out)
@@ -266,7 +350,18 @@ def test_run_review_changes_requested_moves_task_to_fix_ready(tmp_path: Path, mo
     assert main(["run-task", "task_001"]) == 0
     capsys.readouterr()
 
-    _patch_review_provider(monkeypatch, "Review Decision: changes_requested\nMissing test coverage.\n")
+    _patch_review_provider(
+        monkeypatch,
+        json.dumps(
+            {
+                "decision": "changes_requested",
+                "reviewer": "architecture_reviewer",
+                "violations": [{"file": "project/signals/__init__.py", "rule": "Missing tests", "evidence": "No test coverage change was provided."}],
+                "required_fixes": ["Add test coverage for the signal change."],
+                "evidence": [],
+            }
+        ),
+    )
     assert main(["run-review", "task_001"]) == 0
 
     output = json.loads(capsys.readouterr().out)
@@ -280,3 +375,45 @@ def test_run_review_changes_requested_moves_task_to_fix_ready(tmp_path: Path, mo
     fixed = json.loads(capsys.readouterr().out)
     assert fixed["task"]["workflow_stage"] == "implemented"
     assert fixed["execution"]["task_id"] == "task_001"
+
+
+def test_run_review_allows_fix_ready_repair_review(tmp_path: Path, monkeypatch, capsys) -> None:
+    _prepare_task(tmp_path, monkeypatch)
+    capsys.readouterr()
+    _patch_provider(monkeypatch, "Implemented project/signals.py\n")
+    _patch_checks(monkeypatch, "pass")
+    assert main(["run-task", "task_001"]) == 0
+    capsys.readouterr()
+
+    _patch_review_provider(
+        monkeypatch,
+        json.dumps(
+            {
+                "decision": "changes_requested",
+                "reviewer": "architecture_reviewer",
+                "violations": [{"file": "project/signals/__init__.py", "rule": "Missing tests", "evidence": "No test coverage change was provided."}],
+                "required_fixes": ["Add test coverage for the signal change."],
+                "evidence": [],
+            }
+        ),
+    )
+    assert main(["run-review", "task_001"]) == 0
+    rejected = json.loads(capsys.readouterr().out)
+    assert rejected["task"]["workflow_stage"] == "fix_ready"
+
+    _patch_review_provider(
+        monkeypatch,
+        json.dumps(
+            {
+                "decision": "approve",
+                "reviewer": "architecture_reviewer",
+                "violations": [],
+                "required_fixes": [],
+                "evidence": [{"file": "project/signals/__init__.py", "reason": "Repair is now acceptable."}],
+            }
+        ),
+    )
+    assert main(["run-review", "task_001"]) == 0
+    approved = json.loads(capsys.readouterr().out)
+    assert approved["task"]["workflow_stage"] == "reviewed"
+    assert approved["task"]["review_status"] == "approved"

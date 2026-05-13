@@ -11,10 +11,15 @@ REQUIRED_TABLES = {
     "positions",
     "raw_data",
     "raw_market_data",
+    "research_runs",
+    "research_universes",
     "signal_evaluations",
     "signal_registry",
     "signals",
+    "strategy_evidence_summaries",
+    "strategy_specs",
     "trade_ideas",
+    "dataset_snapshots",
 }
 
 
@@ -51,6 +56,57 @@ SCHEMA_SQL = (
         sector varchar,
         market varchar not null,
         is_active boolean not null,
+        created_at varchar not null
+    )
+    """,
+    """
+    create table if not exists research_universes (
+        universe_id varchar primary key,
+        name varchar not null,
+        market varchar not null,
+        description varchar not null,
+        asset_ids_json varchar not null
+    )
+    """,
+    """
+    create table if not exists dataset_snapshots (
+        dataset_snapshot_id varchar primary key,
+        universe_id varchar not null,
+        captured_at varchar not null,
+        data_start varchar not null,
+        data_end varchar not null,
+        asset_ids_json varchar not null
+    )
+    """,
+    """
+    create table if not exists strategy_specs (
+        strategy_spec_id varchar primary key,
+        universe_id varchar not null,
+        hypothesis_id varchar not null,
+        hypothesis_version integer not null,
+        name varchar not null,
+        parameters_json varchar not null
+    )
+    """,
+    """
+    create table if not exists research_runs (
+        research_run_id varchar primary key,
+        strategy_spec_id varchar not null,
+        dataset_snapshot_id varchar not null,
+        started_at varchar not null,
+        completed_at varchar,
+        status varchar not null,
+        notes varchar not null
+    )
+    """,
+    """
+    create table if not exists strategy_evidence_summaries (
+        evidence_summary_id varchar primary key,
+        strategy_spec_id varchar not null,
+        research_run_id varchar not null,
+        dataset_snapshot_id varchar not null,
+        summary varchar not null,
+        metrics_json varchar not null,
         created_at varchar not null
     )
     """,
@@ -163,3 +219,59 @@ SCHEMA_SQL = (
     )
     """,
 )
+
+
+UPSERT_RESEARCH_UNIVERSE_SQL = """
+insert into research_universes values (?, ?, ?, ?, ?)
+on conflict(universe_id) do update set
+    name = excluded.name,
+    market = excluded.market,
+    description = excluded.description,
+    asset_ids_json = excluded.asset_ids_json
+"""
+
+
+UPSERT_DATASET_SNAPSHOT_SQL = """
+insert into dataset_snapshots values (?, ?, ?, ?, ?, ?)
+on conflict(dataset_snapshot_id) do update set
+    universe_id = excluded.universe_id,
+    captured_at = excluded.captured_at,
+    data_start = excluded.data_start,
+    data_end = excluded.data_end,
+    asset_ids_json = excluded.asset_ids_json
+"""
+
+
+UPSERT_STRATEGY_SPEC_SQL = """
+insert into strategy_specs values (?, ?, ?, ?, ?, ?)
+on conflict(strategy_spec_id) do update set
+    universe_id = excluded.universe_id,
+    hypothesis_id = excluded.hypothesis_id,
+    hypothesis_version = excluded.hypothesis_version,
+    name = excluded.name,
+    parameters_json = excluded.parameters_json
+"""
+
+
+UPSERT_RESEARCH_RUN_SQL = """
+insert into research_runs values (?, ?, ?, ?, ?, ?, ?)
+on conflict(research_run_id) do update set
+    strategy_spec_id = excluded.strategy_spec_id,
+    dataset_snapshot_id = excluded.dataset_snapshot_id,
+    started_at = excluded.started_at,
+    completed_at = excluded.completed_at,
+    status = excluded.status,
+    notes = excluded.notes
+"""
+
+
+UPSERT_STRATEGY_EVIDENCE_SUMMARY_SQL = """
+insert into strategy_evidence_summaries values (?, ?, ?, ?, ?, ?, ?)
+on conflict(evidence_summary_id) do update set
+    strategy_spec_id = excluded.strategy_spec_id,
+    research_run_id = excluded.research_run_id,
+    dataset_snapshot_id = excluded.dataset_snapshot_id,
+    summary = excluded.summary,
+    metrics_json = excluded.metrics_json,
+    created_at = excluded.created_at
+"""

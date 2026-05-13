@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
+from typing import cast
 
+from project.cli_support import validate_outputs
+from project.common.models import HypothesisOutput, StrategySpec
+from project.data.repository import DataRepository
 from project.data.models import HypothesisEvaluation
 from project.hypotheses.registry import HypothesisRegistry, HypothesisDefinition
 from project.validation.engine import ValidationEngine
@@ -405,7 +409,7 @@ def test_validation_engine_with_new_validators() -> None:
     
     result = engine.validate(
         evaluation=evaluation,
-        repository=repository,
+        repository=cast(DataRepository, repository),
         hypothesis_registry=registry,
         max_signal_age_hours=24,
     )
@@ -471,7 +475,7 @@ def test_validation_engine_with_malformed_payload() -> None:
     
     result = engine.validate(
         evaluation=evaluation,
-        repository=repository,
+        repository=cast(DataRepository, repository),
         hypothesis_registry=registry,
         max_signal_age_hours=24,
     )
@@ -480,3 +484,107 @@ def test_validation_engine_with_malformed_payload() -> None:
     assert not result.is_valid
     assert "malformed_signal_payload" in result.reasons
     assert len(result.reasons) >= 1  # At least this reason
+
+
+def test_hypothesis_registry_activation_requires_formal_strategy_spec() -> None:
+    registry = HypothesisRegistry()
+    definition = HypothesisDefinition(
+        hypothesis_id="hypothesis:test",
+        name="Test Hypothesis",
+        version=1,
+        definition={},
+        explainability_level="full",
+        status="active",
+    )
+
+    valid_spec = StrategySpec(
+        strategy_spec_id="strategy_spec:test:v1",
+        universe_id="research_universe:indian_indexes",
+        hypothesis_id="hypothesis:test",
+        hypothesis_version=1,
+        name="Test Strategy",
+        parameters=(
+            ("thesis", "Mean reversion on broad Indian indexes."),
+            ("bar_timeframe", "1d"),
+            ("holding_horizon", "10d"),
+            ("required_signals", ("rsi_14",)),
+            ("expected_failure_modes", ("trend_breakout",)),
+            ("evidence_standard", "dataset_snapshot_plus_replay"),
+        ),
+    )
+    registry.activate(definition, ("rsi_14",), valid_spec)
+    assert registry.get_strategy_spec("hypothesis:test") == valid_spec
+
+    with_missing_field = StrategySpec(
+        strategy_spec_id="strategy_spec:test:missing",
+        universe_id="research_universe:indian_indexes",
+        hypothesis_id="hypothesis:test",
+        hypothesis_version=1,
+        name="Missing Thesis",
+        parameters=(
+            ("bar_timeframe", "1d"),
+            ("holding_horizon", "10d"),
+            ("required_signals", ("rsi_14",)),
+            ("expected_failure_modes", ("trend_breakout",)),
+            ("evidence_standard", "dataset_snapshot_plus_replay"),
+        ),
+    )
+    try:
+        registry.activate(definition, ("rsi_14",), with_missing_field)
+    except ValueError as error:
+        assert str(error) == "strategy spec missing fields: thesis"
+    else:
+        raise AssertionError("expected missing-field activation failure")
+
+    with_signal_mismatch = StrategySpec(
+        strategy_spec_id="strategy_spec:test:mismatch",
+        universe_id="research_universe:indian_indexes",
+        hypothesis_id="hypothesis:test",
+        hypothesis_version=1,
+        name="Signal Mismatch",
+        parameters=(
+            ("thesis", "Mean reversion on broad Indian indexes."),
+            ("bar_timeframe", "1d"),
+            ("holding_horizon", "10d"),
+            ("required_signals", ("ma_5",)),
+            ("expected_failure_modes", ("trend_breakout",)),
+            ("evidence_standard", "dataset_snapshot_plus_replay"),
+        ),
+    )
+    try:
+        registry.activate(definition, ("rsi_14",), with_signal_mismatch)
+    except ValueError as error:
+        assert str(error) == "strategy spec required_signals must match registration dependencies"
+    else:
+        raise AssertionError("expected signal-mismatch activation failure")
+
+
+def test_validate_outputs_blocks_missing_strategy_spec_activation() -> None:
+    output = HypothesisOutput(
+        hypothesis_id="hypothesis:rsi_mean_reversion",
+        version=1,
+        asset_id="asset:NIFTY",
+        direction="long",
+        horizon="10d",
+        confidence=0.9,
+        signals_snapshot={"rsi_14": 20.0},
+        explanation={"rule": "oversold"},
+    )
+
+    class MissingSpecRepository:
+        def get_strategy_spec(self, hypothesis_id: str, hypothesis_version: int) -> None:
+            return None
+
+        def get_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
+            return ()
+
+        def get_positions(self, asset_id=None, hypothesis_id=None, direction=None, status=None):
+            return ()
+
+        def get_open_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
+            return ()
+
+    result = validate_outputs(cast(DataRepository, MissingSpecRepository()), (output,))
+    assert len(result) == 1
+    assert not result[0][1].is_valid
+    assert "invalid_hypothesis_status" in result[0][1].reasons

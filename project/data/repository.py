@@ -1,15 +1,67 @@
 from __future__ import annotations
 
-import json
+from dataclasses import astuple, dataclass
 from datetime import datetime
+import json
 from typing import Any
 
 from project.backtesting.models import BacktestResult
-from project.common.models import Asset, Position, RawDataPoint, Signal, TradeIdea, TradeOutcome, utc_now_iso
+from project.common.models import (
+    Asset,
+    DatasetSnapshot,
+    Position,
+    RawDataPoint,
+    ResearchRun,
+    ResearchUniverse,
+    Signal,
+    StrategyEvidenceSummary,
+    StrategySpec,
+    TradeIdea,
+    TradeOutcome,
+    utc_now_iso,
+)
 from project.data.db import DuckDBAccess
-from project.data.models import HypothesisEvaluation, SignalEvaluation
-from project.data.reporting_store import load_backtest_results, load_trade_outcomes, persist_backtest_result
+from project.data.ingestion import build_dataset_provenance
+from project.data.models import (
+    DataSourceMetadata,
+    DatasetProvenance,
+    DatasetSnapshotRecord,
+    HypothesisEvaluation,
+    ResearchRunRecord,
+    ResearchUniverseRecord,
+    SignalEvaluation,
+    StrategyEvidenceSummaryRecord,
+    StrategySpecRecord,
+)
+from project.data.reporting_store import (
+    load_backtest_results,
+    load_trade_outcomes,
+    persist_backtest_result,
+)
 from project.data.row_parsers import build_filters, raw_point_from_row, trade_idea_from_row
+from project.data.schema import (
+    UPSERT_DATASET_SNAPSHOT_SQL,
+    UPSERT_RESEARCH_RUN_SQL,
+    UPSERT_RESEARCH_UNIVERSE_SQL,
+    UPSERT_STRATEGY_EVIDENCE_SUMMARY_SQL,
+    UPSERT_STRATEGY_SPEC_SQL,
+)
+
+ResearchArtifactRecord = (
+    ResearchUniverseRecord
+    | DatasetSnapshotRecord
+    | StrategySpecRecord
+    | ResearchRunRecord
+    | StrategyEvidenceSummaryRecord
+)
+
+
+@dataclass(frozen=True)
+class _SnapshotMetadataAdapter:
+    metadata_value: DataSourceMetadata
+
+    def metadata(self) -> DataSourceMetadata:
+        return self.metadata_value
 
 
 class DataRepository:
@@ -132,9 +184,149 @@ class DataRepository:
 
     def list_assets(self) -> tuple[Asset, ...]:
         rows = self._db.fetch_all(
-            "select asset_id, symbol, name, sector, market, is_active, created_at from assets order by symbol"
+            "select asset_id, symbol, name, sector, market, is_active, created_at "
+            "from assets order by symbol"
         )
         return tuple(Asset(*row) for row in rows)
+
+    def persist_research_artifact(
+        self,
+        artifact: ResearchUniverse
+        | DatasetSnapshot
+        | StrategySpec
+        | ResearchRun
+        | StrategyEvidenceSummary,
+    ) -> None:
+        record: ResearchArtifactRecord
+        if isinstance(artifact, ResearchUniverse):
+            record = ResearchUniverseRecord.from_artifact(artifact)
+            statement = UPSERT_RESEARCH_UNIVERSE_SQL
+        elif isinstance(artifact, DatasetSnapshot):
+            record = DatasetSnapshotRecord.from_artifact(artifact)
+            statement = UPSERT_DATASET_SNAPSHOT_SQL
+        elif isinstance(artifact, StrategySpec):
+            record = StrategySpecRecord.from_artifact(artifact)
+            statement = UPSERT_STRATEGY_SPEC_SQL
+        elif isinstance(artifact, ResearchRun):
+            record = ResearchRunRecord.from_artifact(artifact)
+            statement = UPSERT_RESEARCH_RUN_SQL
+        else:
+            record = StrategyEvidenceSummaryRecord.from_artifact(artifact)
+            statement = UPSERT_STRATEGY_EVIDENCE_SUMMARY_SQL
+        self._db.execute(statement, astuple(record))
+
+    def _load_research_artifacts(
+        self,
+        statement: str,
+        record_type: Any,
+    ) -> tuple[Any, ...]:
+        return tuple(
+            record_type(*row).to_artifact() for row in self._db.fetch_all(statement)
+        )
+
+    def get_research_universes(self) -> tuple[ResearchUniverse, ...]:
+        return self._load_research_artifacts(
+            """
+            select universe_id, name, market, description, asset_ids_json
+            from research_universes
+            order by universe_id
+            """,
+            ResearchUniverseRecord,
+        )
+
+    def get_dataset_snapshots(self) -> tuple[DatasetSnapshot, ...]:
+        return self._load_research_artifacts(
+            """
+            select dataset_snapshot_id, universe_id, captured_at, data_start,
+                   data_end, asset_ids_json
+            from dataset_snapshots
+            order by captured_at, dataset_snapshot_id
+            """,
+            DatasetSnapshotRecord,
+        )
+
+    def get_dataset_provenance(
+        self,
+        snapshot: DatasetSnapshot,
+        bar_timeframe: str,
+    ) -> DatasetProvenance:
+        sources = sorted(
+            {
+                point.source
+                for asset_id in snapshot.asset_ids
+                for point in self.read_raw_values(asset_id, "price")
+                if snapshot.data_start <= point.timestamp <= snapshot.data_end
+            }
+        )
+        adapter = _SnapshotMetadataAdapter(
+            metadata_value=DataSourceMetadata(
+                source_name=",".join(sources),
+                symbol_mapping=self._snapshot_symbol_mapping(snapshot),
+                bar_timeframe=bar_timeframe,
+            )
+        )
+        return build_dataset_provenance(
+            adapter,
+            snapshot.data_start,
+            snapshot.data_end,
+        )
+
+    def _snapshot_symbol_mapping(
+        self,
+        snapshot: DatasetSnapshot,
+    ) -> tuple[tuple[str, str], ...]:
+        return tuple(
+            sorted(
+                (asset.asset_id, asset.symbol)
+                for asset in self.list_assets()
+                if asset.asset_id in snapshot.asset_ids
+            )
+        )
+
+    def get_strategy_specs(self) -> tuple[StrategySpec, ...]:
+        return self._load_research_artifacts(
+            """
+            select strategy_spec_id, universe_id, hypothesis_id, hypothesis_version,
+                   name, parameters_json
+            from strategy_specs
+            order by strategy_spec_id
+            """,
+            StrategySpecRecord,
+        )
+
+    def get_strategy_spec(
+        self,
+        hypothesis_id: str,
+        hypothesis_version: int,
+    ) -> StrategySpec | None:
+        for strategy_spec in self.get_strategy_specs():
+            if strategy_spec.hypothesis_id != hypothesis_id:
+                continue
+            if strategy_spec.hypothesis_version == hypothesis_version:
+                return strategy_spec
+        return None
+
+    def get_research_runs(self) -> tuple[ResearchRun, ...]:
+        return self._load_research_artifacts(
+            """
+            select research_run_id, strategy_spec_id, dataset_snapshot_id,
+                   started_at, completed_at, status, notes
+            from research_runs
+            order by started_at, research_run_id
+            """,
+            ResearchRunRecord,
+        )
+
+    def get_strategy_evidence_summaries(self) -> tuple[StrategyEvidenceSummary, ...]:
+        return self._load_research_artifacts(
+            """
+            select evidence_summary_id, strategy_spec_id, research_run_id,
+                   dataset_snapshot_id, summary, metrics_json, created_at
+            from strategy_evidence_summaries
+            order by created_at, evidence_summary_id
+            """,
+            StrategyEvidenceSummaryRecord,
+        )
 
     def ingest_raw(self, point: RawDataPoint) -> None:
         self._db.execute(
@@ -370,15 +562,17 @@ class DataRepository:
 
     def get_decisions(self, trade_id: str | None = None) -> tuple[tuple, ...]:
         where_clause, params = build_filters([("trade_id = ?", trade_id)])
-        return tuple(self._db.fetch_all(
-            f"""
+        return tuple(
+            self._db.fetch_all(
+                f"""
             select decision_id, trade_id, action, structured_reason, notes, created_at
             from decisions
             where {where_clause}
             order by created_at, decision_id
             """,
-            params,
-        ))
+                params,
+            )
+        )
 
     def get_trade_outcomes(self) -> tuple[TradeOutcome, ...]:
         return load_trade_outcomes(self._db)

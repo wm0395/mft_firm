@@ -18,6 +18,10 @@ class TaskStore:
         files: tuple[str, ...],
         constraints: tuple[str, ...],
         done_conditions: tuple[str, ...],
+        risk_level: str,
+        allowed_change_set: tuple[str, ...],
+        required_checks: tuple[str, ...],
+        required_reviewers: tuple[str, ...],
         route: str,
         provider: str,
     ) -> Task:
@@ -27,6 +31,10 @@ class TaskStore:
             files=files,
             constraints=constraints,
             done_conditions=done_conditions,
+            risk_level=risk_level,
+            allowed_change_set=allowed_change_set,
+            required_checks=required_checks,
+            required_reviewers=required_reviewers,
             route=route,
             recommended_provider=provider,
         )

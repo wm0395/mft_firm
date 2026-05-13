@@ -6,6 +6,12 @@ from typing import cast
 
 from .cache import build_index, render_context_document, retrieve_context_entries
 from .checks import run_required_checks
+from .diff_guard import (
+    DiffGuardUnavailableError,
+    dirty_scope_paths,
+    evaluate_diff_guard,
+    snapshot_worktree_status,
+)
 from .executor import execute_task
 from .launcher import ONESHOT, LAUNCH_PROVIDERS, build_launch_command, launch_task
 from .managed_state import persist_managed_state
@@ -19,7 +25,7 @@ from .workflow import changed_files, snapshot_task_files
 
 
 REVIEW_PROVIDER = "gemini"
-REVIEW_PERSONA = "architecture"
+REVIEW_PERSONA = "architecture_reviewer"
 
 
 @dataclass(frozen=True)
@@ -58,6 +64,13 @@ def run_task_command(
     )
     if options.dry_run:
         return _dry_run_payload(task, provider, options, packet, context, command)
+    scope_paths = _task_scope(task)
+    if not options.resume:
+        dirty_paths = _dirty_scope_paths(paths, scope_paths)
+        if dirty_paths is None:
+            return _diff_guard_unavailable_payload(task, packet, provider, options, command)
+        if dirty_paths:
+            return _preflight_blocked_payload(task, packet, provider, options, command, dirty_paths)
     return _run_managed_task(task, provider, options, paths, tasks, scratchpads, memory, packet, context, command, review_budget)
 
 
@@ -162,7 +175,9 @@ def _run_managed_task(
     review_budget: int,
 ) -> dict[str, object]:
     started_at = utc_now()
-    before_snapshot = snapshot_task_files(paths.workspace_root, task.files)
+    scope_paths = _task_scope(task)
+    before_snapshot = snapshot_task_files(paths.workspace_root, scope_paths)
+    diff_before = _snapshot_worktree_status(paths)
     launch = launch_task(
         provider,
         ONESHOT,
@@ -172,13 +187,14 @@ def _run_managed_task(
         options.json_output,
     )
     finished_at = utc_now()
-    after_snapshot = snapshot_task_files(paths.workspace_root, task.files)
+    after_snapshot = snapshot_task_files(paths.workspace_root, scope_paths)
     artifact_refs = _persist_run_artifacts(paths, task.id, launch.stdout, launch.stderr, options.json_output)
     events = _parse_json_events(launch.stdout) if options.json_output else ()
     implementation_files = changed_files(before_snapshot, after_snapshot)
+    diff_guard = _diff_guard(paths, diff_before, scope_paths)
     review_record = None
     check_record = None
-    if launch.exit_code == 0 and implementation_files:
+    if launch.exit_code == 0 and implementation_files and _diff_guard_passed(diff_guard):
         check_record = _maybe_run_checks(paths, options.checks_enabled)
     run_record = _build_run_record(
         task,
@@ -191,6 +207,7 @@ def _run_managed_task(
         check_record,
         review_record,
         implementation_files,
+        diff_guard,
         started_at,
         finished_at,
     )
@@ -205,7 +222,8 @@ def _run_managed_task(
             launch.stdout,
         )
         if review_record is not None:
-            run_record["actions_taken"].append("Generated review packet.")
+            actions_taken = cast(list[str], run_record["actions_taken"])
+            actions_taken.append("Generated review packet.")
     updated = persist_managed_state(task, tasks, scratchpads, memory, packet, run_record, review_record, check_record)
     return _result_payload(updated, packet, run_record, review_record, check_record)
 
@@ -284,11 +302,13 @@ def _build_run_record(
     check_record: dict[str, object] | None,
     review_record: dict[str, object] | None,
     implementation_files: tuple[str, ...],
+    diff_guard: dict[str, object] | None,
     started_at: str,
     finished_at: str,
 ) -> dict[str, object]:
-    status = _run_status(launch.exit_code, check_record, options.checks_enabled, implementation_files)
+    status = _run_status(launch.exit_code, check_record, options.checks_enabled, implementation_files, diff_guard)
     summary = _extract_summary(launch.stdout, launch.stderr, events)
+    files_changed = _files_changed(implementation_files, diff_guard)
     return {
         "kind": "managed_run",
         "task_id": task.id,
@@ -308,14 +328,15 @@ def _build_run_record(
         "summary": summary,
         "understanding": f"Objective: {task.objective}",
         "plan": "Execute the prepared packet, persist results, and validate required checks.",
-        "actions_taken": _actions_taken(launch.exit_code, check_record),
-        "files_changed": list(implementation_files),
-        "implementation_status": "verified" if implementation_files else "missing",
+        "actions_taken": _actions_taken(launch.exit_code, check_record, diff_guard),
+        "files_changed": list(files_changed),
+        "implementation_status": "verified" if status == "implemented" else "missing",
         "checks_run": _check_names(check_record),
-        "open_issues": _open_issues(status, launch.stderr, check_record),
+        "open_issues": _open_issues(status, launch.stderr, check_record, diff_guard),
         "final_decision": _final_decision(status),
         "context_refs": list(artifact_refs.values()),
         "artifacts": artifact_refs,
+        "diff_guard": diff_guard,
     }
 
 
@@ -324,9 +345,12 @@ def _run_status(
     check_record: dict[str, object] | None,
     checks_enabled: bool,
     implementation_files: tuple[str, ...],
+    diff_guard: dict[str, object] | None,
 ) -> str:
     if exit_code != 0:
         return "provider_failed"
+    if diff_guard and str(diff_guard.get("status")) != "passed":
+        return str(diff_guard.get("status"))
     if not implementation_files:
         return "no_changes"
     if not checks_enabled:
@@ -345,11 +369,19 @@ def _extract_summary(stdout: str, stderr: str, events: tuple[dict[str, object], 
         if lines:
             return " ".join(lines[-3:])[:240]
     return "Provider completed without a textual summary."
+
+
 def _actions_taken(
     exit_code: int,
     check_record: dict[str, object] | None,
+    diff_guard: dict[str, object] | None,
 ) -> list[str]:
     actions = [f"Provider exited with code {exit_code}."]
+    if diff_guard:
+        if str(diff_guard.get("status")) == "passed":
+            actions.append("Validated git diff scope.")
+        else:
+            actions.append("Blocked task advancement because git diff scope validation failed.")
     if check_record:
         actions.append("Ran required checks.")
     return actions
@@ -362,12 +394,25 @@ def _check_names(check_record: dict[str, object] | None) -> list[str]:
     return [str(item["name"]) for item in checks]
 
 
-def _open_issues(status: str, stderr: str, check_record: dict[str, object] | None) -> list[str]:
+def _open_issues(
+    status: str,
+    stderr: str,
+    check_record: dict[str, object] | None,
+    diff_guard: dict[str, object] | None,
+) -> list[str]:
     if status == "implemented":
         return []
     issues = []
     if status == "no_changes":
         issues.append("No implementation changes were detected in the declared task scope.")
+    if status == "preflight_blocked":
+        issues.append("Task-scope files already had uncommitted changes before provider launch.")
+    if status == "scope_violation" and diff_guard:
+        undeclared = cast(list[object], diff_guard.get("undeclared_files", []))
+        issues.append("Git diff guard found out-of-scope file changes.")
+        issues.extend(f"Out-of-scope change: {item}" for item in undeclared)
+    if status == "diff_unavailable":
+        issues.append("Git diff guard could not inspect repository state.")
     if stderr.strip():
         issues.append(stderr.strip().splitlines()[-1])
     if check_record and check_record.get("status") != "pass":
@@ -382,6 +427,12 @@ def _final_decision(status: str) -> str:
         return "Task remains active until failing checks are resolved."
     if status == "no_changes":
         return "Task remains active because no implementation changes were detected."
+    if status == "preflight_blocked":
+        return "Task did not launch because task-scope files were already dirty."
+    if status == "scope_violation":
+        return "Task remains active because git diff guard found out-of-scope changes."
+    if status == "diff_unavailable":
+        return "Task remains active because git diff guard could not inspect repository state."
     return "Task remains active because provider execution failed."
 
 
@@ -400,4 +451,148 @@ def _result_payload(
         "run": run_record,
         "review": review_record,
         "checks": check_record,
+    }
+
+
+def _task_scope(task: Task) -> tuple[str, ...]:
+    return task.allowed_change_set or task.files
+
+
+def _dirty_scope_paths(paths: ProjectPaths, scope_paths: tuple[str, ...]) -> tuple[str, ...] | None:
+    try:
+        return dirty_scope_paths(paths.workspace_root, scope_paths)
+    except DiffGuardUnavailableError:
+        return None
+
+
+def _snapshot_worktree_status(paths: ProjectPaths) -> dict[str, str] | None:
+    try:
+        return snapshot_worktree_status(paths.workspace_root)
+    except DiffGuardUnavailableError:
+        return None
+
+
+def _diff_guard(
+    paths: ProjectPaths,
+    before: dict[str, str] | None,
+    scope_paths: tuple[str, ...],
+) -> dict[str, object] | None:
+    if before is None:
+        return {"status": "diff_unavailable", "changed_files": [], "undeclared_files": [], "scope_ok": False}
+    try:
+        result = evaluate_diff_guard(paths.workspace_root, before, scope_paths)
+    except DiffGuardUnavailableError:
+        return {"status": "diff_unavailable", "changed_files": [], "undeclared_files": [], "scope_ok": False}
+    return result.to_dict()
+
+
+def _diff_guard_passed(diff_guard: dict[str, object] | None) -> bool:
+    if diff_guard is None:
+        return False
+    return str(diff_guard.get("status")) == "passed"
+
+
+def _files_changed(
+    implementation_files: tuple[str, ...],
+    diff_guard: dict[str, object] | None,
+) -> tuple[str, ...]:
+    if diff_guard:
+        changed = cast(list[object], diff_guard.get("changed_files", []))
+        if changed:
+            return tuple(str(item) for item in changed)
+    return implementation_files
+
+
+def _preflight_blocked_payload(
+    task: Task,
+    packet: ExecutionPacket,
+    provider: str,
+    options: RunTaskOptions,
+    command: list[str],
+    dirty_paths: tuple[str, ...],
+) -> dict[str, object]:
+    timestamp = utc_now()
+    run_record = {
+        "kind": "managed_run",
+        "task_id": task.id,
+        "provider": provider,
+        "mode": ONESHOT,
+        "command": command,
+        "budget": options.budget,
+        "model": options.model,
+        "json_output": options.json_output,
+        "resume": options.resume,
+        "review_enabled": options.review_enabled,
+        "checks_enabled": options.checks_enabled,
+        "exit_code": 0,
+        "started_at": timestamp,
+        "finished_at": timestamp,
+        "status": "preflight_blocked",
+        "summary": "Managed run blocked because task-scope files already had uncommitted changes.",
+        "understanding": f"Objective: {task.objective}",
+        "plan": "Execute the prepared packet, persist results, and validate required checks.",
+        "actions_taken": ["Blocked before provider launch due to pre-existing task-scope changes."],
+        "files_changed": list(dirty_paths),
+        "implementation_status": "missing",
+        "checks_run": [],
+        "open_issues": [f"Dirty task-scope file: {path}" for path in dirty_paths],
+        "final_decision": "Task did not launch because task-scope files were already dirty.",
+        "context_refs": [],
+        "artifacts": {},
+        "diff_guard": None,
+    }
+    return {
+        "status": "active",
+        "task": task.to_dict(),
+        "execution": packet.to_dict(),
+        "run": run_record,
+        "review": None,
+        "checks": None,
+    }
+
+
+def _diff_guard_unavailable_payload(
+    task: Task,
+    packet: ExecutionPacket,
+    provider: str,
+    options: RunTaskOptions,
+    command: list[str],
+) -> dict[str, object]:
+    timestamp = utc_now()
+    run_record = {
+        "kind": "managed_run",
+        "task_id": task.id,
+        "provider": provider,
+        "mode": ONESHOT,
+        "command": command,
+        "budget": options.budget,
+        "model": options.model,
+        "json_output": options.json_output,
+        "resume": options.resume,
+        "review_enabled": options.review_enabled,
+        "checks_enabled": options.checks_enabled,
+        "exit_code": 0,
+        "started_at": timestamp,
+        "finished_at": timestamp,
+        "status": "diff_unavailable",
+        "summary": "Managed run blocked because git diff guard could not inspect repository state.",
+        "understanding": f"Objective: {task.objective}",
+        "plan": "Execute the prepared packet, persist results, and validate required checks.",
+        "actions_taken": ["Blocked before provider launch because git diff guard was unavailable."],
+        "files_changed": [],
+        "implementation_status": "missing",
+        "checks_run": [],
+        "open_issues": ["Git repository state could not be inspected before provider launch."],
+        "final_decision": "Task did not launch because git diff guard could not inspect repository state.",
+        "context_refs": [],
+        "artifacts": {},
+        "diff_guard": {"status": "diff_unavailable", "changed_files": [], "undeclared_files": [], "scope_ok": False},
+    }
+    return {
+        "status": "active",
+        "task": task.to_dict(),
+        "execution": packet.to_dict(),
+        "run": run_record,
+        "review": None,
+        "checks": None,
     }

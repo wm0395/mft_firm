@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from subprocess import CompletedProcess
+from typing import cast
 
 from codex_cli.architecture import self_heal
 from codex_cli.cache import build_index, cache_status, retrieve_context
 from codex_cli.cli import main
 from codex_cli.diagnosis import diagnose_task
+from codex_cli.launcher import _build_env, build_launch_command
 from codex_cli.models import Task
 from codex_cli.paths import ProjectPaths
 from codex_cli.prompts import build_execution_packet
@@ -69,7 +71,7 @@ def test_execute_dry_run_builds_codex_oneshot_command(tmp_path: Path, monkeypatc
 
     output = json.loads(capsys.readouterr().out)
     command = output["launch"]["command"]
-    assert command[:3] == ["/usr/bin/codex", "exec", "-C"]
+    assert command[:5] == ["/usr/bin/codex", "exec", "--sandbox", "workspace-write", "-C"]
     assert "--json" in command
     assert output["launch"]["provider"] == "codex"
 
@@ -190,9 +192,10 @@ def test_diagnose_matches_known_violation_pattern(tmp_path: Path, monkeypatch) -
     )
 
     diagnosis = diagnose_task(task, paths)
+    violations = cast(list[dict[str, object]], diagnosis["violations"])
 
-    assert diagnosis["violations"][0]["violation"] == "signal_leakage"
-    assert diagnosis["violations"][0]["fix"] == "move logic to signal layer"
+    assert violations[0]["violation"] == "signal_leakage"
+    assert violations[0]["fix"] == "move logic to signal layer"
 
 
 def test_router_recommends_provider_by_work_type() -> None:
@@ -208,11 +211,17 @@ def test_build_index_and_retrieve_context(tmp_path: Path, monkeypatch) -> None:
     paths.ensure()
     (tmp_path / "project").mkdir()
     (tmp_path / "project" / "signals.py").write_text("def build_signal():\n    return 1\n", encoding="utf-8")
+    runtime_note = tmp_path / "codex_cli" / "runtime" / "codex" / "home" / ".codex" / "note.txt"
+    runtime_note.parent.mkdir(parents=True)
+    runtime_note.write_text("runtime artifact\n", encoding="utf-8")
     build_index(paths)
 
     context = retrieve_context(paths, "build signal")
+    status = cache_status(paths)
     assert "project/signals.py" in context
-    assert cache_status(paths)["index_entries"] >= 1
+    assert cast(int, status["index_entries"]) >= 1
+    assert not any("runtime" in path for path in context)
+    assert paths.cache == tmp_path / "codex_cli" / "state" / "cache"
 
 
 def test_execution_packet_trims_context_when_budget_is_small(tmp_path: Path, monkeypatch) -> None:
@@ -266,6 +275,31 @@ def test_execution_packet_requests_direct_implementation(tmp_path: Path, monkeyp
 
     assert "Implement the assigned task by editing the declared files" in packet.prompt
     assert "Prepare an implementation packet" not in packet.prompt
+
+
+def test_launcher_build_env_uses_workspace_local_codex_runtime(tmp_path: Path) -> None:
+    env = _build_env(tmp_path)
+    runtime_root = tmp_path / "codex_cli" / "runtime" / "codex"
+
+    assert env["HOME"] == str(runtime_root / "home")
+    assert env["XDG_CONFIG_HOME"] == str(runtime_root / "xdg" / "config")
+    assert env["XDG_STATE_HOME"] == str(runtime_root / "xdg" / "state")
+    assert env["XDG_CACHE_HOME"] == str(runtime_root / "xdg" / "cache")
+    assert env["CODEX_HOME"] == str(runtime_root / "home" / ".codex")
+    assert env["TMPDIR"] == str(runtime_root / "tmp")
+    assert env["TMP"] == str(runtime_root / "tmp")
+    assert env["TEMP"] == str(runtime_root / "tmp")
+    assert env["MYPY_CACHE_DIR"] == str(runtime_root / "mypy_cache")
+    assert (runtime_root / "home").is_dir()
+    assert (runtime_root / "home" / ".codex").is_dir()
+    assert (runtime_root / "tmp").is_dir()
+    assert (runtime_root / "mypy_cache").is_dir()
+
+
+def test_build_launch_command_sets_codex_workspace_write_sandbox(tmp_path: Path) -> None:
+    command = build_launch_command("codex", "oneshot", "prompt", tmp_path, None, True)
+
+    assert command[:5] == ["/usr/bin/codex", "exec", "--sandbox", "workspace-write", "-C"]
 
 
 def test_self_heal_loop_runs_executor_before_architecture_check() -> None:

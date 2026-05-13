@@ -35,6 +35,7 @@ DEFAULT_DONE_CONDITIONS = (
     "typing passes",
     "no architecture violations",
 )
+DEFAULT_REQUIRED_REVIEWERS = ("architecture_reviewer",)
 DEFAULT_EXEC_BUDGET = 1200
 DEFAULT_REVIEW_BUDGET = 900
 
@@ -75,12 +76,13 @@ def build_parser() -> argparse.ArgumentParser:
     run_fix_parser.add_argument("--no-review", action="store_true")
     run_fix_parser.add_argument("--no-checks", action="store_true")
     run_fix_parser.add_argument("--dry-run", action="store_true")
-    run_review_parser = subcommands.add_parser("run-review", help="Run the review step for an implemented task")
+    run_review_parser = subcommands.add_parser("run-review", help="Run the review step for an implemented or fix-ready task")
     run_review_parser.add_argument("task_id")
     run_review_parser.add_argument("--provider", choices=LAUNCH_PROVIDERS, default="codex")
     run_review_parser.add_argument("--budget", type=int, default=DEFAULT_REVIEW_BUDGET)
     run_review_parser.add_argument("--json", action="store_true")
     run_review_parser.add_argument("--model")
+    run_review_parser.add_argument("--persona", default="architecture_reviewer")
     queue_parser = subcommands.add_parser("run-queue", help="Run active tasks sequentially with Codex cooldown handling")
     queue_parser.add_argument("--provider", choices=LAUNCH_PROVIDERS)
     queue_parser.add_argument("--budget", type=int, default=DEFAULT_EXEC_BUDGET)
@@ -93,7 +95,7 @@ def build_parser() -> argparse.ArgumentParser:
     review_parser = subcommands.add_parser("review", help="Build review packet for a task")
     review_parser.add_argument("task_id")
     review_parser.add_argument("--provider", choices=("codex", "gemini", "opencode"))
-    review_parser.add_argument("--persona", default="general")
+    review_parser.add_argument("--persona", default="architecture_reviewer")
     review_parser.add_argument("--budget", type=int, default=DEFAULT_REVIEW_BUDGET)
     scratch_parser = subcommands.add_parser("scratch", help="Show or create a task scratchpad")
     scratch_parser.add_argument("task_id")
@@ -180,7 +182,7 @@ def _run_or_plan(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: Scrat
         planned_task = planned_task.with_workflow_stage("planned")
         tasks.save(planned_task)
     execution = _build_packet(planned_task, paths, scratchpad, context, planned_task.recommended_provider, DEFAULT_EXEC_BUDGET)
-    review = _build_review(planned_task, paths, scratchpad, context, "gemini", "architecture", DEFAULT_REVIEW_BUDGET)
+    review = _build_review(planned_task, paths, scratchpad, context, "gemini", "architecture_reviewer", DEFAULT_REVIEW_BUDGET)
     summary = memory.create_summary(planned_task, planned_task.objective, f"Prepared {planned_task.route} workflow.", ("task", planned_task.route))
     persisted = planned_task.with_packet(execution).with_memory_ref(summary.ref)
     tasks.save(persisted)
@@ -199,11 +201,16 @@ def _run_or_plan(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: Scrat
 def _create_task(tasks: TaskStore, objective: str):
     route_name = route(objective)
     provider = recommend_provider(objective, route_name)
+    files = _infer_files(objective)
     return tasks.create(
         objective=objective,
-        files=_infer_files(objective),
+        files=files,
         constraints=DEFAULT_CONSTRAINTS,
         done_conditions=DEFAULT_DONE_CONDITIONS,
+        risk_level="medium",
+        allowed_change_set=files,
+        required_checks=DEFAULT_DONE_CONDITIONS,
+        required_reviewers=DEFAULT_REQUIRED_REVIEWERS,
         route=route_name,
         provider=provider,
     )
@@ -356,8 +363,8 @@ def _run_review(
     memory: MemoryStore,
 ) -> int:
     task = tasks.get(args.task_id)
-    if task.workflow_stage != "implemented":
-        raise ValueError("run-review requires a task in implemented stage")
+    if task.workflow_stage not in {"implemented", "reviewed", "fix_ready"}:
+        raise ValueError("run-review requires a task in implemented, reviewed, or fix_ready stage")
     payload = run_review_command(
         args.task_id,
         RunReviewOptions(
@@ -365,6 +372,7 @@ def _run_review(
             budget=args.budget,
             model=args.model,
             json_output=args.json,
+            persona=args.persona,
         ),
         paths,
         tasks,
@@ -428,7 +436,12 @@ def _run_task_exit_code(payload: dict[str, object]) -> int:
     run = payload["run"]
     if isinstance(run, dict) and int(run.get("exit_code", 0)) != 0:
         return int(run["exit_code"])
-    if isinstance(run, dict) and str(run.get("status")) == "no_changes":
+    if isinstance(run, dict) and str(run.get("status")) in {
+        "no_changes",
+        "preflight_blocked",
+        "scope_violation",
+        "diff_unavailable",
+    }:
         return 1
     checks = payload.get("checks")
     if isinstance(checks, dict) and checks.get("status") == "fail":

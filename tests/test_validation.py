@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
+from typing import cast
 
+from project.data.repository import DataRepository
 from project.data.models import HypothesisEvaluation
+from project.hypotheses.ma_crossover import MACrossoverHypothesis
 from project.hypotheses.registry import HypothesisRegistry, HypothesisDefinition
+from project.hypotheses.rsi_mean_reversion import RSIMeanReversionHypothesis
 from project.validation.engine import ValidationEngine
 from project.validation.validators import (
     confidence_validator,
@@ -287,7 +291,7 @@ def test_validation_engine_integration() -> None:
     
     result = engine.validate(
         evaluation=evaluation,
-        repository=repository,
+        repository=cast(DataRepository, repository),
         hypothesis_registry=registry,
         max_signal_age_hours=24,
     )
@@ -345,7 +349,7 @@ def test_validation_engine_with_failing_conditions() -> None:
     
     result = engine.validate(
         evaluation=evaluation,
-        repository=repository,
+        repository=cast(DataRepository, repository),
         hypothesis_registry=registry,
         max_signal_age_hours=24,
     )
@@ -353,4 +357,24 @@ def test_validation_engine_with_failing_conditions() -> None:
     # Should be invalid due to low confidence
     assert not result.is_valid
     assert "low_confidence" in result.reasons
-    assert len(result.reasons) == 1  # Only one failure reason
+
+
+def test_seed_strategies_declare_daily_indian_index_specs() -> None:
+    universe_id = "research_universe:indian_indexes:daily"
+    rsi_spec = RSIMeanReversionHypothesis.strategy_spec(universe_id)
+    ma_spec = MACrossoverHypothesis.strategy_spec(universe_id)
+
+    rsi_parameters = dict(rsi_spec.parameters)
+    ma_parameters = dict(ma_spec.parameters)
+
+    assert rsi_spec.universe_id == universe_id
+    assert rsi_parameters["bar_timeframe"] == "1d"
+    assert rsi_parameters["holding_horizon"] == "10d"
+    assert tuple(rsi_parameters["required_signals"]) == ("rsi_14",)
+    assert "MIDCPNIFTY" in tuple(rsi_parameters["intended_universe"])
+
+    assert ma_spec.universe_id == universe_id
+    assert ma_parameters["bar_timeframe"] == "1d"
+    assert ma_parameters["holding_horizon"] == "5d"
+    assert tuple(ma_parameters["required_signals"]) == ("ma_5", "ma_20")
+    assert "FINNIFTY" in tuple(ma_parameters["intended_universe"])

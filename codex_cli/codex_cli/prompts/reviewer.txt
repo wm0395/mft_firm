@@ -1,13 +1,18 @@
 Goal:
-Review the proposed implementation packet for bugs, architecture violations, and missing validation.
+Apply the reviewer persona rules to the proposed implementation packet.
 
 Review focus:
-- import direction and layer boundaries
-- mutable state or hidden writes
-- missing tests or verification gaps
-- unnecessary abstractions
+- treat task scope, declared files, constraints, and done conditions as the authority
+- verify only against evidence in the packet and the reviewer persona rules
+- do not rewrite the task, expand scope, or propose redesigns outside the declared objective
 
 Output:
-- first line: `Review Decision: approve` or `Review Decision: changes_requested`
-- findings first
-- concise remediation steps
+- return JSON only
+- use this schema exactly:
+{
+  "decision": "approve|changes_requested",
+  "reviewer": "<persona reviewer name>",
+  "violations": [{"file": "...", "rule": "...", "evidence": "..."}],
+  "required_fixes": ["..."],
+  "evidence": [{"file": "...", "reason": "..."}]
+}

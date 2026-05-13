@@ -9,8 +9,7 @@ from project.data.db import DuckDBAccess
 
 
 def persist_backtest_result(db: DuckDBAccess, result: BacktestResult) -> None:
-    created_at = datetime.now(UTC).replace(microsecond=0).isoformat()
-    backtest_id = f"backtest:{result.hypothesis_id}:{result.asset_id}:{created_at}"
+    backtest_id = f"backtest:{result.hypothesis_id}:{result.asset_id}"
     metrics_json = json.dumps(
         {
             "hypothesis_id": result.hypothesis_id,
@@ -23,13 +22,15 @@ def persist_backtest_result(db: DuckDBAccess, result: BacktestResult) -> None:
             "max_drawdown": result.max_drawdown,
             "sharpe_ratio": result.sharpe_ratio,
             "total_return_pct": result.total_return_pct,
+            "persisted_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
         },
         sort_keys=True,
     )
     db.execute(
         """
         insert into backtests values (?, ?, ?, ?, ?)
-        on conflict(backtest_id) do nothing
+        on conflict(backtest_id) do update set
+            metrics_json = excluded.metrics_json
         """,
         (backtest_id, result.hypothesis_id, result.asset_id, 1, metrics_json),
     )
