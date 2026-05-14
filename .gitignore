@@ -13,3 +13,4 @@ codex_cli/cache/*
 codex_cli/state/*
 codex_cli/runtime/*
 *.duckdb
+.tmp_task001_clone/*

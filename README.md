@@ -23,6 +23,7 @@ Examples:
 
 ```bash
 python project/main.py init-db
+python project/main.py load-market-collector --source-database /path/to/market.duckdb --symbol AAPL
 python project/main.py run-batch NIFTY
 python project/main.py summarize-batch NIFTY
 python project/main.py replay-evaluate AAPL 2026-05-01T10:00:00Z long hypothesis:rsi_mean_reversion
@@ -30,10 +31,26 @@ python project/main.py replay-evaluate AAPL 2026-05-01T10:00:00Z long hypothesis
 
 All commands accept `--database`, which defaults to `project_mft.duckdb`.
 
+`init-db` is the only command that bootstraps schema. Read-only reporting commands open the database without writing.
+Batch and mutation commands emit a structured JSON envelope with `status`, `command`, and `result` or `error`.
+
+## market_collector Integration
+
+If you already offload OHLCV data with `~/market_collector`, import that DuckDB output into this project with:
+
+```bash
+python project/main.py load-market-collector \
+  --source-database /path/to/market.duckdb \
+  --symbol AAPL
+```
+
+The loader reads rows from the `ohlcv` table, keeps the latest row per symbol and timestamp, and persists matching `assets`, `raw_market_data`, and close-price `raw_data` records.
+
 ## Main Commands
 
 Pipeline and execution:
 - `init-db`
+- `load-market-collector --source-database <duckdb> [--symbol ...] [--resolution ...]`
 - `run-batch <asset_id>`
 - `summarize-batch <asset_id>`
 - `review-trade-idea <trade_id> <approve|reject|watchlist>`
@@ -106,17 +123,38 @@ python -m mypy
 - `project/main.py`
 - `project/cli.py`
 - `project/cli_support.py`
+- `project/cli_utils.py`
+- `project/cli_parsers.py`
 - `project/cli_readonly.py`
+- `project/research_batch.py`
+- `project/research_validation.py`
+- `project/strategy_dossier.py`
 - `project/data/repository.py`
+- `project/data/repository_base.py`
+- `project/data/repository_assets.py`
+- `project/data/repository_evaluations.py`
+- `project/data/repository_market.py`
+- `project/data/repository_research.py`
+- `project/data/repository_signals.py`
+- `project/data/repository_trading.py`
 - `project/data/schema.py`
 - `project/data/row_parsers.py`
 - `project/data/reporting_store.py`
+- `project/data/db.py`
+- `project/data/yfinance_loader.py`
+- `project/data/market_collector_loader.py`
 - `project/replay/engine.py`
 - `project/decision/models.py`
 
 ## codex_cli
 
 The separate `codex_cli/` package provides the local `mft` task orchestration tool used for bounded implementation work and architecture enforcement.
+
+Install it from the repo root:
+
+```bash
+pip install -e ./codex_cli
+```
 
 Common commands:
 - `mft run "implement new signal"`

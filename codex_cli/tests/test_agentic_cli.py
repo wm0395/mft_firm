@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 from subprocess import CompletedProcess
 from typing import cast
@@ -14,6 +16,20 @@ from codex_cli.models import Task
 from codex_cli.paths import ProjectPaths
 from codex_cli.prompts import build_execution_packet
 from codex_cli.router import recommend_provider, route
+
+
+def test_module_entrypoint_supports_python_dash_m_cli() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, "-m", "codex_cli.cli", "--help"],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
+    )
+
+    assert result.returncode == 0
+    assert "usage: mft" in result.stdout
 
 
 def test_run_creates_structured_task_packets_and_memory(tmp_path: Path, monkeypatch, capsys) -> None:

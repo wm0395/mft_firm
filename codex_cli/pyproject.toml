@@ -1,3 +1,8 @@
+[build-system]
+requires = []
+build-backend = "_editable_backend"
+backend-path = ["tests"]
+
 [project]
 name = "mft-codex-cli"
 version = "0.1.0"
