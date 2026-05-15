@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 from typing import Any, cast
 
 from project.backtesting.models import BacktestResult
-from project.common.models import Position, TradeOutcome
+from project.common.models import Position, TradeIdea, TradeOutcome
 from project.data.db import DuckDBAccess
 from project.data.reporting_store import load_backtest_results, load_trade_outcomes, persist_backtest_result
-from project.data.row_parsers import build_filters
+from project.data.row_parsers import build_filters, trade_idea_from_row
 
 
 class RepositoryTradingMixin:
@@ -17,6 +18,78 @@ class RepositoryTradingMixin:
 
     def get_backtest_results(self) -> tuple[BacktestResult, ...]:
         return load_backtest_results(_db(self))
+
+    def persist_trade_idea(self, trade: TradeIdea) -> None:
+        _db(self).execute(
+            """
+            insert into trade_ideas (
+                trade_id, asset_id, hypothesis_id, version, direction,
+                confidence, signals_snapshot_json, timestamp
+            ) values (?, ?, ?, ?, ?, ?, ?, ?)
+            on conflict(trade_id) do nothing
+            """,
+            (
+                trade.trade_id,
+                trade.asset_id,
+                trade.hypothesis_id,
+                trade.version,
+                trade.direction,
+                trade.confidence,
+                json.dumps(trade.signals_snapshot, sort_keys=True),
+                trade.timestamp,
+            ),
+        )
+
+    def get_trade_ideas(
+        self,
+        asset_id: str | None = None,
+        hypothesis_id: str | None = None,
+        direction: str | None = None,
+    ) -> tuple[TradeIdea, ...]:
+        where_clause, params = build_filters(
+            [
+                ("asset_id = ?", asset_id),
+                ("hypothesis_id = ?", hypothesis_id),
+                ("direction = ?", direction),
+            ]
+        )
+        rows = _db(self).fetch_all(
+            f"""
+            select trade_id, asset_id, hypothesis_id, version, direction,
+                   confidence, signals_snapshot_json, timestamp
+            from trade_ideas
+            where {where_clause}
+            order by timestamp, trade_id
+            """,
+            params,
+        )
+        return tuple(trade_idea_from_row(row) for row in rows)
+
+    def get_open_trade_ideas(
+        self,
+        asset_id: str | None = None,
+        hypothesis_id: str | None = None,
+        direction: str | None = None,
+    ) -> tuple[TradeIdea, ...]:
+        where_clause, params = build_filters(
+            [
+                ("ti.asset_id = ?", asset_id),
+                ("ti.hypothesis_id = ?", hypothesis_id),
+                ("ti.direction = ?", direction),
+            ]
+        )
+        rows = _db(self).fetch_all(
+            f"""
+            select ti.trade_id, ti.asset_id, ti.hypothesis_id, ti.version,
+                   ti.direction, ti.confidence, ti.signals_snapshot_json, ti.timestamp
+            from trade_ideas ti
+            left join decisions d on ti.trade_id = d.trade_id
+            where d.decision_id is null and {where_clause}
+            order by ti.timestamp, ti.trade_id
+            """,
+            params,
+        )
+        return tuple(trade_idea_from_row(row) for row in rows)
 
     def persist_position(self, position: Position) -> None:
         _db(self).execute(
@@ -63,36 +136,6 @@ class RepositoryTradingMixin:
             params,
         )
         return tuple(Position(*row) for row in rows)
-
-    def persist_decision(self, decision: Any) -> None:
-        _db(self).execute(
-            """
-            insert into decisions values (?, ?, ?, ?, ?, ?)
-            on conflict(decision_id) do nothing
-            """,
-            (
-                decision.decision_id,
-                decision.trade_id,
-                decision.action,
-                decision.structured_reason,
-                decision.notes,
-                decision.created_at,
-            ),
-        )
-
-    def get_decisions(self, trade_id: str | None = None) -> tuple[tuple, ...]:
-        where_clause, params = build_filters([("trade_id = ?", trade_id)])
-        return tuple(
-            _db(self).fetch_all(
-                f"""
-            select decision_id, trade_id, action, structured_reason, notes, created_at
-            from decisions
-            where {where_clause}
-            order by created_at, decision_id
-            """,
-                params,
-            )
-        )
 
     def get_trade_outcomes(self) -> tuple[TradeOutcome, ...]:
         return load_trade_outcomes(_db(self))

@@ -40,6 +40,7 @@ def can_complete(task: Task) -> bool:
         and task.implementation_status == "verified"
         and task.review_status == REVIEW_APPROVED
         and _required_reviewers_approved(task)
+        and _latest_checks_passed(task)
         and _latest_diff_guard_passed(task)
     )
 
@@ -80,4 +81,12 @@ def _latest_diff_guard_passed(task: Task) -> bool:
         if isinstance(diff_guard, dict):
             return bool(diff_guard.get("scope_ok"))
         return False
+    return False
+
+
+def _latest_checks_passed(task: Task) -> bool:
+    for record in reversed(task.check_history):
+        if str(record.get("kind", "")) != "checks":
+            continue
+        return str(record.get("status", "")) == "pass"
     return False

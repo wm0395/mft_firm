@@ -282,6 +282,17 @@ def _task() -> Task:
         workflow_stage="implemented",
         implementation_status="verified",
         implementation_files=("codex_cli/review_runner.py",),
+        check_history=(
+            {
+                "kind": "checks",
+                "status": "pass",
+                "checks": (
+                    {"name": "pytest", "status": "pass"},
+                    {"name": "ruff", "status": "pass"},
+                    {"name": "mypy", "status": "pass"},
+                ),
+            },
+        ),
         run_history=(
             {
                 "kind": "managed_run",

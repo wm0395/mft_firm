@@ -127,6 +127,7 @@ def _evaluate_research_outputs(
     outputs: list[HypothesisOutput] = []
     for asset_id in universe.asset_ids:
         signals = compute_latest_price_signals(repository, default_signal_registry(), asset_id)
+        repository.persist_signals(signals)
         outputs.extend(evaluate_hypotheses(asset_id, signals, hypotheses()))
     return tuple(outputs)
 
@@ -310,7 +311,9 @@ def _latest_price_timestamp(repository: DataRepository, asset_id: str) -> str:
 
 
 def _trade_id_for_output(output) -> str:
-    return f"trade:{output.asset_id}:{output.hypothesis_id}:{output.version}"
+    if not output.timestamp:
+        raise ValueError("hypothesis output timestamp is required")
+    return f"trade:{output.asset_id}:{output.hypothesis_id}:{output.version}:{output.timestamp}"
 
 
 def _horizon_days(value: str) -> int:

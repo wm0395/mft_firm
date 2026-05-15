@@ -116,6 +116,7 @@ SCHEMA_SQL = (
         asset_id varchar not null,
         timestamp varchar not null,
         signal_type varchar not null,
+        raw_reference varchar not null,
         value double not null,
         metadata_json varchar,
         is_persistent boolean not null
@@ -195,7 +196,8 @@ SCHEMA_SQL = (
         version integer not null,
         direction varchar not null,
         confidence double not null,
-        signals_snapshot_json varchar not null
+        signals_snapshot_json varchar not null,
+        timestamp varchar not null
     )
     """,
     """

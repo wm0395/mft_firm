@@ -29,16 +29,19 @@ def compute_latest_price_signals(
     signals: list[Signal] = []
     for signal_type, value in definitions.items():
         definition = registry.require(signal_type)
-        signal = Signal(
-            signal_type=signal_type,
-            value=float(value),
-            encoding_type="numeric",
-            timestamp=timestamp,
-            asset_id=asset_id,
-            raw_reference=raw_reference,
-            metadata={"version": definition.version, "dependencies": list(definition.dependencies)},
-            is_persistent=definition.is_persistent,
+        signals.append(
+            Signal(
+                signal_type=signal_type,
+                value=float(value),
+                encoding_type="numeric",
+                timestamp=timestamp,
+                asset_id=asset_id,
+                raw_reference=raw_reference,
+                metadata={
+                    "version": definition.version,
+                    "dependencies": list(definition.dependencies),
+                },
+                is_persistent=definition.is_persistent,
+            )
         )
-        repository.persist_signal(signal)
-        signals.append(signal)
     return tuple(signals)

@@ -173,6 +173,7 @@ class HypothesisOutput:
     confidence: float
     signals_snapshot: dict[str, float]
     explanation: dict[str, Any]
+    timestamp: str = ""
 
 
 @dataclass(frozen=True)
@@ -184,6 +185,7 @@ class TradeIdea:
     direction: Direction
     confidence: float
     signals_snapshot: dict[str, float]
+    timestamp: str = ""
 
 
 @dataclass(frozen=True)

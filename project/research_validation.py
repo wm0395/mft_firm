@@ -48,7 +48,7 @@ def evaluation_from_output(
     research_run_id: str | None = None,
     dataset_snapshot_id: str | None = None,
 ) -> HypothesisEvaluation:
-    timestamp_value = timestamp or utc_now_iso()
+    timestamp_value = timestamp or output.timestamp or utc_now_iso()
     return HypothesisEvaluation(
         evaluation_id=f"eval:{output.asset_id}:{output.hypothesis_id}:{output.version}:{timestamp_value}",
         asset_id=output.asset_id,

@@ -8,15 +8,20 @@ def generate_trade_ideas(outputs: tuple[HypothesisOutput, ...]) -> tuple[TradeId
     for output in outputs:
         if output.direction == "flat" or output.confidence <= 0:
             continue
+        if not output.timestamp:
+            raise ValueError("hypothesis output timestamp is required")
         ideas.append(
             TradeIdea(
-                trade_id=f"trade:{output.asset_id}:{output.hypothesis_id}:{output.version}",
+                trade_id=(
+                    f"trade:{output.asset_id}:{output.hypothesis_id}:{output.version}:{output.timestamp}"
+                ),
                 asset_id=output.asset_id,
                 hypothesis_id=output.hypothesis_id,
                 version=output.version,
                 direction=output.direction,
                 confidence=output.confidence,
                 signals_snapshot=dict(sorted(output.signals_snapshot.items())),
+                timestamp=output.timestamp,
             )
         )
     return tuple(ideas)

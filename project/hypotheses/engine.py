@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from project.common.models import HypothesisOutput, Signal
+from project.common.models import HypothesisOutput, Signal, utc_now_iso
 from project.hypotheses.interface import Hypothesis
 
 
@@ -11,9 +11,13 @@ def evaluate_hypotheses(
     signals: tuple[Signal, ...],
     hypotheses: tuple[Hypothesis, ...],
 ) -> tuple[HypothesisOutput, ...]:
+    latest_timestamp = _latest_signal_timestamp(signals)
     raw_outputs = tuple(hypothesis.evaluate(asset_id, signals) for hypothesis in hypotheses)
     grouped = _group_outputs(raw_outputs)
-    return tuple(_annotate_competition(output, grouped[output.direction]) for output in raw_outputs)
+    return tuple(
+        _annotate_competition(output, grouped[output.direction], latest_timestamp)
+        for output in raw_outputs
+    )
 
 
 def _group_outputs(outputs: tuple[HypothesisOutput, ...]) -> dict[str, tuple[HypothesisOutput, ...]]:
@@ -26,6 +30,7 @@ def _group_outputs(outputs: tuple[HypothesisOutput, ...]) -> dict[str, tuple[Hyp
 def _annotate_competition(
     output: HypothesisOutput,
     competing: tuple[HypothesisOutput, ...],
+    timestamp: str,
 ) -> HypothesisOutput:
     sorted_outputs = tuple(sorted(competing, key=lambda item: item.confidence, reverse=True))
     explanation = dict(output.explanation)
@@ -39,7 +44,14 @@ def _annotate_competition(
         confidence=output.confidence,
         signals_snapshot=output.signals_snapshot,
         explanation=explanation,
+        timestamp=output.timestamp or timestamp,
     )
+
+
+def _latest_signal_timestamp(signals: tuple[Signal, ...]) -> str:
+    if not signals:
+        return utc_now_iso()
+    return max(signals, key=lambda signal: signal.timestamp).timestamp
 
 
 def _competition_payload(

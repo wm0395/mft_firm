@@ -195,6 +195,7 @@ def run_batch(repository: DataRepository, asset_ref: str, persist: bool) -> int:
     ideas = generate_trade_ideas(tuple(output for output, result in validations if result.is_valid))
     if persist:
         with repository.transaction():
+            repository.persist_signals(signals)
             _persist_run_batch(repository, validations, ideas)
     _emit_success(
         "run-batch",
