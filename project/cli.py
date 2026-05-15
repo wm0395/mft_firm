@@ -38,6 +38,7 @@ from project.cli_support import (
 )
 from project.common.models import DecisionAction, DecisionReason, Direction, HypothesisOutput, TradeIdea, utc_now_iso
 from project.data.db import DuckDBAccess
+from project.data.loader import load_ohlcv_csv
 from project.data.market_collector_loader import load_market_collector_ohlcv
 from project.data.repository import DataRepository
 from project.data.yfinance_loader import load_default_yfinance_universe
@@ -112,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
 def dispatch(args: argparse.Namespace, repository: DataRepository) -> int:
     if args.command in {"run-batch", "summarize-batch", "run-research-batch"}:
         return _dispatch_pipeline(repository, args)
-    if args.command in {"load-yfinance-universe", "load-market-collector"}:
+    if args.command in {"load-yfinance-universe", "load-market-collector", "load-ohlcv-csv"}:
         return _dispatch_ingestion(repository, args)
     if args.command in {"review-trade-idea", "replay-evaluate", "backtest-hypothesis"}:
         return _dispatch_trade(repository, args)
@@ -134,6 +135,8 @@ def _dispatch_pipeline(repository: DataRepository, args: argparse.Namespace) -> 
 def _dispatch_ingestion(repository: DataRepository, args: argparse.Namespace) -> int:
     if args.command == "load-yfinance-universe":
         return load_yfinance_universe(repository, args.period, args.interval)
+    if args.command == "load-ohlcv-csv":
+        return load_ohlcv_csv_command(repository, args.file_path, args.asset_symbol)
     return load_market_collector(repository, args.source_database, args.symbol, args.resolution)
 
 
@@ -271,6 +274,23 @@ def load_market_collector(
         _emit_error("load-market-collector", error)
         return 1
     _emit_success("load-market-collector", payload)
+    return 0
+
+
+def load_ohlcv_csv_command(repository: DataRepository, file_path: str, asset_symbol: str) -> int:
+    try:
+        rows_loaded = load_ohlcv_csv(Path(file_path), asset_symbol, repository)
+    except (OSError, RuntimeError, ValueError) as error:
+        _emit_error("load-ohlcv-csv", error)
+        return 1
+    _emit_success(
+        "load-ohlcv-csv",
+        {
+            "asset_symbol": asset_symbol.upper(),
+            "file_path": file_path,
+            "rows_loaded": rows_loaded,
+        },
+    )
     return 0
 
 

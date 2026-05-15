@@ -51,6 +51,7 @@ The loader reads rows from the `ohlcv` table, keeps the latest row per symbol an
 Pipeline and execution:
 - `init-db`
 - `load-market-collector --source-database <duckdb> [--symbol ...] [--resolution ...]`
+- `load-ohlcv-csv --file-path <csv> --asset-symbol <symbol>`
 - `run-batch <asset_id>`
 - `summarize-batch <asset_id>`
 - `review-trade-idea <trade_id> <approve|reject|watchlist>`
@@ -117,6 +118,12 @@ Current expected checks:
 python -m pytest
 python -m ruff check .
 python -m mypy
+```
+
+Single local command:
+
+```bash
+./scripts/check.sh
 ```
 
 `mypy` is intentionally scoped in `pyproject.toml` to the stabilized command and data surface:

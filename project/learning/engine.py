@@ -1,10 +1,11 @@
 from __future__ import annotations
-import statistics
+
 import math
-from typing import List
+import statistics
 
 from project.common.models import TradeOutcome
-from project.data.models import SignalEvaluation, HypothesisMetrics
+from project.data.models import HypothesisMetrics, SignalEvaluation
+
 
 def analyze_hypothesis_performance(outcomes: tuple[TradeOutcome, ...]) -> dict[str, dict[str, float | int]]:
     grouped: dict[str, list[TradeOutcome]] = {}
@@ -19,59 +20,55 @@ def analyze_hypothesis_performance(outcomes: tuple[TradeOutcome, ...]) -> dict[s
         for hypothesis_id, items in sorted(grouped.items())
     }
 
+
 def aggregate_signal_performance(
-    evaluations: List[SignalEvaluation], 
-    horizon_idx: int = 2  # Default to forward_return_20
+    evaluations: list[SignalEvaluation],
+    horizon_idx: int = 2,
 ) -> HypothesisMetrics:
-    """
-    Aggregates signal evaluations into measurable research metrics.
-    horizon_idx mapping: 0 -> return_1, 1 -> return_5, 2 -> return_20
-    """
-    if not evaluations:
-        return HypothesisMetrics(0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-
-    horizons = [1, 5, 20]
-    attr_name = f"forward_return_{horizons[horizon_idx]}"
-    
-    returns = []
-    for e in evaluations:
-        val = getattr(e, attr_name)
-        if not math.isnan(val):
-            returns.append(val)
-
+    returns = _signal_returns(evaluations, horizon_idx)
     if not returns:
         return HypothesisMetrics(len(evaluations), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    return _metrics_from_returns(len(returns), returns)
 
-    n_signals = len(returns)
-    hits = sum(1 for r in returns if r > 0)
-    hit_rate = hits / n_signals
-    mean_ret = statistics.mean(returns)
-    median_ret = statistics.median(returns)
-    
-    # Volatility (Std Dev)
-    vol = statistics.stdev(returns) if n_signals > 1 else 0.0
-    
-    # Sharpe-like score: mean / vol
-    sharpe = mean_ret / vol if vol > 0 else 0.0
-    
-    # Max Drawdown on cumulative returns
-    cum_ret = 0.0
-    peak = -float('inf')
-    max_dd = 0.0
-    for r in returns:
-        cum_ret += r
-        if cum_ret > peak:
-            peak = cum_ret
-        dd = peak - cum_ret
-        if dd > max_dd:
-            max_dd = dd
-            
+
+def _signal_returns(evaluations: list[SignalEvaluation], horizon_idx: int) -> list[float]:
+    attr_name = _horizon_attribute(horizon_idx)
+    return [
+        value
+        for value in (_signal_return(evaluation, attr_name) for evaluation in evaluations)
+        if not math.isnan(value)
+    ]
+
+
+def _horizon_attribute(horizon_idx: int) -> str:
+    horizons = (1, 5, 20)
+    return f"forward_return_{horizons[horizon_idx]}"
+
+
+def _signal_return(evaluation: SignalEvaluation, attr_name: str) -> float:
+    return float(getattr(evaluation, attr_name))
+
+
+def _metrics_from_returns(n_signals: int, returns: list[float]) -> HypothesisMetrics:
+    hit_rate = sum(1 for value in returns if value > 0) / n_signals
+    volatility = statistics.stdev(returns) if n_signals > 1 else 0.0
     return HypothesisMetrics(
         n_signals=n_signals,
         hit_rate=hit_rate,
-        mean_return=mean_ret,
-        median_return=median_ret,
-        volatility=vol,
-        sharpe_like_score=sharpe,
-        max_drawdown=max_dd
+        mean_return=statistics.mean(returns),
+        median_return=statistics.median(returns),
+        volatility=volatility,
+        sharpe_like_score=statistics.mean(returns) / volatility if volatility > 0 else 0.0,
+        max_drawdown=_max_drawdown(returns),
     )
+
+
+def _max_drawdown(returns: list[float]) -> float:
+    equity = 0.0
+    peak = 0.0
+    max_drawdown = 0.0
+    for value in returns:
+        equity += value
+        peak = max(peak, equity)
+        max_drawdown = max(max_drawdown, peak - equity)
+    return max_drawdown

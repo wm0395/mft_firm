@@ -415,13 +415,13 @@ Refine the task first.
 Create:
 
 ```text
-agents/prompts/
+docs/prompts/
 ```
 
 Structure:
 
 ```text
-agents/prompts/
+docs/prompts/
 ├── architecture_reviewer.md
 ├── determinism_auditor.md
 ├── complexity_reviewer.md

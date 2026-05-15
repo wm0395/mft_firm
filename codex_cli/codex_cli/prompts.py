@@ -163,6 +163,8 @@ def _check_results_block(task: Task) -> str:
 def _reviewer_prompt(paths: ProjectPaths, persona: str) -> str:
     reviewer = reviewer_name(persona)
     candidates = (
+        paths.workspace_root / "docs" / "prompts" / f"{reviewer}.md",
+        Path(__file__).resolve().parents[2] / "docs" / "prompts" / f"{reviewer}.md",
         paths.workspace_root / "agents" / "prompts" / f"{reviewer}.md",
         Path(__file__).resolve().parents[2] / "agents" / "prompts" / f"{reviewer}.md",
     )

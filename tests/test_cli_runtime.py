@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -16,6 +18,35 @@ from project.data.yfinance_loader import (
     YFinancePriceBatch,
     load_default_yfinance_universe,
 )
+
+
+CSV_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "market_data" / "NIFTY.csv"
+
+
+def _run_help(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, *command],
+        cwd=cwd,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_project_main_script_help() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    result = _run_help(["project/main.py", "--help"], repo_root)
+
+    assert result.returncode == 0
+    assert "usage:" in result.stdout.lower()
+
+
+def test_project_main_module_help() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    result = _run_help(["-m", "project.main", "--help"], repo_root)
+
+    assert result.returncode == 0
+    assert "usage:" in result.stdout.lower()
 
 
 def test_read_only_command_skips_schema_bootstrap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
@@ -74,6 +105,66 @@ def test_mutating_command_emits_structured_error(tmp_path: Path, capsys: pytest.
     assert exit_code == 1
     assert payload["status"] == "error"
     assert payload["command"] == "review-trade-idea"
+
+
+def test_load_ohlcv_csv_command_ingests_data(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    db_path = tmp_path / "mft.duckdb"
+
+    exit_code = main(["init-db", "--database", str(db_path)])
+    capsys.readouterr()
+    assert exit_code == 0
+
+    exit_code = main(
+        [
+            "load-ohlcv-csv",
+            "--file-path",
+            str(CSV_FIXTURE),
+            "--asset-symbol",
+            "NIFTY",
+            "--database",
+            str(db_path),
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+    db = DuckDBAccess(db_path)
+    repository = DataRepository(db)
+    try:
+        assert exit_code == 0
+        assert payload["status"] == "ok"
+        assert payload["command"] == "load-ohlcv-csv"
+        assert payload["result"]["asset_symbol"] == "NIFTY"
+        assert payload["result"]["rows_loaded"] == 25
+        assert len(repository.list_assets()) == 1
+        assert len(repository.get_market_data("NIFTY", None, None)) == 25
+    finally:
+        db.close()
+
+
+def test_load_ohlcv_csv_command_reports_missing_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    db_path = tmp_path / "mft.duckdb"
+    missing = tmp_path / "missing.csv"
+
+    exit_code = main(["init-db", "--database", str(db_path)])
+    capsys.readouterr()
+    assert exit_code == 0
+
+    exit_code = main(
+        [
+            "load-ohlcv-csv",
+            "--file-path",
+            str(missing),
+            "--asset-symbol",
+            "NIFTY",
+            "--database",
+            str(db_path),
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 1
+    assert payload["status"] == "error"
+    assert payload["command"] == "load-ohlcv-csv"
+    assert "No such file" in payload["error"] or "not found" in payload["error"]
 
 
 def test_yfinance_loader_rolls_back_on_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

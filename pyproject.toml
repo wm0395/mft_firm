@@ -1,6 +1,7 @@
 [tool.ruff]
 exclude = [
     ".env",
+    ".tmp_task001_clone",
     ".pytest_cache",
     ".ruff_cache",
     "__pycache__",

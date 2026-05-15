@@ -60,7 +60,7 @@ def test_editable_install_exposes_mft_command_from_repo_root(tmp_path: Path) -> 
 def _create_checkout(root: Path) -> Path:
     checkout_root = root / "checkout"
     checkout_root.mkdir()
-    shutil.copytree(REPO_ROOT / "agents", checkout_root / "agents")
+    shutil.copytree(REPO_ROOT / "docs" / "prompts", checkout_root / "docs" / "prompts")
     shutil.copytree(PACKAGE_ROOT, checkout_root / "codex_cli", ignore=_ignore_package_artifacts)
     (checkout_root / "AGENTS.md").write_text("# Rules\n- keep it bounded\n", encoding="utf-8")
     (checkout_root / "README.md").write_text("# Test checkout\n", encoding="utf-8")

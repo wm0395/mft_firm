@@ -3,6 +3,58 @@ from __future__ import annotations
 from project.common.models import SignalDefinition
 
 
+DEFAULT_SIGNAL_DEFINITIONS = (
+    SignalDefinition(
+        signal_type="rsi_14",
+        category="technical",
+        definition="14-period relative strength index",
+        dependencies=("price",),
+        is_persistent=True,
+        version=1,
+    ),
+    SignalDefinition(
+        signal_type="ma_3",
+        category="technical",
+        definition="3-period moving average of close",
+        dependencies=("price",),
+        is_persistent=True,
+        version=1,
+    ),
+    SignalDefinition(
+        signal_type="ma_5",
+        category="technical",
+        definition="5-period moving average of close",
+        dependencies=("price",),
+        is_persistent=True,
+        version=1,
+    ),
+    SignalDefinition(
+        signal_type="ma_20",
+        category="technical",
+        definition="20-period moving average of close",
+        dependencies=("price",),
+        is_persistent=True,
+        version=1,
+    ),
+    SignalDefinition(
+        signal_type="volatility_5",
+        category="technical",
+        definition="5-period mean absolute close return",
+        dependencies=("price",),
+        is_persistent=True,
+        version=1,
+    ),
+    SignalDefinition(
+        signal_type="volatility_20",
+        category="technical",
+        definition="20-period mean absolute close return",
+        dependencies=("price",),
+        is_persistent=True,
+        version=1,
+    ),
+)
+
+
 class SignalRegistry:
     def __init__(self) -> None:
         self._definitions: dict[str, SignalDefinition] = {}
@@ -25,64 +77,6 @@ class SignalRegistry:
 
 def default_signal_registry() -> SignalRegistry:
     registry = SignalRegistry()
-    registry.register(
-        SignalDefinition(
-            signal_type="rsi_14",
-            category="technical",
-            definition="14-period relative strength index",
-            dependencies=("price",),
-            is_persistent=True,
-            version=1,
-        )
-    )
-    registry.register(
-        SignalDefinition(
-            signal_type="ma_3",
-            category="technical",
-            definition="3-period moving average of close",
-            dependencies=("price",),
-            is_persistent=True,
-            version=1,
-        )
-    )
-    registry.register(
-        SignalDefinition(
-            signal_type="ma_5",
-            category="technical",
-            definition="5-period moving average of close",
-            dependencies=("price",),
-            is_persistent=True,
-            version=1,
-        )
-    )
-    registry.register(
-        SignalDefinition(
-            signal_type="ma_20",
-            category="technical",
-            definition="20-period moving average of close",
-            dependencies=("price",),
-            is_persistent=True,
-            version=1,
-        )
-    )
-    registry.register(
-        SignalDefinition(
-            signal_type="volatility_5",
-            category="technical",
-            definition="5-period mean absolute close return",
-            dependencies=("price",),
-            is_persistent=True,
-            version=1,
-        )
-    )
-    registry.register(
-        SignalDefinition(
-            signal_type="volatility_20",
-            category="technical",
-            definition="20-period mean absolute close return",
-            dependencies=("price",),
-            is_persistent=True,
-            version=1,
-        )
-    )
+    for definition in DEFAULT_SIGNAL_DEFINITIONS:
+        registry.register(definition)
     return registry

@@ -1,396 +1,299 @@
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 from project.data.models import HypothesisEvaluation
 from project.data.repository import DataRepository
 from project.hypotheses.registry import HypothesisRegistry
 from project.validation.models import ValidationResult
-import json
 
 
 def confidence_validator(
     evaluation: HypothesisEvaluation,
     context: dict,
 ) -> ValidationResult:
-    """
-    Reject if confidence < 0.55
-    Reason: "low_confidence"
-    """
-    is_valid = evaluation.confidence >= 0.55
-    reasons = [] if is_valid else ["low_confidence"]
     metrics = {"confidence_threshold": 0.55, "actual_confidence": evaluation.confidence}
-    return ValidationResult(
-        is_valid=is_valid,
-        reasons=reasons,
-        metrics=metrics,
-        validated_at=ValidationResult.now(),
-    )
+    if evaluation.confidence >= 0.55:
+        return _result(True, (), metrics)
+    return _result(False, ("low_confidence",), metrics)
 
 
 def hypothesis_status_validator(
     evaluation: HypothesisEvaluation,
     context: dict,
 ) -> ValidationResult:
-    """
-    Allowed: testing, active
-    Reject: deprecated, archived
-    Reason: "invalid_hypothesis_status"
-    """
-    hypothesis_registry: HypothesisRegistry = context.get("hypothesis_registry")
-    if hypothesis_registry is None:
-        # If no registry provided, we can't check status - assume valid
-        return ValidationResult(
-            is_valid=True,
-            reasons=[],
-            metrics={},
-            validated_at=ValidationResult.now(),
-        )
-    
-    definition = hypothesis_registry.get_definition(evaluation.hypothesis_id)
+    registry: HypothesisRegistry | None = context.get("hypothesis_registry")
+    if registry is None:
+        return _result(True, (), {})
+    definition = registry.get_definition(evaluation.hypothesis_id)
     if definition is None:
-        # Hypothesis not found in registry - reject
-        return ValidationResult(
-            is_valid=False,
-            reasons=["invalid_hypothesis_status"],
-            metrics={"hypothesis_id": evaluation.hypothesis_id},
-            validated_at=ValidationResult.now(),
+        return _result(
+            False,
+            ("invalid_hypothesis_status",),
+            {"hypothesis_id": evaluation.hypothesis_id},
         )
-    
-    is_valid = definition.status in ["testing", "active"]
-    reasons = [] if is_valid else ["invalid_hypothesis_status"]
+    allowed = ("testing", "active")
     metrics = {
         "hypothesis_id": evaluation.hypothesis_id,
         "hypothesis_status": definition.status,
-        "allowed_statuses": ["testing", "active"]
+        "allowed_statuses": list(allowed),
     }
-    return ValidationResult(
-        is_valid=is_valid,
-        reasons=reasons,
-        metrics=metrics,
-        validated_at=ValidationResult.now(),
-    )
+    if definition.status not in allowed:
+        return _result(False, ("invalid_hypothesis_status",), metrics)
+    return _result(True, (), metrics)
 
 
 def signal_freshness_validator(
     evaluation: HypothesisEvaluation,
     context: dict,
 ) -> ValidationResult:
-    """
-    Reject if signal age > configurable threshold
-    Default: 24 hours
-    Reason: "stale_signals"
-    """
-    from datetime import datetime, timezone
-    
-    # Get max age from context, default to 24 hours
-    max_age_hours = context.get("max_signal_age_hours", 24)
-    
-    # Parse evaluation timestamp
-    eval_time = datetime.fromisoformat(evaluation.timestamp.replace("Z", "+00:00"))
-    now = datetime.now(timezone.utc)
-    age_hours = (now - eval_time).total_seconds() / 3600
-    
-    is_valid = age_hours <= max_age_hours
-    reasons = [] if is_valid else ["stale_signals"]
+    max_age_hours = float(context.get("max_signal_age_hours", 24))
+    now = datetime.now(UTC)
+    try:
+        timestamp = _parse_timestamp(evaluation.timestamp)
+    except ValueError as error:
+        return _result(
+            False,
+            ("stale_signals",),
+            {"error": str(error), "evaluation_timestamp": evaluation.timestamp},
+        )
+    age_hours = (now - timestamp).total_seconds() / 3600
     metrics = {
         "signal_age_hours": age_hours,
         "max_age_hours": max_age_hours,
-        "evaluation_timestamp": evaluation.timestamp
+        "evaluation_timestamp": evaluation.timestamp,
     }
-    return ValidationResult(
-        is_valid=is_valid,
-        reasons=reasons,
-        metrics=metrics,
-        validated_at=ValidationResult.now(),
-    )
+    if age_hours > max_age_hours:
+        return _result(False, ("stale_signals",), metrics)
+    return _result(True, (), metrics)
 
 
 def duplicate_exposure_validator(
     evaluation: HypothesisEvaluation,
     context: dict,
 ) -> ValidationResult:
-    """
-    Reject if existing active exposure exists for:
-    * same asset
-    * same direction
-    * same hypothesis
-    
-    Active exposure is defined as:
-    - An open position
-    - A trade idea pending decision
-    
-    Reason: "duplicate_exposure"
-    """
-    repository: DataRepository = context.get("repository")
+    repository: DataRepository | None = context.get("repository")
     if repository is None:
-        # If no repository provided, we can't check for duplicates - assume valid
-        return ValidationResult(
-            is_valid=True,
-            reasons=[],
-            metrics={},
-            validated_at=ValidationResult.now(),
-        )
-    
-    # 1. Check for open positions
+        return _result(True, (), {})
     open_positions = repository.get_positions(
         asset_id=evaluation.asset_id,
         hypothesis_id=evaluation.hypothesis_id,
         direction=evaluation.direction,
-        status="open"
+        status="open",
     )
-    
-    # 2. Check for trade ideas pending decision
-    pending_trade_ideas = repository.get_open_trade_ideas(
+    pending_ideas = repository.get_open_trade_ideas(
         asset_id=evaluation.asset_id,
         hypothesis_id=evaluation.hypothesis_id,
-        direction=evaluation.direction
+        direction=evaluation.direction,
     )
-    
-    # If either exist, reject to prevent duplicate exposure
-    has_exposure = len(open_positions) > 0 or len(pending_trade_ideas) > 0
-    is_valid = not has_exposure
-    reasons = [] if is_valid else ["duplicate_exposure"]
     metrics = {
         "evaluation_asset_id": evaluation.asset_id,
         "evaluation_hypothesis_id": evaluation.hypothesis_id,
         "evaluation_direction": evaluation.direction,
         "open_positions_count": len(open_positions),
-        "pending_trade_ideas_count": len(pending_trade_ideas)
+        "pending_trade_ideas_count": len(pending_ideas),
     }
-    return ValidationResult(
-        is_valid=is_valid,
-        reasons=reasons,
-        metrics=metrics,
-        validated_at=ValidationResult.now(),
-    )
+    if open_positions or pending_ideas:
+        return _result(False, ("duplicate_exposure",), metrics)
+    return _result(True, (), metrics)
 
 
 def malformed_signal_payload_validator(
     evaluation: HypothesisEvaluation,
     context: dict,
 ) -> ValidationResult:
-    """
-    Validate that signal payload is well-formed.
-    Checks for:
-    - Valid JSON in signals_snapshot_json and explanation_json
-    - Required signals present based on hypothesis dependencies
-    Reason: "malformed_signal_payload"
-    """
-    # Parse signals snapshot
-    try:
-        signals_snapshot = json.loads(evaluation.signals_snapshot_json)
-        if not isinstance(signals_snapshot, dict):
-            raise ValueError("signals_snapshot is not a dictionary")
-    except (json.JSONDecodeError, ValueError, TypeError) as e:
-        return ValidationResult(
-            is_valid=False,
-            reasons=["malformed_signal_payload"],
-            metrics={"error": f"Invalid signals_snapshot_json: {str(e)}"},
-            validated_at=ValidationResult.now(),
+    signals_snapshot, duplicate_signal_keys = _load_json_object(evaluation.signals_snapshot_json)
+    if signals_snapshot is None:
+        return _result(
+            False,
+            ("malformed_signal_payload",),
+            {"error": "Invalid signals_snapshot_json"},
         )
-    
-    # Parse explanation
-    try:
-        explanation = json.loads(evaluation.explanation_json)
-        if not isinstance(explanation, dict):
-            raise ValueError("explanation is not a dictionary")
-    except (json.JSONDecodeError, ValueError, TypeError) as e:
-        return ValidationResult(
-            is_valid=False,
-            reasons=["malformed_signal_payload"],
-            metrics={"error": f"Invalid explanation_json: {str(e)}"},
-            validated_at=ValidationResult.now(),
+    if duplicate_signal_keys:
+        return _result(
+            False,
+            ("duplicate_signal_definitions",),
+            {"duplicate_signals": duplicate_signal_keys},
         )
-    
-    # Check for required signals if hypothesis registry is available
-    hypothesis_registry: HypothesisRegistry = context.get("hypothesis_registry")
-    if hypothesis_registry is not None:
-        definition = hypothesis_registry.get_definition(evaluation.hypothesis_id)
-        if definition is not None:
-            required_signals = hypothesis_registry.required_signals(evaluation.hypothesis_id)
-            missing_signals = [signal for signal in required_signals if signal not in signals_snapshot]
-            if missing_signals:
-                return ValidationResult(
-                    is_valid=False,
-                    reasons=["missing_signal_dependencies"],
-                    metrics={
-                        "missing_signals": missing_signals,
-                        "required_signals": list(required_signals),
-                        "available_signals": list(signals_snapshot.keys())
-                    },
-                    validated_at=ValidationResult.now(),
-                )
-    
-    return ValidationResult(
-        is_valid=True,
-        reasons=[],
-        metrics={},
-        validated_at=ValidationResult.now(),
-    )
+    if _load_json_object(evaluation.explanation_json)[0] is None:
+        return _result(
+            False,
+            ("malformed_signal_payload",),
+            {"error": "Invalid explanation_json"},
+        )
+    return _signal_dependency_validation(context.get("hypothesis_registry"), evaluation, signals_snapshot)
 
 
 def inconsistent_timestamps_validator(
     evaluation: HypothesisEvaluation,
     context: dict,
 ) -> ValidationResult:
-    """
-    Validate timestamp consistency.
-    Checks that evaluation timestamp is reasonable (not too far in future/past).
-    Reason: "inconsistent_timestamps"
-    """
-    from datetime import datetime, timezone, timedelta
-    
+    now = datetime.now(UTC)
     try:
-        eval_time = datetime.fromisoformat(evaluation.timestamp.replace("Z", "+00:00"))
-        now = datetime.now(timezone.utc)
-        
-        # Allow up to 1 day in future or 7 days in past
-        future_threshold = now + timedelta(days=1)
-        past_threshold = now - timedelta(days=7)
-        
-        if eval_time > future_threshold:
-            return ValidationResult(
-                is_valid=False,
-                reasons=["inconsistent_timestamps"],
-                metrics={
-                    "evaluation_timestamp": evaluation.timestamp,
-                    "current_time": now.isoformat(),
-                    "issue": "timestamp_too_far_in_future"
-                },
-                validated_at=ValidationResult.now(),
-            )
-        
-        if eval_time < past_threshold:
-            return ValidationResult(
-                is_valid=False,
-                reasons=["inconsistent_timestamps"],
-                metrics={
-                    "evaluation_timestamp": evaluation.timestamp,
-                    "current_time": now.isoformat(),
-                    "issue": "timestamp_too_far_in_past"
-                },
-                validated_at=ValidationResult.now(),
-            )
-            
-    except ValueError as e:
-        return ValidationResult(
-            is_valid=False,
-            reasons=["inconsistent_timestamps"],
-            metrics={"error": f"Invalid timestamp format: {str(e)}"},
-            validated_at=ValidationResult.now(),
+        timestamp = _parse_timestamp(evaluation.timestamp)
+    except ValueError as error:
+        return _result(
+            False,
+            ("inconsistent_timestamps",),
+            {"error": f"Invalid timestamp format: {error}"},
         )
-    
-    # Return timestamp in metrics when valid for consistency
-    return ValidationResult(
-        is_valid=True,
-        reasons=[],
-        metrics={
-            "evaluation_timestamp": evaluation.timestamp
-        },
-        validated_at=ValidationResult.now(),
-    )
+    future_threshold = now + timedelta(days=1)
+    past_threshold = now - timedelta(days=7)
+    if timestamp > future_threshold:
+        return _result(
+            False,
+            ("inconsistent_timestamps",),
+            {
+                "evaluation_timestamp": evaluation.timestamp,
+                "current_time": now.isoformat(),
+                "issue": "timestamp_too_far_in_future",
+            },
+        )
+    if timestamp < past_threshold:
+        return _result(
+            False,
+            ("inconsistent_timestamps",),
+            {
+                "evaluation_timestamp": evaluation.timestamp,
+                "current_time": now.isoformat(),
+                "issue": "timestamp_too_far_in_past",
+            },
+        )
+    return _result(True, (), {"evaluation_timestamp": evaluation.timestamp})
 
 
 def confidence_out_of_range_validator(
     evaluation: HypothesisEvaluation,
     context: dict,
 ) -> ValidationResult:
-    """
-    Validate confidence is in valid range [0, 1].
-    Reason: "confidence_out_of_range"
-    """
-    is_valid = 0.0 <= evaluation.confidence <= 1.0
-    reasons = [] if is_valid else ["confidence_out_of_range"]
-    metrics = {
-        "confidence": evaluation.confidence,
-        "min_allowed": 0.0,
-        "max_allowed": 1.0
-    }
-    return ValidationResult(
-        is_valid=is_valid,
-        reasons=reasons,
-        metrics=metrics,
-        validated_at=ValidationResult.now(),
-    )
+    metrics = {"confidence": evaluation.confidence, "min_allowed": 0.0, "max_allowed": 1.0}
+    if 0.0 <= evaluation.confidence <= 1.0:
+        return _result(True, (), metrics)
+    return _result(False, ("confidence_out_of_range",), metrics)
 
 
 def invalid_hypothesis_version_validator(
     evaluation: HypothesisEvaluation,
     context: dict,
 ) -> ValidationResult:
-    """
-    Validate hypothesis version is positive.
-    Reason: "invalid_hypothesis_version"
-    """
-    hypothesis_registry: HypothesisRegistry = context.get("hypothesis_registry")
-    if hypothesis_registry is not None:
-        definition = hypothesis_registry.get_definition(evaluation.hypothesis_id)
-        if definition is not None:
-            if evaluation.hypothesis_version != definition.version:
-                return ValidationResult(
-                    is_valid=False,
-                    reasons=["invalid_hypothesis_version"],
-                    metrics={
-                        "evaluation_version": evaluation.hypothesis_version,
-                        "registered_version": definition.version,
-                        "hypothesis_id": evaluation.hypothesis_id
-                    },
-                    validated_at=ValidationResult.now(),
-                )
-        # If hypothesis not found, this will be caught by hypothesis_status_validator
-    
-    return ValidationResult(
-        is_valid=True,
-        reasons=[],
-        metrics={},
-        validated_at=ValidationResult.now(),
-    )
+    if evaluation.hypothesis_version < 1:
+        return _result(
+            False,
+            ("invalid_hypothesis_version",),
+            {"evaluation_version": evaluation.hypothesis_version},
+        )
+    registry: HypothesisRegistry | None = context.get("hypothesis_registry")
+    if registry is None:
+        return _result(True, (), {})
+    definition = registry.get_definition(evaluation.hypothesis_id)
+    if definition is None:
+        return _result(True, (), {})
+    if evaluation.hypothesis_version != definition.version:
+        return _result(
+            False,
+            ("invalid_hypothesis_version",),
+            {
+                "evaluation_version": evaluation.hypothesis_version,
+                "registered_version": definition.version,
+                "hypothesis_id": evaluation.hypothesis_id,
+            },
+        )
+    return _result(True, (), {})
 
 
 def duplicate_signal_definitions_validator(
     evaluation: HypothesisEvaluation,
     context: dict,
 ) -> ValidationResult:
-    """
-    This validator is conceptual - duplicate signal definitions would be caught
-    at hypothesis registration time. Included for completeness.
-    Reason: "duplicate_signal_definitions" (would never trigger in practice)
-    """
-    # In practice, duplicate signal definitions are prevented during hypothesis registration
-    # This validator exists to satisfy the requirement but will always pass
-    return ValidationResult(
-        is_valid=True,
-        reasons=[],
-        metrics={},
-        validated_at=ValidationResult.now(),
-    )
+    registry: HypothesisRegistry | None = context.get("hypothesis_registry")
+    if registry is None:
+        return _result(True, (), {})
+    if registry.get_definition(evaluation.hypothesis_id) is None:
+        return _result(True, (), {})
+    required_signals = registry.required_signals(evaluation.hypothesis_id)
+    duplicate_signals = sorted({signal for signal in required_signals if required_signals.count(signal) > 1})
+    if duplicate_signals:
+        return _result(
+            False,
+            ("duplicate_signal_definitions",),
+            {"duplicate_signals": duplicate_signals},
+        )
+    return _result(True, (), {})
 
 
 def impossible_directional_conflicts_validator(
     evaluation: HypothesisEvaluation,
     context: dict,
 ) -> ValidationResult:
-    """
-    Validate that direction is one of the allowed values.
-    Reason: "impossible_directional_conflicts"
-    """
-    allowed_directions = {"long", "short", "flat"}
+    allowed_directions = ("long", "short", "flat")
+    metrics = {"direction": evaluation.direction}
     if evaluation.direction not in allowed_directions:
-        return ValidationResult(
-            is_valid=False,
-            reasons=["impossible_directional_conflicts"],
-            metrics={
-                "direction": evaluation.direction,
-                "allowed_directions": list(allowed_directions)
+        metrics["allowed_directions"] = list(allowed_directions)
+        return _result(False, ("impossible_directional_conflicts",), metrics)
+    return _result(True, (), metrics)
+
+
+def _load_json_object(payload: str | None) -> tuple[dict[str, Any] | None, tuple[str, ...]]:
+    if not payload:
+        return None, ()
+    duplicate_keys: list[str] = []
+
+    def object_pairs_hook(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        data: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in data and key not in duplicate_keys:
+                duplicate_keys.append(key)
+            data[key] = value
+        return data
+
+    try:
+        parsed = json.loads(payload, object_pairs_hook=object_pairs_hook)
+    except (json.JSONDecodeError, TypeError):
+        return None, ()
+    if not isinstance(parsed, dict):
+        return None, ()
+    return parsed, tuple(duplicate_keys)
+
+
+def _parse_timestamp(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _signal_dependency_validation(
+    registry: HypothesisRegistry | None,
+    evaluation: HypothesisEvaluation,
+    signals_snapshot: dict[str, Any],
+) -> ValidationResult:
+    if registry is None:
+        return _result(True, (), {})
+    definition = registry.get_definition(evaluation.hypothesis_id)
+    if definition is None:
+        return _result(True, (), {})
+    required_signals = registry.required_signals(evaluation.hypothesis_id)
+    missing = [signal for signal in required_signals if signal not in signals_snapshot]
+    if missing:
+        return _result(
+            False,
+            ("missing_signal_dependencies",),
+            {
+                "missing_signals": missing,
+                "required_signals": list(required_signals),
+                "available_signals": list(signals_snapshot.keys()),
             },
-            validated_at=ValidationResult.now(),
         )
-    
-    # Return direction in metrics when valid for consistency
+    return _result(True, (), {})
+
+
+def _result(
+    is_valid: bool,
+    reasons: tuple[str, ...],
+    metrics: dict[str, Any],
+) -> ValidationResult:
     return ValidationResult(
-        is_valid=True,
-        reasons=[],
-        metrics={
-            "direction": evaluation.direction
-        },
+        is_valid=is_valid,
+        reasons=list(reasons),
+        metrics=dict(metrics),
         validated_at=ValidationResult.now(),
     )

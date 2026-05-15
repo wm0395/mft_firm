@@ -93,9 +93,10 @@ def _register_strategy(
 
 
 def _latest_price_timestamp(repository: DataRepository, asset_id: str) -> str:
-    if not hasattr(repository, "read_raw_values"):
+    try:
+        points = repository.read_raw_values(asset_id, "price")
+    except AttributeError:
         return utc_now_iso()
-    points = repository.read_raw_values(asset_id, "price")
     if not points:
         return utc_now_iso()
     return points[-1].timestamp

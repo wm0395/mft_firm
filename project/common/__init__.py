@@ -3,6 +3,7 @@ from project.common.explainability import (
     ExplanationTree as ExplanationTree,
     SignalContribution as SignalContribution,
     create_empty_explanation as create_empty_explanation,
+    create_ma_crossover_explanation as create_ma_crossover_explanation,
     create_rsi_explanation as create_rsi_explanation,
 )
 
@@ -11,5 +12,6 @@ __all__ = [
     "ExplanationTree",
     "SignalContribution",
     "create_empty_explanation",
+    "create_ma_crossover_explanation",
     "create_rsi_explanation",
 ]

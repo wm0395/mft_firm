@@ -301,7 +301,7 @@ def _write_contract_files(root: Path) -> None:
     (root / "AGENTS.md").write_text((Path(__file__).resolve().parents[2] / "AGENTS.md").read_text(encoding="utf-8"), encoding="utf-8")
     prompts_dir = root / "agents" / "prompts"
     prompts_dir.mkdir(parents=True)
-    source_dir = Path(__file__).resolve().parents[2] / "agents" / "prompts"
+    source_dir = Path(__file__).resolve().parents[2] / "docs" / "prompts"
     for name in (
         "architecture_reviewer.md",
         "complexity_reviewer.md",

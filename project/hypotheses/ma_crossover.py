@@ -10,7 +10,7 @@ from project.common.models import (
     StrategySpec,
     utc_now_iso,
 )
-from project.common.explainability import create_rsi_explanation
+from project.common.explainability import create_ma_crossover_explanation
 
 
 class MACrossoverHypothesis:
@@ -52,37 +52,21 @@ class MACrossoverHypothesis:
 
     def evaluate(self, asset_id: str, signals: tuple[Signal, ...]) -> HypothesisOutput:
         snapshot = {signal.signal_type: signal.value for signal in signals}
-        if "ma_5" not in snapshot or "ma_20" not in snapshot:
-            raise ValueError("ma_5 and ma_20 signals are required")
-        
-        ma_5 = snapshot["ma_5"]
-        ma_20 = snapshot["ma_20"]
-        direction: Direction
-        # Simple crossover logic
-        if ma_5 > ma_20:
-            direction = "long"
-            # Confidence based on how much faster MA is above slower MA
-            confidence = min((ma_5 - ma_20) / ma_20, 1.0) if ma_20 != 0 else 0.0
-        elif ma_5 < ma_20:
-            direction = "short"
-            # Confidence based on how much faster MA is below slower MA
-            confidence = min((ma_20 - ma_5) / ma_5, 1.0) if ma_5 != 0 else 0.0
-        else:
-            direction = "flat"
-            confidence = 0.0
-        
-        # Create a proper MA explanation (using MA value, not RSI)
-        explanation_tree = create_rsi_explanation(
-            rsi_value=ma_5,  # Using MA value as input to explanation function
+        ma_5 = _required_signal(snapshot, "ma_5")
+        ma_20 = _required_signal(snapshot, "ma_20")
+        direction = _crossover_direction(ma_5, ma_20)
+        confidence = _crossover_confidence(ma_5, ma_20, direction)
+        explanation_tree = create_ma_crossover_explanation(
+            ma_fast=ma_5,
+            ma_slow=ma_20,
             direction=direction,
             confidence=confidence,
             hypothesis_id=self.definition.hypothesis_id,
             version=self.definition.version,
             asset_id=asset_id,
             horizon="5d",
-            timestamp=utc_now_iso()
+            timestamp=utc_now_iso(),
         )
-        
         return HypothesisOutput(
             hypothesis_id=self.definition.hypothesis_id,
             version=self.definition.version,
@@ -93,3 +77,25 @@ class MACrossoverHypothesis:
             signals_snapshot=snapshot,
             explanation=explanation_tree.to_dict(),
         )
+
+
+def _required_signal(snapshot: dict[str, float], signal_type: str) -> float:
+    if signal_type not in snapshot:
+        raise ValueError(f"{signal_type} signal is required")
+    return snapshot[signal_type]
+
+
+def _crossover_direction(ma_fast: float, ma_slow: float) -> Direction:
+    if ma_fast > ma_slow:
+        return "long"
+    if ma_fast < ma_slow:
+        return "short"
+    return "flat"
+
+
+def _crossover_confidence(ma_fast: float, ma_slow: float, direction: Direction) -> float:
+    if direction == "long" and ma_slow != 0:
+        return min((ma_fast - ma_slow) / ma_slow, 1.0)
+    if direction == "short" and ma_fast != 0:
+        return min((ma_slow - ma_fast) / ma_fast, 1.0)
+    return 0.0

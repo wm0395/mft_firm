@@ -30,6 +30,7 @@ from project.data.models import (
 from project.data.repository import DataRepository
 from project.data.schema import REQUIRED_TABLES
 from project.hypotheses.engine import evaluate_hypotheses
+from project.hypotheses.ma_crossover import MACrossoverHypothesis
 from project.hypotheses.rsi_mean_reversion import RSIMeanReversionHypothesis
 from project.signals.compute import moving_average, rsi, volatility
 from project.signals.pipeline import compute_latest_price_signals
@@ -76,6 +77,30 @@ def test_signal_hypothesis_trade_pipeline(tmp_path: Path) -> None:
     assert outputs[0].direction == "long"
     assert ideas[0].hypothesis_id == "hypothesis:rsi_mean_reversion"
     assert "rsi_14" in ideas[0].signals_snapshot
+
+
+def test_ma_hypothesis_explanation_structure(tmp_path: Path) -> None:
+    db = DuckDBAccess(tmp_path / "mft.duckdb")
+    repository = DataRepository(db)
+    repository.initialize()
+    asset = repository.add_asset("nifty", "NIFTY 50", "index", "NSE")
+
+    prices = [float(value) for value in range(100, 125)]
+    for index, close in enumerate(prices, start=1):
+        repository.ingest_raw(
+            build_raw_price_point(asset.asset_id, f"2026-05-{index:02d}T00:00:00+00:00", close, "test")
+        )
+
+    signals = compute_latest_price_signals(repository, default_signal_registry(), asset.asset_id)
+    outputs = evaluate_hypotheses(asset.asset_id, signals, (MACrossoverHypothesis(),))
+
+    explanation = outputs[0].explanation
+    assert outputs[0].direction == "long"
+    assert explanation["triggering_signals"][0]["signal_type"] == "ma_5"
+    assert explanation["supporting_signals"][0]["signal_type"] == "ma_20"
+    assert explanation["triggering_signals"][0]["direction"] == "long"
+    assert explanation["confidence_factors"]["signal_agreement"] == 1.0
+    db.close()
 
 
 def test_hypothesis_evaluation_persistence(tmp_path: Path) -> None:

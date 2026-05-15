@@ -23,6 +23,9 @@ def add_ingestion_commands(subcommands: argparse._SubParsersAction[argparse.Argu
     market_collector_parser.add_argument("--source-database", required=True)
     market_collector_parser.add_argument("--symbol", action="append", default=[])
     market_collector_parser.add_argument("--resolution", default="1d")
+    csv_parser = subcommands.add_parser("load-ohlcv-csv")
+    csv_parser.add_argument("--file-path", required=True)
+    csv_parser.add_argument("--asset-symbol", required=True)
 
 
 def add_trade_commands(subcommands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:

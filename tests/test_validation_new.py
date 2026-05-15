@@ -14,6 +14,7 @@ from project.validation.validators import (
     inconsistent_timestamps_validator,
     confidence_out_of_range_validator,
     invalid_hypothesis_version_validator,
+    duplicate_signal_definitions_validator,
     impossible_directional_conflicts_validator,
 )
 
@@ -81,6 +82,27 @@ def test_malformed_signal_payload_validator() -> None:
     assert not result.is_valid
     assert "malformed_signal_payload" in result.reasons
     assert "Invalid explanation_json" in result.metrics["error"]
+
+    # Duplicate signal definitions in the payload
+    evaluation_duplicate_signals = HypothesisEvaluation(
+        evaluation_id="test",
+        asset_id="asset:TEST",
+        hypothesis_id="hypothesis:test",
+        hypothesis_version=1,
+        timestamp="2026-05-06T00:00:00Z",
+        direction="long",
+        confidence=0.8,
+        signals_snapshot_json='{"rsi_14": 30.0, "rsi_14": 31.0}',
+        explanation_json='{"rule": "test"}',
+        generated_trade_idea=False,
+        validation_result_json=None,
+        created_at="2026-05-06T00:00:00Z",
+    )
+
+    result = malformed_signal_payload_validator(evaluation_duplicate_signals, {})
+    assert not result.is_valid
+    assert result.reasons == ["duplicate_signal_definitions"]
+    assert result.metrics["duplicate_signals"] == ("rsi_14",)
 
 
 def test_inconsistent_timestamps_validator() -> None:
@@ -272,13 +294,32 @@ def test_invalid_hypothesis_version_validator() -> None:
     result = invalid_hypothesis_version_validator(evaluation_valid, {"hypothesis_registry": registry})
     assert result.is_valid
     assert result.reasons == []
-    
-    # Invalid version (too low)
+
+    evaluation_zero_version = HypothesisEvaluation(
+        evaluation_id="test",
+        asset_id="asset:TEST",
+        hypothesis_id="hypothesis:test",
+        hypothesis_version=0,
+        timestamp="2026-05-06T00:00:00Z",
+        direction="long",
+        confidence=0.8,
+        signals_snapshot_json='{"rsi_14": 30.0}',
+        explanation_json='{"rule": "test"}',
+        generated_trade_idea=False,
+        validation_result_json=None,
+        created_at="2026-05-06T00:00:00Z",
+    )
+
+    result = invalid_hypothesis_version_validator(evaluation_zero_version, {})
+    assert not result.is_valid
+    assert result.reasons == ["invalid_hypothesis_version"]
+    assert result.metrics["evaluation_version"] == 0
+
     evaluation_wrong_version = HypothesisEvaluation(
         evaluation_id="test",
         asset_id="asset:TEST",
         hypothesis_id="hypothesis:test",
-        hypothesis_version=0,  # Wrong version
+        hypothesis_version=2,
         timestamp="2026-05-06T00:00:00Z",
         direction="long",
         confidence=0.8,
@@ -288,34 +329,51 @@ def test_invalid_hypothesis_version_validator() -> None:
         validation_result_json=None,
         created_at="2026-05-06T00:00:00Z",
     )
-    
-    result = invalid_hypothesis_version_validator(evaluation_wrong_version, {"hypothesis_registry": registry})
-    assert not result.is_valid
-    assert "invalid_hypothesis_version" in result.reasons
-    assert result.metrics["evaluation_version"] == 0
-    assert result.metrics["registered_version"] == 1
-    
-    # Invalid version (too high)
-    evaluation_wrong_version_high = HypothesisEvaluation(
-        evaluation_id="test",
-        asset_id="asset:TEST",
-        hypothesis_id="hypothesis:test",
-        hypothesis_version=2,  # Wrong version
-        timestamp="2026-05-06T00:00:00Z",
-        direction="long",
-        confidence=0.8,
-        signals_snapshot_json='{"rsi_14": 30.0}',
-        explanation_json='{"rule": "test"}',
-        generated_trade_idea=False,
-        validation_result_json=None,
-        created_at="2026-05-06T00:00:00Z",
+
+    result = invalid_hypothesis_version_validator(
+        evaluation_wrong_version,
+        {"hypothesis_registry": registry},
     )
-    
-    result = invalid_hypothesis_version_validator(evaluation_wrong_version_high, {"hypothesis_registry": registry})
     assert not result.is_valid
     assert "invalid_hypothesis_version" in result.reasons
     assert result.metrics["evaluation_version"] == 2
     assert result.metrics["registered_version"] == 1
+
+
+def test_duplicate_signal_definitions_validator() -> None:
+    evaluation = HypothesisEvaluation(
+        evaluation_id="test",
+        asset_id="asset:TEST",
+        hypothesis_id="hypothesis:test",
+        hypothesis_version=1,
+        timestamp="2026-05-06T00:00:00Z",
+        direction="long",
+        confidence=0.8,
+        signals_snapshot_json='{"rsi_14": 30.0}',
+        explanation_json='{"rule": "test"}',
+        generated_trade_idea=False,
+        validation_result_json=None,
+        created_at="2026-05-06T00:00:00Z",
+    )
+
+    registry = HypothesisRegistry()
+    definition = HypothesisDefinition(
+        hypothesis_id="hypothesis:test",
+        name="Test Hypothesis",
+        version=1,
+        definition={},
+        explainability_level="full",
+        status="active",
+    )
+    registry.register(definition, ("rsi_14", "rsi_14"))
+
+    result = duplicate_signal_definitions_validator(
+        evaluation,
+        {"hypothesis_registry": registry},
+    )
+    assert not result.is_valid
+    assert result.reasons == ["duplicate_signal_definitions"]
+    assert result.metrics["duplicate_signals"] == ["rsi_14"]
 
 
 def test_impossible_directional_conflicts_validator() -> None:
@@ -429,6 +487,55 @@ def test_validation_engine_with_new_validators() -> None:
     # Check that we ran all validators by checking we have a reasonable number of metrics
     # (at least the ones that reliably return metrics on success)
     assert len(result.metrics) >= 6
+
+
+def test_validation_engine_rejects_duplicate_required_signals() -> None:
+    evaluation = HypothesisEvaluation(
+        evaluation_id="test",
+        asset_id="asset:TEST",
+        hypothesis_id="hypothesis:test",
+        hypothesis_version=1,
+        timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        direction="long",
+        confidence=0.8,
+        signals_snapshot_json='{"rsi_14": 30.0}',
+        explanation_json='{"rule": "test"}',
+        generated_trade_idea=False,
+        validation_result_json=None,
+        created_at="2026-05-06T00:00:00Z",
+    )
+
+    registry = HypothesisRegistry()
+    definition = HypothesisDefinition(
+        hypothesis_id="hypothesis:test",
+        name="Test Hypothesis",
+        version=1,
+        definition={},
+        explainability_level="full",
+        status="active",
+    )
+    registry.register(definition, ("rsi_14", "rsi_14"))
+
+    class MockRepository:
+        def get_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
+            return ()
+
+        def get_positions(self, asset_id=None, hypothesis_id=None, direction=None, status=None):
+            return ()
+
+        def get_open_trade_ideas(self, asset_id=None, hypothesis_id=None, direction=None):
+            return ()
+
+    engine = ValidationEngine()
+    result = engine.validate(
+        evaluation=evaluation,
+        repository=cast(DataRepository, MockRepository()),
+        hypothesis_registry=registry,
+        max_signal_age_hours=24,
+    )
+
+    assert not result.is_valid
+    assert "duplicate_signal_definitions" in result.reasons
 
 
 def test_validation_engine_with_malformed_payload() -> None:

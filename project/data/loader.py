@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from project.data.ingestion import build_raw_price_point
 from project.data.models import DataSourceMetadata
 from project.data.repository import DataRepository
 from project.data.validation import validate_historical_data
@@ -57,33 +58,44 @@ def load_ohlcv_csv(
             f"Historical data validation failed: {validation_result.errors}"
         )
 
-    _ingest_ohlcv_records(repository, asset_symbol, tuple(data))
+    asset = repository.add_asset(asset_symbol.upper(), asset_symbol.upper(), "equity", "NSE")
+    _ingest_ohlcv_records(
+        repository,
+        asset.asset_id,
+        asset_symbol.upper(),
+        file_path.name,
+        tuple(data),
+    )
     return len(data)
 
 
 def _ingest_ohlcv_records(
     repository: DataRepository,
+    asset_id: str,
     asset_symbol: str,
+    source_name: str,
     records: tuple[tuple[datetime, float, float, float, float, float], ...],
 ) -> None:
     for record in records:
+        timestamp = record[0]
         repository.ingest_market_data(
             asset_symbol=asset_symbol,
-            timestamp=record[0],
+            timestamp=timestamp,
             open=record[1],
             high=record[2],
             low=record[3],
             close=record[4],
             volume=record[5],
         )
+        repository.ingest_raw(
+            build_raw_price_point(asset_id, timestamp.isoformat(), record[4], f"csv:{source_name}")
+        )
 
 
 def _looks_like_header(row: list[str]) -> bool:
-    try:
-        _parse_ohlcv_row(row)
-    except ValueError:
-        return True
-    return False
+    expected = ("timestamp", "open", "high", "low", "close", "volume")
+    normalized = tuple(cell.strip().lower() for cell in row[: len(expected)])
+    return normalized == expected
 
 
 def _parse_ohlcv_row(row: list[str]) -> tuple[datetime, float, float, float, float, float]:

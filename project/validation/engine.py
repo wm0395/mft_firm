@@ -33,7 +33,7 @@ class ValidationEngine:
             hypothesis_status_validator,             # Check if hypothesis is active/testing
             signal_freshness_validator,              # Check if signals are fresh
             duplicate_exposure_validator,            # Check for duplicate exposures
-            duplicate_signal_definitions_validator,  # Check for duplicate signal definitions (placeholder)
+            duplicate_signal_definitions_validator,  # Check for duplicate signal definitions
             impossible_directional_conflicts_validator, # Check for impossible directions
         ]
 
