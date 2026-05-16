@@ -1,0 +1,13 @@
+[Unit]
+Description=MFT market data import template
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/mft/platform.env
+WorkingDirectory=/opt/mft_project
+ExecStart=/usr/bin/true
+
+[Install]
+WantedBy=multi-user.target

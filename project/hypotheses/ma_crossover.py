@@ -22,10 +22,18 @@ class MACrossoverHypothesis:
         definition={
             "fast_ma": "ma_5",
             "slow_ma": "ma_20",
+            "direction_policy": "long_short_or_flat",
             "horizon": "5d",
             "bar_timeframe": "1d",
             "intended_universe": "indian_daily_index_basket",
             "required_signals": ("ma_5", "ma_20"),
+            "thesis": "Follow short-term trend continuation when fast average crosses slow average.",
+            "failure_modes": ("range_bound_whipsaw", "gap_reversal", "volatility_spike"),
+            "evidence_standard": {
+                "min_dataset_snapshots": 1,
+                "min_total_trades": 20,
+                "required_metrics": ("win_rate", "max_drawdown", "total_return_pct"),
+            },
         },
         explainability_level="full",
         status="active",

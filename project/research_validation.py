@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import json
 from typing import Any
 
 from project.common.models import HypothesisOutput, utc_now_iso, strategy_spec_parameters
+from project.common.models import StrategySpec
 from project.data.models import HypothesisEvaluation
 from project.data.repository import DataRepository
-from project.hypotheses.ma_crossover import MACrossoverHypothesis
-from project.hypotheses.registry import HypothesisRegistry
-from project.hypotheses.rsi_mean_reversion import RSIMeanReversionHypothesis
+from project.cli_utils import load_hypothesis_registry
 from project.validation.engine import ValidationEngine
 from project.validation.models import ValidationResult
 
@@ -19,9 +17,7 @@ def validate_outputs(
     outputs: tuple[HypothesisOutput, ...],
 ) -> list[tuple[HypothesisOutput, ValidationResult]]:
     validation_engine = ValidationEngine()
-    registry = HypothesisRegistry()
-    _register_strategy(registry, repository, RSIMeanReversionHypothesis.definition, ("rsi_14",))
-    _register_strategy(registry, repository, MACrossoverHypothesis.definition, ("ma_5", "ma_20"))
+    registry = load_hypothesis_registry(repository)
     results: list[tuple[HypothesisOutput, ValidationResult]] = []
     for output in outputs:
         evaluation = evaluation_from_output(
@@ -76,22 +72,6 @@ def validation_payload(result: ValidationResult) -> dict:
     }
 
 
-def _register_strategy(
-    registry: HypothesisRegistry,
-    repository: DataRepository,
-    definition,
-    signal_types: tuple[str, ...],
-) -> None:
-    strategy_spec = repository.get_strategy_spec(definition.hypothesis_id, definition.version)
-    if strategy_spec is None:
-        registry.register(replace(definition, status="draft"), signal_types)
-        return
-    try:
-        registry.activate(definition, signal_types, strategy_spec)
-    except ValueError:
-        registry.register(replace(definition, status="draft"), signal_types)
-
-
 def _latest_price_timestamp(repository: DataRepository, asset_id: str) -> str:
     try:
         points = repository.read_raw_values(asset_id, "price")
@@ -107,39 +87,59 @@ def _apply_research_gate(
     output: HypothesisOutput,
     result: ValidationResult,
 ) -> ValidationResult:
-    reasons = list(result.reasons)
-    metrics: dict[str, Any] = dict(result.metrics)
     strategy_spec = repository.get_strategy_spec(output.hypothesis_id, output.version)
     if strategy_spec is None:
-        return result
-    parameters = strategy_spec_parameters(strategy_spec)
-    snapshot = _latest_snapshot_for_universe(repository, strategy_spec.universe_id)
-    if snapshot is None:
-        reasons.append("missing_dataset_snapshot")
-    elif output.asset_id not in snapshot.asset_ids:
-        reasons.append("unsupported_universe")
-        metrics["research_gate.dataset_snapshot_id"] = snapshot.dataset_snapshot_id
-    else:
-        evidence = _latest_evidence_summary(
-            repository,
-            strategy_spec.strategy_spec_id,
-            snapshot.dataset_snapshot_id,
-        )
-        if evidence is None:
-            reasons.append("missing_strategy_evidence")
-        metrics["research_gate.dataset_snapshot_id"] = snapshot.dataset_snapshot_id
-    if output.horizon != parameters.get("holding_horizon"):
-        reasons.append("unsupported_horizon")
+        return _invalid_research_gate(result, ("invalid_hypothesis_status",), {})
+    reasons, metrics = _research_gate_issues(repository, output, strategy_spec)
     if not reasons:
         return result
     metrics["research_gate.strategy_spec_id"] = strategy_spec.strategy_spec_id
-    metrics["research_gate.expected_horizon"] = parameters.get("holding_horizon")
+    metrics["research_gate.expected_horizon"] = strategy_spec_parameters(strategy_spec).get(
+        "holding_horizon"
+    )
     metrics["research_gate.output_horizon"] = output.horizon
-    deduped_reasons = tuple(dict.fromkeys(reasons))
+    return _invalid_research_gate(result, tuple(reasons), metrics)
+
+
+def _research_gate_issues(
+    repository: DataRepository,
+    output: HypothesisOutput,
+    strategy_spec: StrategySpec,
+) -> tuple[list[str], dict[str, Any]]:
+    reasons: list[str] = []
+    metrics: dict[str, Any] = {}
+    snapshot = _latest_snapshot_for_universe(repository, strategy_spec.universe_id)
+    if snapshot is None:
+        reasons.append("missing_dataset_snapshot")
+        return reasons, metrics
+    metrics["research_gate.dataset_snapshot_id"] = snapshot.dataset_snapshot_id
+    if output.asset_id not in snapshot.asset_ids:
+        reasons.append("unsupported_universe")
+    evidence = _latest_evidence_summary(
+        repository,
+        strategy_spec.strategy_spec_id,
+        snapshot.dataset_snapshot_id,
+    )
+    if evidence is None:
+        reasons.append("missing_strategy_evidence")
+    parameters = strategy_spec_parameters(strategy_spec)
+    if output.horizon != parameters.get("holding_horizon"):
+        reasons.append("unsupported_horizon")
+    return reasons, metrics
+
+
+def _invalid_research_gate(
+    result: ValidationResult,
+    reasons: tuple[str, ...],
+    metrics: dict[str, Any],
+) -> ValidationResult:
+    merged = list(dict.fromkeys([*result.reasons, *reasons]))
+    merged_metrics = dict(result.metrics)
+    merged_metrics.update(metrics)
     return ValidationResult(
         is_valid=False,
-        reasons=list(deduped_reasons),
-        metrics=metrics,
+        reasons=merged,
+        metrics=merged_metrics,
         validated_at=result.validated_at,
     )
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from project.cli import main
+from project.cli_utils import ensure_default_hypothesis_catalog
 from project.data.db import DuckDBAccess
 from project.data.ingestion import build_raw_price_point
 from project.data.repository import DataRepository
@@ -75,6 +76,25 @@ def test_batch_commands_are_explicit_about_persistence(
             assert all(idea.trade_id.endswith(idea.timestamp) for idea in ideas)
     finally:
         repository.close()
+
+
+def test_run_batch_uses_only_active_hypotheses_by_default(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "mft.duckdb"
+    repository = _repository(tmp_path)
+    asset = repository.add_asset("NIFTY", "NIFTY 50", "index", "NSE")
+    _seed_prices(repository, asset.asset_id)
+    ensure_default_hypothesis_catalog(repository)
+    repository.update_hypothesis_status("hypothesis:ma_crossover", "deprecated")
+    repository.close()
+
+    exit_code = main(["run-batch", asset.asset_id, "--database", str(db_path)])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["result"]["hypotheses"] == 1
 
 
 def _repository(tmp_path: Path) -> DataRepository:

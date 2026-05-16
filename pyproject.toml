@@ -1,3 +1,12 @@
+[project]
+name = "mft-project"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.1,<4.0"]
+
 [tool.ruff]
 exclude = [
     ".env",
@@ -6,6 +15,7 @@ exclude = [
     ".ruff_cache",
     "__pycache__",
     "codex_cli/mft_codex_cli.egg-info",
+    "scripts/*.sh",
 ]
 
 [tool.mypy]
@@ -33,6 +43,12 @@ files = [
     "project/data/reporting_store.py",
     "project/data/yfinance_loader.py",
     "project/data/market_collector_loader.py",
+    "market_collector/core/schemas.py",
+    "market_collector/offload/backend.py",
+    "market_collector/offload/duckdb_backend.py",
+    "market_collector/offload/ingester.py",
+    "market_collector/offload/postgres_backend.py",
+    "market_collector/offload/uploader.py",
     "project/replay/engine.py",
     "project/decision/models.py",
 ]

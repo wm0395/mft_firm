@@ -6,6 +6,7 @@ from project.data.repository_base import DataRepositoryBase
 from project.data.repository_decisions import RepositoryDecisionMixin
 from project.data.repository_evaluations import RepositoryEvaluationsMixin
 from project.data.repository_market import RepositoryMarketDataMixin
+from project.data.repository_hypotheses import RepositoryHypothesesMixin
 from project.data.repository_research import RepositoryResearchMixin
 from project.data.repository_signals import RepositorySignalsMixin
 from project.data.repository_trading import RepositoryTradingMixin
@@ -15,6 +16,7 @@ class DataRepository(
     DataRepositoryBase,
     RepositoryMarketDataMixin,
     RepositoryAssetsMixin,
+    RepositoryHypothesesMixin,
     RepositoryResearchMixin,
     RepositorySignalsMixin,
     RepositoryEvaluationsMixin,

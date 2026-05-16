@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from project.data.models import SignalEvaluation
+from project.data.quality import build_data_quality_report
 from project.data.repository import DataRepository
 from project.learning.engine import aggregate_signal_performance, analyze_hypothesis_performance
 from project.regimes.engine import RegimeEngine
@@ -217,3 +220,23 @@ def strategy_dossier(repository: DataRepository, hypothesis_id: str) -> int:
         return 1
     emit(dossier)
     return 0
+
+
+def data_quality_report(
+    repository: DataRepository,
+    symbols: list[str],
+    resolution: str,
+    max_staleness_days: int | None,
+) -> int:
+    try:
+        report = build_data_quality_report(
+            repository,
+            tuple(symbols),
+            resolution,
+            max_staleness_days,
+        )
+    except ValueError as error:
+        emit({"error": str(error)})
+        return 1
+    emit(asdict(report))
+    return 1 if report.status == "fail" else 0

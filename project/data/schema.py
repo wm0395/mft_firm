@@ -164,9 +164,15 @@ SCHEMA_SQL = (
     """
     create table if not exists backtests (
         backtest_id varchar primary key,
+        research_run_id varchar,
+        strategy_spec_id varchar,
+        dataset_snapshot_id varchar,
         hypothesis_id varchar not null,
         asset_id varchar not null,
         hypothesis_version integer not null,
+        start_timestamp varchar,
+        end_timestamp varchar,
+        parameters_json varchar not null,
         metrics_json varchar not null
     )
     """,
@@ -276,4 +282,26 @@ on conflict(evidence_summary_id) do update set
     summary = excluded.summary,
     metrics_json = excluded.metrics_json,
     created_at = excluded.created_at
+"""
+
+
+UPSERT_HYPOTHESIS_SQL = """
+insert into hypotheses values (?, ?, ?, ?, ?, ?)
+on conflict(hypothesis_id) do update set
+    name = excluded.name,
+    version = excluded.version,
+    definition_json = excluded.definition_json,
+    explainability_level = excluded.explainability_level,
+    status = excluded.status
+"""
+
+
+UPSERT_SIGNAL_REGISTRY_SQL = """
+insert into signal_registry values (?, ?, ?, ?, ?, ?)
+on conflict(signal_type) do update set
+    category = excluded.category,
+    definition = excluded.definition,
+    dependencies_json = excluded.dependencies_json,
+    is_persistent = excluded.is_persistent,
+    version = excluded.version
 """

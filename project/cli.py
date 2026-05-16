@@ -1,53 +1,8 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
-from typing import cast
-from uuid import uuid4
 
-from project.backtesting.engine import BacktestEngine
-from project.backtesting.models import BacktestConfig
-from project.cli_readonly import (
-    advanced_report,
-    backtest_results,
-    hypothesis_performance,
-    lineage_trace,
-    list_rejected_hypotheses,
-    position_management,
-    regime_analysis,
-    report_hypotheses,
-    show_competition,
-    show_explanation,
-    show_signal_lineage,
-    strategy_dossier,
-    show_validation_failures,
-    show_validation_path,
-)
-from project.cli_support import (
-    build_strategy_dossier,
-    decision_action,
-    decision_reason,
-    emit,
-    evaluation_from_output,
-    find_asset,
-    hypotheses,
-    parse_datetime,
-    run_research_batch,
-    validate_outputs,
-    validation_payload,
-)
-from project.common.models import DecisionAction, DecisionReason, Direction, HypothesisOutput, TradeIdea, utc_now_iso
-from project.data.db import DuckDBAccess
-from project.data.loader import load_ohlcv_csv
-from project.data.market_collector_loader import load_market_collector_ohlcv
-from project.data.repository import DataRepository
-from project.data.yfinance_loader import load_default_yfinance_universe
-from project.decision.models import Decision
-from project.hypotheses.engine import evaluate_hypotheses
-from project.replay.engine import ReplayEngine
-from project.signals.pipeline import compute_latest_price_signals
-from project.signals.registry import default_signal_registry
-from project.trade_engine.generator import generate_trade_ideas
+from project import cli_commands
 from project.cli_parsers import (
     add_database_argument,
     add_ingestion_commands,
@@ -58,24 +13,47 @@ from project.cli_parsers import (
     add_setup_commands,
     add_trade_commands,
 )
-from project.validation.models import ValidationResult
+from project.cli_readonly import (
+    advanced_report,
+    backtest_results,
+    data_quality_report,
+    hypothesis_performance,
+    lineage_trace,
+    list_rejected_hypotheses,
+    position_management,
+    regime_analysis,
+    report_hypotheses,
+    show_competition,
+    show_explanation,
+    show_signal_lineage,
+    show_validation_failures,
+    show_validation_path,
+    strategy_dossier,
+)
+from project.data.db import DuckDBAccess
+from project.data.repository import DataRepository
 
 
 READ_ONLY_COMMANDS = {
     "backtest-results",
+    "data-quality-report",
+    "hypothesis-readiness",
     "hypothesis-performance",
     "lineage-trace",
     "list-rejected-hypotheses",
+    "list-hypotheses",
     "position-management",
     "report-hypotheses",
     "regime-analysis",
     "show-competition",
     "show-explanation",
+    "show-hypothesis",
     "show-hypothesis-evaluations",
     "show-signal-lineage",
     "show-trade-idea",
     "show-validation-failures",
     "show-validation-path",
+    "validate-hypothesis",
     "strategy-dossier",
     "summarize-batch",
 }
@@ -103,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "init-db":
             repository.initialize()
-            _emit_success("init-db", {"schema": "initialized"})
+            cli_commands._emit_success("init-db", {"schema": "initialized"})
             return 0
         return dispatch(args, repository)
     finally:
@@ -113,11 +91,23 @@ def main(argv: list[str] | None = None) -> int:
 def dispatch(args: argparse.Namespace, repository: DataRepository) -> int:
     if args.command in {"run-batch", "summarize-batch", "run-research-batch"}:
         return _dispatch_pipeline(repository, args)
-    if args.command in {"load-yfinance-universe", "load-market-collector", "load-ohlcv-csv"}:
+    if args.command in {
+        "load-yfinance-universe",
+        "load-market-collector",
+        "load-ohlcv-csv",
+        "create-dataset-snapshot",
+        "sync-market-data",
+    }:
         return _dispatch_ingestion(repository, args)
     if args.command in {"review-trade-idea", "replay-evaluate", "backtest-hypothesis"}:
         return _dispatch_trade(repository, args)
-    if args.command in {"report-hypotheses", "backtest-results", "hypothesis-performance"}:
+    if args.command in {"run-strategy-research", "promote-hypothesis"}:
+        return _dispatch_governance(repository, args)
+    if args.command in {
+        "report-hypotheses",
+        "backtest-results",
+        "hypothesis-performance",
+    }:
         return _dispatch_reports(repository, args)
     if args.command in READ_ONLY_COMMANDS:
         return _dispatch_readonly(repository, args)
@@ -126,26 +116,88 @@ def dispatch(args: argparse.Namespace, repository: DataRepository) -> int:
 
 def _dispatch_pipeline(repository: DataRepository, args: argparse.Namespace) -> int:
     if args.command == "run-batch":
-        return run_batch(repository, args.asset_id, persist=True)
+        return cli_commands.run_batch(repository, args.asset_id, persist=True)
     if args.command == "summarize-batch":
-        return run_batch(repository, args.asset_id, persist=False)
-    return research_batch(repository)
+        return cli_commands.run_batch(repository, args.asset_id, persist=False)
+    return cli_commands.research_batch(
+        repository,
+        args.include_testing,
+        args.include_draft,
+    )
+
+
+def _dispatch_governance(repository: DataRepository, args: argparse.Namespace) -> int:
+    if args.command == "run-strategy-research":
+        return cli_commands.run_strategy_research(
+            repository,
+            args.dataset_snapshot_id,
+            args.hypothesis_id,
+            args.asset_symbol,
+            args.start_date,
+            args.end_date,
+            args.slippage_bps,
+            args.position_size,
+            args.exit_horizon,
+            args.include_testing,
+            args.include_draft,
+        )
+    return cli_commands.promote_hypothesis(
+        repository,
+        args.hypothesis_id,
+        args.to,
+        args.force,
+    )
 
 
 def _dispatch_ingestion(repository: DataRepository, args: argparse.Namespace) -> int:
     if args.command == "load-yfinance-universe":
-        return load_yfinance_universe(repository, args.period, args.interval)
+        return cli_commands.load_yfinance_universe(
+            repository, args.period, args.interval
+        )
     if args.command == "load-ohlcv-csv":
-        return load_ohlcv_csv_command(repository, args.file_path, args.asset_symbol)
-    return load_market_collector(repository, args.source_database, args.symbol, args.resolution)
+        return cli_commands.load_ohlcv_csv_command(
+            repository, args.file_path, args.asset_symbol
+        )
+    if args.command == "create-dataset-snapshot":
+        return cli_commands.create_dataset_snapshot_command(
+            repository,
+            args.name,
+            args.market,
+            args.symbol,
+            args.data_start,
+            args.data_end,
+            args.resolution,
+            args.description,
+        )
+    if args.command == "sync-market-data":
+        return cli_commands.sync_market_data_command(
+            repository, args.symbol, args.resolution, args.market_db_url_env
+        )
+    return cli_commands.load_market_collector(
+        repository, args.source_database, args.symbol, args.resolution
+    )
 
 
 def _dispatch_trade(repository: DataRepository, args: argparse.Namespace) -> int:
     if args.command == "review-trade-idea":
-        return review_trade_idea(repository, args.trade_id, args.action, args.reason, args.notes)
+        return cli_commands.review_trade_idea(
+            repository, args.trade_id, args.action, args.reason, args.notes
+        )
     if args.command == "replay-evaluate":
-        return replay_evaluate(repository, args.asset_symbol, args.timestamp, args.direction, args.hypothesis_id)
-    return backtest_hypothesis(repository, args.hypothesis_id, args.asset_symbol, args.start_date, args.end_date)
+        return cli_commands.replay_evaluate(
+            repository,
+            args.asset_symbol,
+            args.timestamp,
+            args.direction,
+            args.hypothesis_id,
+        )
+    return cli_commands.backtest_hypothesis(
+        repository,
+        args.hypothesis_id,
+        args.asset_symbol,
+        args.start_date,
+        args.end_date,
+    )
 
 
 def _dispatch_reports(repository: DataRepository, args: argparse.Namespace) -> int:
@@ -157,10 +209,50 @@ def _dispatch_reports(repository: DataRepository, args: argparse.Namespace) -> i
 
 
 def _dispatch_readonly(repository: DataRepository, args: argparse.Namespace) -> int:
+    if args.command in {
+        "list-hypotheses",
+        "show-hypothesis",
+        "validate-hypothesis",
+        "hypothesis-readiness",
+    }:
+        return _dispatch_readonly_registry(repository, args)
+    if args.command in {
+        "show-trade-idea",
+        "show-hypothesis-evaluations",
+        "show-validation-failures",
+        "show-competition",
+        "show-explanation",
+        "show-signal-lineage",
+        "show-validation-path",
+        "list-rejected-hypotheses",
+        "regime-analysis",
+        "lineage-trace",
+        "position-management",
+        "strategy-dossier",
+    }:
+        return _dispatch_readonly_inspection(repository, args)
+    if args.command == "data-quality-report":
+        return data_quality_report(
+            repository, args.symbol, args.resolution, args.max_staleness_days
+        )
+    return advanced_report(repository, args.hypothesis_id, args.asset_id)
+
+
+def _dispatch_readonly_registry(repository: DataRepository, args: argparse.Namespace) -> int:
+    if args.command == "list-hypotheses":
+        return cli_commands.list_hypotheses(repository)
+    if args.command == "show-hypothesis":
+        return cli_commands.show_hypothesis(repository, args.hypothesis_id)
+    return cli_commands.validate_hypothesis(repository, args.hypothesis_id)
+
+
+def _dispatch_readonly_inspection(repository: DataRepository, args: argparse.Namespace) -> int:
     if args.command == "show-trade-idea":
-        return show_trade_idea(repository, args.trade_id)
+        return cli_commands.show_trade_idea(repository, args.trade_id)
     if args.command == "show-hypothesis-evaluations":
-        return show_hypothesis_evaluations(repository, args.asset_id, args.hypothesis_id)
+        return cli_commands.show_hypothesis_evaluations(
+            repository, args.asset_id, args.hypothesis_id
+        )
     if args.command == "show-validation-failures":
         return show_validation_failures(repository)
     if args.command == "show-competition":
@@ -178,219 +270,11 @@ def _dispatch_readonly(repository: DataRepository, args: argparse.Namespace) -> 
     if args.command == "lineage-trace":
         return lineage_trace(repository, args.signal_type, args.hypothesis_id)
     if args.command == "position-management":
-        return position_management(repository, args.asset_id, args.hypothesis_id, args.status)
-    if args.command == "strategy-dossier":
-        return strategy_dossier(repository, args.hypothesis_id)
-    return advanced_report(repository, args.hypothesis_id, args.asset_id)
-
-
-def run_batch(repository: DataRepository, asset_ref: str, persist: bool) -> int:
-    asset = find_asset(repository, asset_ref)
-    if asset is None:
-        _emit_error("run-batch", f"Asset {asset_ref} not found")
-        return 1
-    signals = compute_latest_price_signals(repository, default_signal_registry(), asset.asset_id)
-    outputs = evaluate_hypotheses(asset.asset_id, signals, hypotheses())
-    validations = validate_outputs(repository, outputs)
-    ideas = generate_trade_ideas(tuple(output for output, result in validations if result.is_valid))
-    if persist:
-        with repository.transaction():
-            repository.persist_signals(signals)
-            _persist_run_batch(repository, validations, ideas)
-    _emit_success(
-        "run-batch",
-        {
-            "asset_id": asset.asset_id,
-            "signals": len(signals),
-            "hypotheses": len(outputs),
-            "valid_hypotheses": sum(bool(result.is_valid) for _, result in validations),
-            "trade_ideas": len(ideas),
-            "persisted": persist,
-        },
-    )
-    return 0
-
-
-def _persist_run_batch(
-    repository: DataRepository,
-    validations: list[tuple[HypothesisOutput, ValidationResult]],
-    ideas: tuple[TradeIdea, ...],
-) -> None:
-    idea_ids = {idea.hypothesis_id for idea in ideas}
-    for idea in ideas:
-        repository.persist_trade_idea(idea)
-    for output, result in validations:
-        repository.persist_hypothesis_evaluation(
-            evaluation_from_output(
-                output,
-                output.hypothesis_id in idea_ids,
-                validation_payload(result),
-            )
+        return position_management(
+            repository, args.asset_id, args.hypothesis_id, args.status
         )
-
-
-def research_batch(repository: DataRepository) -> int:
-    try:
-        result = run_research_batch(repository)
-    except ValueError as error:
-        _emit_error("run-research-batch", error)
-        return 1
-    result["dossiers"] = tuple(
-        dossier
-        for hypothesis_id in ("hypothesis:rsi_mean_reversion", "hypothesis:ma_crossover")
-        if (dossier := build_strategy_dossier(repository, hypothesis_id)) is not None
-    )
-    _emit_success("run-research-batch", result)
-    return 0
-
-
-def load_yfinance_universe(
-    repository: DataRepository,
-    period: str,
-    interval: str,
-) -> int:
-    try:
-        payload = load_default_yfinance_universe(repository, period, interval)
-    except (RuntimeError, ValueError) as error:
-        _emit_error("load-yfinance-universe", error)
-        return 1
-    _emit_success("load-yfinance-universe", payload)
-    return 0
-
-
-def load_market_collector(
-    repository: DataRepository,
-    source_database: str,
-    symbols: list[str],
-    resolution: str,
-) -> int:
-    try:
-        payload = load_market_collector_ohlcv(
-            repository,
-            Path(source_database),
-            tuple(symbols),
-            resolution,
-        )
-    except (RuntimeError, ValueError) as error:
-        _emit_error("load-market-collector", error)
-        return 1
-    _emit_success("load-market-collector", payload)
-    return 0
-
-
-def load_ohlcv_csv_command(repository: DataRepository, file_path: str, asset_symbol: str) -> int:
-    try:
-        rows_loaded = load_ohlcv_csv(Path(file_path), asset_symbol, repository)
-    except (OSError, RuntimeError, ValueError) as error:
-        _emit_error("load-ohlcv-csv", error)
-        return 1
-    _emit_success(
-        "load-ohlcv-csv",
-        {
-            "asset_symbol": asset_symbol.upper(),
-            "file_path": file_path,
-            "rows_loaded": rows_loaded,
-        },
-    )
-    return 0
-
-
-def review_trade_idea(
-    repository: DataRepository,
-    trade_id: str,
-    action: str,
-    reason: str | None,
-    notes: str,
-) -> int:
-    trade_idea = next((idea for idea in repository.get_trade_ideas() if idea.trade_id == trade_id), None)
-    if trade_idea is None:
-        _emit_error("review-trade-idea", f"Trade idea {trade_id} not found")
-        return 1
-    decision = Decision(
-        decision_id=f"decision:{uuid4()}",
-        trade_id=trade_id,
-        action=cast(DecisionAction, decision_action(action)),
-        structured_reason=cast(DecisionReason, decision_reason(reason)),
-        notes=notes,
-        created_at=utc_now_iso(),
-    )
-    repository.persist_decision(decision)
-    _emit_success("review-trade-idea", decision.__dict__)
-    return 0
-
-
-def show_trade_idea(repository: DataRepository, trade_id: str) -> int:
-    trade_idea = next((idea for idea in repository.get_trade_ideas() if idea.trade_id == trade_id), None)
-    if trade_idea is None:
-        _emit_error("show-trade-idea", f"Trade idea {trade_id} not found")
-        return 1
-    emit(trade_idea.__dict__)
-    return 0
-
-
-def replay_evaluate(
-    repository: DataRepository,
-    asset_symbol: str,
-    timestamp_text: str,
-    direction: str,
-    hypothesis_id: str,
-) -> int:
-    engine = ReplayEngine(repository)
-    try:
-        evaluation = engine.evaluate_signal(
-            asset_symbol.upper(),
-            parse_datetime(timestamp_text),
-            cast(Direction, direction),
-            hypothesis_id,
-        )
-    except ValueError as error:
-        _emit_error("replay-evaluate", error)
-        return 1
-    repository.persist_signal_evaluation(evaluation)
-    _emit_success("replay-evaluate", evaluation.__dict__)
-    return 0
-
-
-def show_hypothesis_evaluations(
-    repository: DataRepository,
-    asset_id: str | None,
-    hypothesis_id: str | None,
-) -> int:
-    emit([evaluation.__dict__ for evaluation in repository.get_hypothesis_evaluations(asset_id, hypothesis_id)])
-    return 0
-
-
-def backtest_hypothesis(
-    repository: DataRepository,
-    hypothesis_id: str,
-    asset_symbol: str,
-    start_date: str,
-    end_date: str,
-) -> int:
-    engine = BacktestEngine(repository)
-    try:
-        result = engine.run(
-            hypothesis_id,
-            asset_symbol.upper(),
-            parse_datetime(f"{start_date}T00:00:00+00:00"),
-            parse_datetime(f"{end_date}T23:59:59+00:00"),
-            BacktestConfig(),
-        )
-    except ValueError as error:
-        _emit_error("backtest-hypothesis", error)
-        return 1
-    repository.persist_backtest_result(result)
-    _emit_success("backtest-hypothesis", result.__dict__)
-    return 0
+    return strategy_dossier(repository, args.hypothesis_id)
 
 
 def _is_read_only_command(command: str) -> bool:
     return command in READ_ONLY_COMMANDS
-
-
-def _emit_success(command: str, payload: object) -> None:
-    emit({"command": command, "result": payload, "status": "ok"})
-
-
-def _emit_error(command: str, error: Exception | str) -> None:
-    emit({"command": command, "error": str(error), "status": "error"})

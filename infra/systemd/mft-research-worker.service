@@ -1,0 +1,14 @@
+[Unit]
+Description=MFT research worker template
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/mft/platform.env
+WorkingDirectory=/opt/mft_project
+ExecStart=/usr/bin/true
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -33,13 +33,17 @@ RESEARCH_UNIVERSE_ID = "research_universe:indian_indexes:daily"
 RESEARCH_BAR_TIMEFRAME = "1d"
 
 
-def run_research_batch(repository: DataRepository) -> dict[str, object]:
+def run_research_batch(
+    repository: DataRepository,
+    include_testing: bool = False,
+    include_draft: bool = False,
+) -> dict[str, object]:
     with repository.transaction():
         universe = ensure_research_universe(repository)
         strategy_specs = ensure_strategy_specs(repository, universe)
         snapshot = build_dataset_snapshot(repository, universe)
         provenance = repository.get_dataset_provenance(snapshot, RESEARCH_BAR_TIMEFRAME)
-        outputs = _evaluate_research_outputs(repository, universe)
+        outputs = _evaluate_research_outputs(repository, universe, include_testing, include_draft)
         runs = _persist_research_runs(repository, snapshot, strategy_specs)
         _persist_preliminary_evaluations(repository, outputs, runs, snapshot)
         _persist_strategy_evidence(repository, snapshot, strategy_specs, runs)
@@ -123,12 +127,15 @@ def build_dataset_snapshot(
 def _evaluate_research_outputs(
     repository: DataRepository,
     universe: ResearchUniverse,
+    include_testing: bool,
+    include_draft: bool,
 ) -> tuple[HypothesisOutput, ...]:
     outputs: list[HypothesisOutput] = []
+    selected_hypotheses = hypotheses(repository, include_testing, include_draft)
     for asset_id in universe.asset_ids:
         signals = compute_latest_price_signals(repository, default_signal_registry(), asset_id)
         repository.persist_signals(signals)
-        outputs.extend(evaluate_hypotheses(asset_id, signals, hypotheses()))
+        outputs.extend(evaluate_hypotheses(asset_id, signals, selected_hypotheses))
     return tuple(outputs)
 
 

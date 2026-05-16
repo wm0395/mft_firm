@@ -1,0 +1,10 @@
+[Unit]
+Description=Run MFT market data import daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+Unit=market-data-import.service
+
+[Install]
+WantedBy=timers.target

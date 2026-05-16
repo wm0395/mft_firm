@@ -14,6 +14,7 @@ pip install -e ./codex_cli
 Core runtime dependencies:
 - `duckdb`
 - `mypy`
+- `psycopg[binary]`
 
 ## Entry Point
 
@@ -24,6 +25,7 @@ Examples:
 ```bash
 python project/main.py init-db
 python project/main.py load-market-collector --source-database /path/to/market.duckdb --symbol AAPL
+python project/main.py sync-market-data --symbol AAPL --resolution 1d
 python project/main.py run-batch NIFTY
 python project/main.py summarize-batch NIFTY
 python project/main.py replay-evaluate AAPL 2026-05-01T10:00:00Z long hypothesis:rsi_mean_reversion
@@ -46,11 +48,43 @@ python project/main.py load-market-collector \
 
 The loader reads rows from the `ohlcv` table, keeps the latest row per symbol and timestamp, and persists matching `assets`, `raw_market_data`, and close-price `raw_data` records.
 
+If `market_raw.ohlcv_deduplicated` is already populated in Postgres, sync canonical rows directly into this project with:
+
+```bash
+python project/main.py sync-market-data \
+  --symbol AAPL \
+  --symbol MSFT \
+  --resolution 1d \
+  --market-db-url-env MARKET_DB_URL
+```
+
+The command reads from the central Postgres view, normalizes timestamps to UTC, validates OHLCV ordering, and persists through the existing `DataRepository` path.
+
+DuckDB remains the default offload backend for collector nodes. When a node writes directly to Postgres, use the same config shape with `backend="postgres"` and a `MARKET_DB_URL` environment variable:
+
+```python
+from market_collector.core.schemas import MarketCollectorConfig, OffloadConfig
+
+duckdb_config = MarketCollectorConfig(
+    offload=OffloadConfig(db_path="/tmp/market.duckdb"),
+)
+postgres_config = MarketCollectorConfig(
+    offload=OffloadConfig(backend="postgres", database_url_env="MARKET_DB_URL"),
+)
+```
+
+Install the Postgres client only on nodes that need it:
+
+```bash
+pip install "psycopg[binary]>=3.1,<4.0"
+```
+
 ## Main Commands
 
 Pipeline and execution:
 - `init-db`
 - `load-market-collector --source-database <duckdb> [--symbol ...] [--resolution ...]`
+- `sync-market-data --symbol <symbol> [--symbol ...] [--resolution ...] [--market-db-url-env MARKET_DB_URL]`
 - `load-ohlcv-csv --file-path <csv> --asset-symbol <symbol>`
 - `run-batch <asset_id>`
 - `summarize-batch <asset_id>`

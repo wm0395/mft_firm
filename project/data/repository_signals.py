@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import astuple
 import json
 from typing import Any, cast
 
 from project.common.models import Signal
 from project.data.db import DuckDBAccess
-from project.data.models import SignalEvaluation
+from project.data.models import SignalDefinition, SignalEvaluation, SignalDefinitionRecord
 from project.data.row_parsers import build_filters, signal_from_row
+from project.data.schema import UPSERT_SIGNAL_REGISTRY_SQL
 
 
 class RepositorySignalsMixin:
@@ -69,6 +71,23 @@ class RepositorySignalsMixin:
             """,
         )
         return tuple(SignalEvaluation(*row) for row in rows)
+
+    def persist_signal_definition(self, definition: SignalDefinition) -> None:
+        _db(self).execute(
+            UPSERT_SIGNAL_REGISTRY_SQL,
+            astuple(SignalDefinitionRecord.from_artifact(definition)),
+        )
+
+    def get_signal_definitions(self) -> tuple[SignalDefinition, ...]:
+        rows = _db(self).fetch_all(
+            """
+            select signal_type, category, definition, dependencies_json,
+                   is_persistent, version
+            from signal_registry
+            order by signal_type
+            """,
+        )
+        return tuple(SignalDefinitionRecord(*row).to_artifact() for row in rows)
 
 
 def _db(repository: Any) -> DuckDBAccess:

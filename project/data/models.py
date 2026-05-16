@@ -6,11 +6,13 @@ import json
 
 from project.common.models import (
     DatasetSnapshot,
+    HypothesisDefinition,
     ResearchRun,
     ResearchRunStatus,
     ResearchUniverse,
     StrategyEvidenceSummary,
     StrategySpec,
+    SignalDefinition,
 )
 
 
@@ -220,6 +222,68 @@ class StrategyEvidenceSummaryRecord:
             summary=self.summary,
             metrics=tuple(sorted(json.loads(self.metrics_json).items())),
             created_at=self.created_at,
+        )
+
+
+@dataclass(frozen=True)
+class HypothesisDefinitionRecord:
+    hypothesis_id: str
+    name: str
+    version: int
+    definition_json: str
+    explainability_level: str
+    status: str
+
+    @classmethod
+    def from_artifact(cls, artifact: HypothesisDefinition) -> "HypothesisDefinitionRecord":
+        return cls(
+            hypothesis_id=artifact.hypothesis_id,
+            name=artifact.name,
+            version=artifact.version,
+            definition_json=json.dumps(artifact.definition, sort_keys=True),
+            explainability_level=artifact.explainability_level,
+            status=artifact.status,
+        )
+
+    def to_artifact(self) -> HypothesisDefinition:
+        return HypothesisDefinition(
+            hypothesis_id=self.hypothesis_id,
+            name=self.name,
+            version=self.version,
+            definition=json.loads(self.definition_json),
+            explainability_level=self.explainability_level,
+            status=self.status,
+        )
+
+
+@dataclass(frozen=True)
+class SignalDefinitionRecord:
+    signal_type: str
+    category: str
+    definition: str
+    dependencies_json: str
+    is_persistent: bool
+    version: int
+
+    @classmethod
+    def from_artifact(cls, artifact: SignalDefinition) -> "SignalDefinitionRecord":
+        return cls(
+            signal_type=artifact.signal_type,
+            category=artifact.category,
+            definition=artifact.definition,
+            dependencies_json=json.dumps(artifact.dependencies, sort_keys=True),
+            is_persistent=artifact.is_persistent,
+            version=artifact.version,
+        )
+
+    def to_artifact(self) -> SignalDefinition:
+        return SignalDefinition(
+            signal_type=self.signal_type,
+            category=self.category,
+            definition=self.definition,
+            dependencies=tuple(json.loads(self.dependencies_json)),
+            is_persistent=self.is_persistent,
+            version=self.version,
         )
 
 
