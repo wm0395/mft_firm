@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .env/
+.venv/
 dist/
 build/
 *.egg-info/
@@ -13,3 +14,8 @@ codex_cli/state/*
 codex_cli/runtime/*
 *.duckdb
 .tmp_task001_clone/*
+research/**/.ipynb_checkpoints/
+research/**/artifacts/*
+!research/**/artifacts/README.md
+research/**/exports/
+research/**/tmp/

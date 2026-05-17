@@ -122,6 +122,107 @@ def add_research_commands(
     promote_parser.add_argument("--force", action="store_true")
 
 
+def add_research_lifecycle_commands(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    _add_create_research_project_parser(subcommands)
+    subcommands.add_parser("list-research-projects")
+    _add_show_research_project_parser(subcommands)
+    _add_run_parameter_research_parser(subcommands)
+    _add_list_research_runs_parser(subcommands)
+    _add_show_research_run_parser(subcommands)
+    _add_compare_research_runs_parser(subcommands)
+    _add_export_research_pack_parser(subcommands)
+    _add_promote_strategy_candidate_parser(subcommands)
+
+
+def _add_create_research_project_parser(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subcommands.add_parser("create-research-project")
+    parser.add_argument("project_id", nargs="?")
+    parser.add_argument("--research-project-id")
+    parser.add_argument("--project-id")
+    parser.add_argument("--name", required=True)
+    parser.add_argument("--description", default="")
+    parser.add_argument("--dataset-snapshot-id")
+
+
+def _add_show_research_project_parser(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subcommands.add_parser("show-research-project")
+    parser.add_argument("project_id", nargs="?")
+    parser.add_argument("--research-project-id")
+    parser.add_argument("--project-id")
+
+
+def _add_run_parameter_research_parser(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subcommands.add_parser("run-parameter-research")
+    parser.add_argument("project_id", nargs="?")
+    parser.add_argument("--research-project-id")
+    parser.add_argument("--project-id")
+    parser.add_argument("--hypothesis-id")
+    parser.add_argument("--dataset-snapshot-id")
+    parser.add_argument("--parameters-json")
+    parser.add_argument("--parameter", action="append", default=[])
+    parser.add_argument("--research-run-config")
+    parser.add_argument("--strategy-grid", action="append", default=[])
+    parser.add_argument("--export-dir")
+    parser.add_argument("--include-testing", action="store_true")
+    parser.add_argument("--include-draft", action="store_true")
+
+
+def _add_list_research_runs_parser(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subcommands.add_parser("list-research-runs")
+    parser.add_argument("--research-project-id")
+    parser.add_argument("--project-id")
+
+
+def _add_show_research_run_parser(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subcommands.add_parser("show-research-run")
+    parser.add_argument("run_id", nargs="?")
+    parser.add_argument("--research-run-id")
+
+
+def _add_compare_research_runs_parser(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subcommands.add_parser("compare-research-runs")
+    parser.add_argument("research_run_ids", nargs="*")
+    parser.add_argument("--research-run-id", action="append", default=[])
+
+
+def _add_export_research_pack_parser(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subcommands.add_parser("export-research-pack")
+    parser.add_argument("project_id", nargs="?")
+    parser.add_argument("--research-project-id")
+    parser.add_argument("--project-id")
+    parser.add_argument("--output-dir")
+
+
+def _add_promote_strategy_candidate_parser(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subcommands.add_parser("promote-strategy-candidate")
+    parser.add_argument("candidate_id", nargs="?")
+    parser.add_argument("--strategy-candidate-id")
+    parser.add_argument(
+        "--to",
+        required=True,
+        choices=["draft", "testing", "active", "deprecated", "archived"],
+    )
+    parser.add_argument("--force", action="store_true")
+
+
 def add_inspection_commands(
     subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:

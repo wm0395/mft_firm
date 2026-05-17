@@ -1,0 +1,21 @@
+{
+  "strategy_family": "mean_reversion",
+  "asset_symbol": "NIFTY",
+  "start_date": "2026-04-20",
+  "end_date": "2026-05-14",
+  "dataset_snapshot_id": "dataset_snapshot:csv:NIFTY.csv:1d:69f1606d573e",
+  "slippage_bps": 1.0,
+  "parameter_grid": {
+    "lookback_bars": [5, 10, 20],
+    "entry_zscore": [0.75, 1.25],
+    "exit_zscore": [0.25, 0.5],
+    "holding_bars": [2, 4]
+  },
+  "promotion": {
+    "minimum_total_trades": 1,
+    "minimum_win_rate": 0.0,
+    "minimum_total_return_pct": -100.0,
+    "maximum_drawdown_pct": 1000.0,
+    "minimum_sharpe_like_score": 0.0
+  }
+}

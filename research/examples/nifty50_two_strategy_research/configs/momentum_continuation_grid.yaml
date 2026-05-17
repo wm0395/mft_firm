@@ -1,0 +1,21 @@
+{
+  "strategy_family": "momentum_continuation",
+  "asset_symbol": "NIFTY",
+  "start_date": "2026-04-20",
+  "end_date": "2026-05-14",
+  "dataset_snapshot_id": "dataset_snapshot:csv:NIFTY.csv:1d:69f1606d573e",
+  "slippage_bps": 1.0,
+  "parameter_grid": {
+    "lookback_bars": [3, 5, 10],
+    "entry_threshold": [0.005, 0.01],
+    "exit_threshold": [0.0, 0.0025],
+    "holding_bars": [2, 4]
+  },
+  "promotion": {
+    "minimum_total_trades": 1,
+    "minimum_win_rate": 0.0,
+    "minimum_total_return_pct": -100.0,
+    "maximum_drawdown_pct": 1000.0,
+    "minimum_sharpe_like_score": 0.0
+  }
+}

@@ -3,21 +3,28 @@ from __future__ import annotations
 
 REQUIRED_TABLES = {
     "assets",
+    "approval_events",
     "backtests",
     "decisions",
+    "parameter_results",
+    "parameter_sets",
     "hypotheses",
     "hypothesis_evaluations",
     "hypothesis_signal_map",
     "positions",
     "raw_data",
     "raw_market_data",
+    "research_artifacts",
+    "research_projects",
     "research_runs",
     "research_universes",
     "signal_evaluations",
     "signal_registry",
     "signals",
     "strategy_evidence_summaries",
+    "strategy_candidates",
     "strategy_specs",
+    "strategy_versions",
     "trade_ideas",
     "dataset_snapshots",
 }
@@ -69,6 +76,27 @@ SCHEMA_SQL = (
     )
     """,
     """
+    create table if not exists research_projects (
+        project_id varchar primary key,
+        name varchar not null,
+        description varchar not null,
+        status varchar not null,
+        created_at varchar not null,
+        updated_at varchar not null
+    )
+    """,
+    """
+    create table if not exists research_artifacts (
+        artifact_id varchar primary key,
+        project_id varchar not null,
+        research_run_id varchar,
+        artifact_type varchar not null,
+        payload_json varchar not null,
+        content_hash varchar not null,
+        created_at varchar not null
+    )
+    """,
+    """
     create table if not exists dataset_snapshots (
         dataset_snapshot_id varchar primary key,
         universe_id varchar not null,
@@ -97,6 +125,58 @@ SCHEMA_SQL = (
         completed_at varchar,
         status varchar not null,
         notes varchar not null
+    )
+    """,
+    """
+    create table if not exists parameter_sets (
+        parameter_set_id varchar primary key,
+        project_id varchar not null,
+        strategy_version_id varchar not null,
+        parameters_json varchar not null,
+        parameters_hash varchar not null,
+        created_at varchar not null
+    )
+    """,
+    """
+    create table if not exists parameter_results (
+        parameter_result_id varchar primary key,
+        parameter_set_id varchar not null,
+        metric_name varchar not null,
+        metric_value double not null,
+        created_at varchar not null
+    )
+    """,
+    """
+    create table if not exists strategy_versions (
+        strategy_version_id varchar primary key,
+        project_id varchar not null,
+        version integer not null,
+        definition_json varchar not null,
+        status varchar not null,
+        created_at varchar not null,
+        updated_at varchar not null
+    )
+    """,
+    """
+    create table if not exists strategy_candidates (
+        candidate_id varchar primary key,
+        project_id varchar not null,
+        strategy_version_id varchar not null,
+        label varchar not null,
+        status varchar not null,
+        created_at varchar not null,
+        promoted_at varchar
+    )
+    """,
+    """
+    create table if not exists approval_events (
+        approval_event_id varchar primary key,
+        project_id varchar not null,
+        candidate_id varchar not null,
+        event_type varchar not null,
+        actor varchar not null,
+        reason varchar not null,
+        created_at varchar not null
     )
     """,
     """
@@ -238,6 +318,16 @@ on conflict(universe_id) do update set
     asset_ids_json = excluded.asset_ids_json
 """
 
+UPSERT_RESEARCH_ARTIFACT_SQL = """
+insert into research_artifacts values (?, ?, ?, ?, ?, ?, ?)
+on conflict(artifact_id) do update set
+    project_id = excluded.project_id,
+    research_run_id = excluded.research_run_id,
+    artifact_type = excluded.artifact_type,
+    payload_json = excluded.payload_json,
+    content_hash = excluded.content_hash,
+    created_at = excluded.created_at
+"""
 
 UPSERT_DATASET_SNAPSHOT_SQL = """
 insert into dataset_snapshots values (?, ?, ?, ?, ?, ?)
@@ -271,8 +361,6 @@ on conflict(research_run_id) do update set
     status = excluded.status,
     notes = excluded.notes
 """
-
-
 UPSERT_STRATEGY_EVIDENCE_SUMMARY_SQL = """
 insert into strategy_evidence_summaries values (?, ?, ?, ?, ?, ?, ?)
 on conflict(evidence_summary_id) do update set

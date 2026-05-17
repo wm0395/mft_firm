@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 import re
@@ -19,6 +20,8 @@ from project.common.models import (
 )
 from project.data.repository import DataRepository
 from project.hypotheses.catalog import get_hypothesis, get_hypothesis_implementation
+from project.research.config import ResearchConfig
+from project.research.runner import ResearchRunRequest, ResearchRunResult, run_research as run_parameter_grid_research_core
 
 
 @dataclass(frozen=True)
@@ -78,6 +81,17 @@ def run_strategy_research(
         raise RuntimeError(
             f"strategy research run {research_run.research_run_id} failed: {error}"
         ) from error
+
+
+def run_parameter_grid_research(
+    repository: DataRepository,
+    config: ResearchConfig,
+    output_dir: str | Path,
+) -> ResearchRunResult:
+    return run_parameter_grid_research_core(
+        repository,
+        ResearchRunRequest(config=config, output_dir=Path(output_dir)),
+    )
 
 
 def _complete_research_run(

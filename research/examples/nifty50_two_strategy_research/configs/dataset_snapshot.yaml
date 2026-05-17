@@ -1,0 +1,10 @@
+{
+  "dataset_snapshot_id": "dataset_snapshot:csv:NIFTY.csv:1d:69f1606d573e",
+  "universe_id": "research_universe:nifty50_two_strategy_research:nse",
+  "captured_at": "2026-05-14T23:59:59+00:00",
+  "data_start": "2026-04-20T00:00:00+00:00",
+  "data_end": "2026-05-14T23:59:59+00:00",
+  "asset_ids": [
+    "asset:NIFTY"
+  ]
+}

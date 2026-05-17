@@ -8,6 +8,17 @@ from project.data.repository_evaluations import RepositoryEvaluationsMixin
 from project.data.repository_market import RepositoryMarketDataMixin
 from project.data.repository_hypotheses import RepositoryHypothesesMixin
 from project.data.repository_research import RepositoryResearchMixin
+from project.data.repository_research_commands import (
+    RepositoryResearchCandidateCommandMixin,
+    RepositoryResearchProjectCommandMixin,
+    RepositoryResearchRunCommandMixin,
+)
+from project.data.repository_research_lifecycle import (
+    RepositoryParameterMixin,
+    RepositoryResearchProjectMixin,
+    RepositoryResearchRunMixin,
+    RepositoryStrategyLifecycleMixin,
+)
 from project.data.repository_signals import RepositorySignalsMixin
 from project.data.repository_trading import RepositoryTradingMixin
 
@@ -18,6 +29,13 @@ class DataRepository(
     RepositoryAssetsMixin,
     RepositoryHypothesesMixin,
     RepositoryResearchMixin,
+    RepositoryResearchRunMixin,
+    RepositoryResearchProjectMixin,
+    RepositoryParameterMixin,
+    RepositoryStrategyLifecycleMixin,
+    RepositoryResearchProjectCommandMixin,
+    RepositoryResearchRunCommandMixin,
+    RepositoryResearchCandidateCommandMixin,
     RepositorySignalsMixin,
     RepositoryEvaluationsMixin,
     RepositoryTradingMixin,

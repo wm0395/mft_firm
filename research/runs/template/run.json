@@ -1,0 +1,7 @@
+{
+  "research_run_id": "research_run:example",
+  "research_project_id": "research_project:example",
+  "dataset_snapshot_id": "dataset_snapshot:example",
+  "command": "run-parameter-research",
+  "status": "completed"
+}

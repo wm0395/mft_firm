@@ -10,6 +10,7 @@ postgres = ["psycopg[binary]>=3.1,<4.0"]
 [tool.ruff]
 exclude = [
     ".env",
+    ".venv",
     ".tmp_task001_clone",
     ".pytest_cache",
     ".ruff_cache",
@@ -52,6 +53,16 @@ files = [
     "project/data/yfinance_loader.py",
     "project/data/market_collector_loader.py",
     "project/replay/engine.py",
+    "project/research/__init__.py",
+    "project/research/artifacts.py",
+    "project/research/config.py",
+    "project/research/metrics.py",
+    "project/research/models.py",
+    "project/research/parameter_grid.py",
+    "project/research/promotion.py",
+    "project/research/runner.py",
+    "project/research/strategies.py",
+    "project/research/workbench.py",
     "project/decision/models.py",
 ]
 follow_imports = "silent"

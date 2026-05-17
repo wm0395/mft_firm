@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import hashlib
 import json
 
 from project.common.models import (
@@ -27,6 +28,11 @@ def _json_object_from_pairs(
             raise ValueError(msg)
         payload[key] = value
     return json.dumps(payload, sort_keys=True)
+
+
+def build_stable_hash(payload: object) -> str:
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
 
 
 @dataclass(frozen=True)
@@ -101,6 +107,27 @@ class ResearchUniverseRecord:
             description=self.description,
             asset_ids=tuple(json.loads(self.asset_ids_json)),
         )
+
+
+@dataclass(frozen=True)
+class ResearchProjectRecord:
+    project_id: str
+    name: str
+    description: str
+    status: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class ResearchArtifactRecord:
+    artifact_id: str
+    project_id: str
+    research_run_id: str | None
+    artifact_type: str
+    payload_json: str
+    content_hash: str
+    created_at: str
 
 
 @dataclass(frozen=True)
@@ -186,6 +213,58 @@ class StrategySpecRecord:
 
 
 @dataclass(frozen=True)
+class ParameterSetRecord:
+    parameter_set_id: str
+    project_id: str
+    strategy_version_id: str
+    parameters_json: str
+    parameters_hash: str
+    created_at: str
+
+
+@dataclass(frozen=True)
+class ParameterResultRecord:
+    parameter_result_id: str
+    parameter_set_id: str
+    metric_name: str
+    metric_value: float
+    created_at: str
+
+
+@dataclass(frozen=True)
+class StrategyVersionRecord:
+    strategy_version_id: str
+    project_id: str
+    version: int
+    definition_json: str
+    status: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class StrategyCandidateRecord:
+    candidate_id: str
+    project_id: str
+    strategy_version_id: str
+    label: str
+    status: str
+    created_at: str
+    promoted_at: str | None
+
+
+@dataclass(frozen=True)
+class ApprovalEventRecord:
+    approval_event_id: str
+    project_id: str
+    candidate_id: str
+    event_type: str
+    actor: str
+    reason: str
+    created_at: str
+
+
+@dataclass(frozen=True)
 class StrategyEvidenceSummaryRecord:
     evidence_summary_id: str
     strategy_spec_id: str
@@ -251,8 +330,8 @@ class HypothesisDefinitionRecord:
             name=self.name,
             version=self.version,
             definition=json.loads(self.definition_json),
-            explainability_level=self.explainability_level,
-            status=self.status,
+            explainability_level=self.explainability_level,  # type: ignore[arg-type]
+            status=self.status,  # type: ignore[arg-type]
         )
 
 

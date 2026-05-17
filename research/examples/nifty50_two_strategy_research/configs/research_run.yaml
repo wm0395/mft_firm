@@ -1,0 +1,9 @@
+{
+  "research_project_id": "research_project:nifty50_two_strategy_research",
+  "dataset_snapshot_id": "dataset_snapshot:csv:NIFTY.csv:1d:69f1606d573e",
+  "export_dir": "reports/research",
+  "strategy_grids": [
+    "momentum_continuation_grid.yaml",
+    "mean_reversion_grid.yaml"
+  ]
+}

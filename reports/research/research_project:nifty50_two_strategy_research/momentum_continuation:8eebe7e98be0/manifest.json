@@ -1,0 +1,48 @@
+{
+  "asset_symbol": "NIFTY",
+  "best_parameter_set_hash": "70b8564c938e9980be81fd6f69097248dfa78bf791a022a84940038bf8222d0f",
+  "config_hash": "8eebe7e98be0afa6f3d7a4701e2dd64f8db5edbf0e1f65f067b920375efe0e37",
+  "dataset_snapshot_id": "dataset_snapshot:csv:NIFTY.csv:1d:69f1606d573e",
+  "end_date": "2026-05-14",
+  "files": [
+    {
+      "name": "parameter_grid_results.csv",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/momentum_continuation:8eebe7e98be0/parameter_grid_results.csv",
+      "sha256": "55a4f08448fe5507ee61a26eade470b2cb82f918270d172fd1445a8318b5361b",
+      "size_bytes": 8602
+    },
+    {
+      "name": "parameter_grid_summary.md",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/momentum_continuation:8eebe7e98be0/parameter_grid_summary.md",
+      "sha256": "32323c68bd8dd9ca45e7641b2e321d20ce9b46f145adadd08002cd7addeb6a46",
+      "size_bytes": 3132
+    },
+    {
+      "name": "equity_curve.png",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/momentum_continuation:8eebe7e98be0/equity_curve.png",
+      "sha256": "8a0b0f73487254e4a1939b1c645b16aa8986c4b87cd0ec1137af69b288ce657b",
+      "size_bytes": 42917
+    },
+    {
+      "name": "drawdown_curve.png",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/momentum_continuation:8eebe7e98be0/drawdown_curve.png",
+      "sha256": "48ed8db8f1ab2c2cc72876bac511de4e46d92a9819c1d7b41885a8fc34a67228",
+      "size_bytes": 40313
+    },
+    {
+      "name": "parameter_comparison.png",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/momentum_continuation:8eebe7e98be0/parameter_comparison.png",
+      "sha256": "47116499f053223251df8e53d9ab8a6808ac4bfd86308d2f5f3dc43bc6e5e657",
+      "size_bytes": 58641
+    },
+    {
+      "name": "trade_pnl_distribution.png",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/momentum_continuation:8eebe7e98be0/trade_pnl_distribution.png",
+      "sha256": "b29a90f6e616aafbcc7c4e55f3408fdef2739cfdcce4e092b2640e88f47b9716",
+      "size_bytes": 16954
+    }
+  ],
+  "generated_at": "2026-05-17T11:03:48+00:00",
+  "start_date": "2026-04-20",
+  "strategy_family": "momentum_continuation"
+}

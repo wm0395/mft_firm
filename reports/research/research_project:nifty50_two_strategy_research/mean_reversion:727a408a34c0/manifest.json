@@ -1,0 +1,48 @@
+{
+  "asset_symbol": "NIFTY",
+  "best_parameter_set_hash": "ee6751f0518cb5eb0e1668b878e52d027e92e91eab2f8ff88f49eb56a370daad",
+  "config_hash": "727a408a34c083286b48eeb4ff855f883e3348467413b7ee476df589514e0cc9",
+  "dataset_snapshot_id": "dataset_snapshot:csv:NIFTY.csv:1d:69f1606d573e",
+  "end_date": "2026-05-14",
+  "files": [
+    {
+      "name": "parameter_grid_results.csv",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/mean_reversion:727a408a34c0/parameter_grid_results.csv",
+      "sha256": "23c8c81c3ca77456b5843d8e8f8a9dfdbabd22f5f0557b7604d188e42aafeec6",
+      "size_bytes": 8042
+    },
+    {
+      "name": "parameter_grid_summary.md",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/mean_reversion:727a408a34c0/parameter_grid_summary.md",
+      "sha256": "04462f4166516a1c82ab9601fa5308cabb50e73e72d7ed5439aa73c22ae96701",
+      "size_bytes": 3173
+    },
+    {
+      "name": "equity_curve.png",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/mean_reversion:727a408a34c0/equity_curve.png",
+      "sha256": "8525bf65aad9d190aabb83b80565495ec8c55b7058c6697dd858b2bd6a05a5cc",
+      "size_bytes": 43095
+    },
+    {
+      "name": "drawdown_curve.png",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/mean_reversion:727a408a34c0/drawdown_curve.png",
+      "sha256": "fea7322cb1ca4af3cd5624ae9b1fb0fc717824e55033bc5aed19f27212d36d7d",
+      "size_bytes": 38890
+    },
+    {
+      "name": "parameter_comparison.png",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/mean_reversion:727a408a34c0/parameter_comparison.png",
+      "sha256": "6491f2d8befd8fa1ff907bc7043de109c2f88d81e141abeb3ceccc79df0c0283",
+      "size_bytes": 46041
+    },
+    {
+      "name": "trade_pnl_distribution.png",
+      "path": "reports/research/research_project:nifty50_two_strategy_research/mean_reversion:727a408a34c0/trade_pnl_distribution.png",
+      "sha256": "af9cbe0c9bae2f7ffc919ea46a078c5890bbcf5d572e81e306b4a62b0b3a57b9",
+      "size_bytes": 17433
+    }
+  ],
+  "generated_at": "2026-05-17T11:03:50+00:00",
+  "start_date": "2026-04-20",
+  "strategy_family": "mean_reversion"
+}

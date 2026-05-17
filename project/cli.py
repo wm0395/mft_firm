@@ -10,6 +10,7 @@ from project.cli_parsers import (
     add_pipeline_commands,
     add_report_commands,
     add_research_commands,
+    add_research_lifecycle_commands,
     add_setup_commands,
     add_trade_commands,
 )
@@ -46,6 +47,17 @@ from project.cli_readonly import (
     show_validation_path,
     strategy_dossier,
 )
+from project.cli_research import (
+    compare_research_runs,
+    create_research_project,
+    export_research_pack,
+    list_research_projects,
+    list_research_runs,
+    promote_strategy_candidate,
+    run_parameter_research,
+    show_research_project,
+    show_research_run,
+)
 from project.cli_trade import (
     backtest_hypothesis,
     replay_evaluate,
@@ -65,6 +77,10 @@ READ_ONLY_COMMANDS = {
     "hypothesis-performance",
     "lineage-trace",
     "list-rejected-hypotheses",
+    "compare-research-runs",
+    "export-research-pack",
+    "list-research-projects",
+    "list-research-runs",
     "next-steps",
     "list-hypotheses",
     "position-management",
@@ -74,6 +90,8 @@ READ_ONLY_COMMANDS = {
     "show-explanation",
     "show-hypothesis",
     "show-hypothesis-evaluations",
+    "show-research-project",
+    "show-research-run",
     "show-signal-lineage",
     "show-trade-idea",
     "show-validation-failures",
@@ -94,6 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_trade_commands(subcommands)
     add_report_commands(subcommands)
     add_research_commands(subcommands)
+    add_research_lifecycle_commands(subcommands)
     add_inspection_commands(subcommands)
     add_database_argument(subcommands)
     return parser
@@ -135,6 +154,21 @@ def dispatch(args: argparse.Namespace, repository: DataRepository) -> int:
         "hypothesis-performance",
     }:
         return _dispatch_reports(repository, args)
+    if args.command in {
+        "list-research-projects",
+        "show-research-project",
+        "list-research-runs",
+        "show-research-run",
+        "compare-research-runs",
+        "export-research-pack",
+    }:
+        return _dispatch_research_readonly(repository, args)
+    if args.command in {
+        "create-research-project",
+        "run-parameter-research",
+        "promote-strategy-candidate",
+    }:
+        return _dispatch_research_lifecycle(repository, args)
     if args.command in READ_ONLY_COMMANDS:
         return _dispatch_readonly(repository, args)
     raise ValueError(f"Unknown command: {args.command}")
@@ -259,6 +293,32 @@ def _dispatch_readonly(repository: DataRepository, args: argparse.Namespace) -> 
     if args.command == "next-steps":
         return next_steps(repository)
     return advanced_report(repository, args.hypothesis_id, args.asset_id)
+
+
+def _dispatch_research_readonly(
+    repository: DataRepository, args: argparse.Namespace
+) -> int:
+    if args.command == "list-research-projects":
+        return list_research_projects(repository)
+    if args.command == "show-research-project":
+        return show_research_project(repository, args)
+    if args.command == "list-research-runs":
+        return list_research_runs(repository, args)
+    if args.command == "show-research-run":
+        return show_research_run(repository, args)
+    if args.command == "compare-research-runs":
+        return compare_research_runs(repository, args)
+    return export_research_pack(repository, args)
+
+
+def _dispatch_research_lifecycle(
+    repository: DataRepository, args: argparse.Namespace
+) -> int:
+    if args.command == "create-research-project":
+        return create_research_project(repository, args)
+    if args.command == "run-parameter-research":
+        return run_parameter_research(repository, args)
+    return promote_strategy_candidate(repository, args)
 
 
 def _dispatch_readonly_registry(

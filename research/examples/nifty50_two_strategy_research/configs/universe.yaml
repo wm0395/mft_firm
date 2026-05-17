@@ -1,0 +1,8 @@
+{
+  "name": "NIFTY50 two-strategy research",
+  "market": "NSE",
+  "description": "Starter universe for the momentum continuation and mean reversion research workflow.",
+  "asset_ids": [
+    "asset:NIFTY"
+  ]
+}

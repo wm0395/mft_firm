@@ -1,0 +1,8 @@
+{
+  "research_project_id": "research_project:example",
+  "exported_at": "2026-05-17T00:00:00+00:00",
+  "artifacts": [
+    "project.json",
+    "run.json"
+  ]
+}

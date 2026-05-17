@@ -1,0 +1,8 @@
+{
+  "research_project_id": "research_project:example",
+  "name": "example-project",
+  "description": "Deterministic research project template",
+  "dataset_snapshot_id": "dataset_snapshot:example",
+  "hypothesis_id": "hypothesis:example",
+  "status": "draft"
+}

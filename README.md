@@ -110,6 +110,24 @@ python project/main.py validate-hypothesis hypothesis:rsi_mean_reversion
 python project/main.py promote-hypothesis hypothesis:rsi_mean_reversion --to testing
 ```
 
+Research lifecycle commands now live alongside the existing research workflow
+and use the same JSON envelope contract:
+
+```bash
+python project/main.py create-research-project --name research:rsi --description "RSI checks"
+python project/main.py list-research-projects
+python project/main.py show-research-project research_project:rsi
+python project/main.py run-parameter-research \
+  --research-run-config research/examples/nifty50_two_strategy_research/configs/research_run.yaml
+python project/main.py list-research-runs --research-project-id research_project:rsi
+python project/main.py compare-research-runs research_run:1 research_run:2
+python project/main.py export-research-pack research_project:rsi --output-dir research/exports/rsi
+python project/main.py promote-strategy-candidate strategy_candidate:rsi --to testing
+```
+
+See [research/README.md](research/README.md) for the notebook-safe workflow,
+workspace layout, and artifact review rules.
+
 ### Inspection
 
 The inspection commands remain available for traceability and review:

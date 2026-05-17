@@ -31,6 +31,28 @@ If you already have a DuckDB export from a separate collector checkout, use:
 
 Use `list-hypotheses`, `show-hypothesis`, and `validate-hypothesis` when you need the current registry state.
 
+For lifecycle work around research projects and candidates, use the CLI
+commands documented in [research/README.md](../research/README.md):
+
+- `create-research-project`
+- `list-research-projects`
+- `show-research-project`
+- `run-parameter-research`
+- `list-research-runs`
+- `show-research-run`
+- `compare-research-runs`
+- `export-research-pack`
+- `promote-strategy-candidate`
+
+Notebook work is exploration-only. Use dataset snapshots and CLI runs as the
+canonical source of truth, then review exported artifacts instead of mutating
+the database from notebooks.
+
+For the NIFTY50 starter workflow, use
+`research/examples/nifty50_two_strategy_research/configs/research_run.yaml`
+as the research-run entry point. It references the momentum continuation and
+mean reversion grid files and keeps the CLI invocation short.
+
 ## Inspection Workflow
 
 The inspection commands are read-only and emit the same JSON envelope as mutating commands:
