@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Any, Literal, cast
 import re
 
 from project.common.models import Asset
@@ -122,7 +122,7 @@ def build_data_quality_report(
         ),
         resolution=resolution,
         requested_symbols=requested_symbols,
-        generated_at=_timestamp_text(current_time),
+        generated_at=current_time.isoformat(),
         data_start=_timestamp_text(start) if start is not None else None,
         data_end=_timestamp_text(end) if end is not None else None,
         max_staleness_days=staleness_days,
@@ -229,22 +229,38 @@ def _analyze_rows(
     non_positive_close_count = 0
     non_positive_volume_count = 0
     for row in rows:
-        missing_price = row.open is None or row.high is None or row.low is None or row.close is None
-        missing_volume = row.volume is None
+        open_value = row.open
+        high_value = row.high
+        low_value = row.low
+        close_value = row.close
+        volume_value = row.volume
+        missing_price = (
+            open_value is None
+            or high_value is None
+            or low_value is None
+            or close_value is None
+        )
+        missing_volume = volume_value is None
         if missing_price:
             missing_price_count += 1
         if missing_volume:
             missing_volume_count += 1
         if missing_price or missing_volume:
             missing_ohlcv_count += 1
-        if not missing_price and (
-            row.high < max(row.open, row.close, row.low)
-            or row.low > min(row.open, row.close, row.high)
+        if (
+            open_value is not None
+            and high_value is not None
+            and low_value is not None
+            and close_value is not None
+            and (
+                high_value < max(open_value, close_value, low_value)
+                or low_value > min(open_value, close_value, high_value)
+            )
         ):
             invalid_ohlc_count += 1
-        if row.close is not None and row.close <= 0:
+        if close_value is not None and close_value <= 0:
             non_positive_close_count += 1
-        if row.volume is not None and row.volume <= 0:
+        if volume_value is not None and volume_value <= 0:
             non_positive_volume_count += 1
     large_gap_count = 0
     if len(unique_timestamps) > 1:
@@ -389,4 +405,7 @@ def _timestamp_text(value: datetime | None) -> str | None:
 def _optional_float(value: object) -> float | None:
     if value is None:
         return None
-    return float(value)
+    try:
+        return float(cast(Any, value))
+    except (TypeError, ValueError):
+        return None

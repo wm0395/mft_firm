@@ -89,7 +89,7 @@ def _connect_market_server(market_db_url_env: str) -> Any:
     if not conninfo:
         raise RuntimeError(f"environment variable {market_db_url_env} is not set")
     try:
-        import psycopg
+        import psycopg  # type: ignore[import-not-found]
     except ImportError as error:
         raise RuntimeError("psycopg is required for sync-market-data") from error
     try:

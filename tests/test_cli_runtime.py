@@ -50,7 +50,9 @@ def test_project_main_module_help() -> None:
     assert "usage:" in result.stdout.lower()
 
 
-def test_read_only_command_skips_schema_bootstrap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def test_read_only_command_skips_schema_bootstrap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     db_path = tmp_path / "mft.duckdb"
     repository = DataRepository(DuckDBAccess(db_path))
     repository.initialize()
@@ -95,12 +97,16 @@ def test_init_db_bootstraps_schema(tmp_path: Path) -> None:
         db.close()
 
 
-def test_mutating_command_emits_structured_error(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_mutating_command_emits_structured_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     db_path = tmp_path / "mft.duckdb"
     main(["init-db", "--database", str(db_path)])
     capsys.readouterr()
 
-    exit_code = main(["review-trade-idea", "trade:missing", "approve", "--database", str(db_path)])
+    exit_code = main(
+        ["review-trade-idea", "trade:missing", "approve", "--database", str(db_path)]
+    )
     payload = json.loads(capsys.readouterr().out)
 
     assert exit_code == 1
@@ -108,7 +114,9 @@ def test_mutating_command_emits_structured_error(tmp_path: Path, capsys: pytest.
     assert payload["command"] == "review-trade-idea"
 
 
-def test_load_ohlcv_csv_command_ingests_data(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_load_ohlcv_csv_command_ingests_data(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     db_path = tmp_path / "mft.duckdb"
 
     exit_code = main(["init-db", "--database", str(db_path)])
@@ -141,7 +149,9 @@ def test_load_ohlcv_csv_command_ingests_data(tmp_path: Path, capsys: pytest.Capt
         db.close()
 
 
-def test_load_ohlcv_csv_command_reports_missing_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_load_ohlcv_csv_command_reports_missing_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     db_path = tmp_path / "mft.duckdb"
     missing = tmp_path / "missing.csv"
 
@@ -179,13 +189,50 @@ def test_data_quality_report_command_emits_report(
     _seed_cli_data(repository, asset.asset_id, asset.symbol)
     repository.close()
 
-    exit_code = main(["data-quality-report", "--symbol", "AAPL", "--database", str(db_path)])
+    exit_code = main(
+        ["data-quality-report", "--symbol", "AAPL", "--database", str(db_path)]
+    )
     payload = json.loads(capsys.readouterr().out)
 
     assert exit_code == 0
     assert payload["status"] == "ok"
-    assert payload["requested_symbols"] == ["AAPL"]
-    assert payload["symbols"][0]["row_count"] == 20
+    assert payload["result"]["requested_symbols"] == ["AAPL"]
+    assert payload["result"]["symbols"][0]["row_count"] == 20
+
+
+def test_data_quality_report_default_is_non_fatal(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "mft.duckdb"
+    repository = DataRepository(DuckDBAccess(db_path))
+    repository.initialize()
+    repository.close()
+
+    exit_code = main(
+        ["data-quality-report", "--symbol", "AAPL", "--database", str(db_path)]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["status"] == "fail"
+    assert payload["command"] == "data-quality-report"
+    assert payload["result"]["status"] == "fail"
+
+    exit_code = main(
+        [
+            "data-quality-report",
+            "--symbol",
+            "AAPL",
+            "--strict",
+            "--database",
+            str(db_path),
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 1
+    assert payload["status"] == "fail"
 
 
 def test_create_dataset_snapshot_command_persists_artifacts(
@@ -230,7 +277,10 @@ def test_create_dataset_snapshot_command_persists_artifacts(
         assert exit_code == 0
         assert payload["status"] == "ok"
         assert payload["result"]["quality_status"] == "ok"
-        assert payload["result"]["universe_id"] == "research_universe:us_largecap_daily_v1:us"
+        assert (
+            payload["result"]["universe_id"]
+            == "research_universe:us_largecap_daily_v1:us"
+        )
         assert len(repository.get_research_universes()) == 1
         assert len(repository.get_dataset_snapshots()) == 1
     finally:
@@ -250,22 +300,49 @@ def test_hypothesis_registry_cli_commands(
     exit_code = main(["list-hypotheses", "--database", str(db_path)])
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 0
-    assert any(item["hypothesis_id"] == "hypothesis:rsi_mean_reversion" for item in payload)
+    assert payload["command"] == "list-hypotheses"
+    assert any(
+        item["hypothesis_id"] == "hypothesis:rsi_mean_reversion"
+        for item in payload["result"]
+    )
 
     exit_code = main(
         ["show-hypothesis", "hypothesis:rsi_mean_reversion", "--database", str(db_path)]
     )
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 0
-    assert payload["hypothesis_id"] == "hypothesis:rsi_mean_reversion"
-    assert payload["status"] == "active"
+    assert payload["command"] == "show-hypothesis"
+    assert payload["result"]["hypothesis_id"] == "hypothesis:rsi_mean_reversion"
+    assert payload["result"]["status"] == "active"
 
     exit_code = main(
-        ["validate-hypothesis", "hypothesis:rsi_mean_reversion", "--database", str(db_path)]
+        [
+            "validate-hypothesis",
+            "hypothesis:rsi_mean_reversion",
+            "--database",
+            str(db_path),
+        ]
     )
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 0
-    assert payload["valid"] is True
+    assert payload["command"] == "validate-hypothesis"
+    assert payload["result"]["valid"] is True
+
+    exit_code = main(
+        [
+            "hypothesis-readiness",
+            "hypothesis:rsi_mean_reversion",
+            "--database",
+            str(db_path),
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["command"] == "hypothesis-readiness"
+    assert payload["status"] in {"warn", "ok"}
+    assert payload["result"]["hypothesis_id"] == "hypothesis:rsi_mean_reversion"
+    assert payload["result"]["readiness"] in {"ready", "not_ready"}
+    assert payload["result"]["signal_registration_status"]
 
     exit_code = main(
         [
@@ -287,16 +364,51 @@ def test_hypothesis_registry_cli_commands(
     )
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 0
-    assert payload["status"] == "deprecated"
+    assert payload["result"]["status"] == "deprecated"
 
 
-def test_yfinance_loader_rolls_back_on_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_operator_commands_emit_envelopes(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "mft.duckdb"
+    repository = DataRepository(DuckDBAccess(db_path))
+    repository.initialize()
+    repository.close()
+
+    exit_code = main(["doctor", "--database", str(db_path)])
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["command"] == "doctor"
+    assert payload["status"] in {"fail", "warn"}
+    assert any(
+        check["check"] == "schema_initialized" for check in payload["result"]["checks"]
+    )
+
+    exit_code = main(["workflow-status", "--database", str(db_path)])
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["command"] == "workflow-status"
+    assert payload["result"]["next_recommended_command"] == "sync-market-data"
+
+    exit_code = main(["next-steps", "--database", str(db_path)])
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert payload["command"] == "next-steps"
+    assert payload["result"]["steps"][0]["command"] == "init-db"
+
+
+def test_yfinance_loader_rolls_back_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     db = DuckDBAccess(tmp_path / "mft.duckdb")
     repository = DataRepository(db)
     repository.initialize()
     base = datetime(2026, 5, 1, tzinfo=UTC)
 
-    def fake_download(spec: YFinanceAssetSpec, period: str, interval: str) -> YFinancePriceBatch:
+    def fake_download(
+        spec: YFinanceAssetSpec, period: str, interval: str
+    ) -> YFinancePriceBatch:
         rows = tuple(
             (
                 base + timedelta(days=index),
@@ -319,7 +431,9 @@ def test_yfinance_loader_rolls_back_on_failure(tmp_path: Path, monkeypatch: pyte
             raise RuntimeError("boom")
         return original_add_asset(symbol, name, sector, market)
 
-    monkeypatch.setattr("project.data.yfinance_loader._download_price_batch", fake_download)
+    monkeypatch.setattr(
+        "project.data.yfinance_loader._download_price_batch", fake_download
+    )
     monkeypatch.setattr(repository, "add_asset", fail_on_second_asset)
 
     with pytest.raises(RuntimeError, match="boom"):
@@ -330,13 +444,17 @@ def test_yfinance_loader_rolls_back_on_failure(tmp_path: Path, monkeypatch: pyte
     repository.close()
 
 
-def test_yfinance_loader_is_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_yfinance_loader_is_idempotent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     db = DuckDBAccess(tmp_path / "mft.duckdb")
     repository = DataRepository(db)
     repository.initialize()
     base = datetime(2026, 5, 1, tzinfo=UTC)
 
-    def fake_download(spec: YFinanceAssetSpec, period: str, interval: str) -> YFinancePriceBatch:
+    def fake_download(
+        spec: YFinanceAssetSpec, period: str, interval: str
+    ) -> YFinancePriceBatch:
         rows = tuple(
             (
                 base + timedelta(days=index),
@@ -350,7 +468,9 @@ def test_yfinance_loader_is_idempotent(tmp_path: Path, monkeypatch: pytest.Monke
         )
         return YFinancePriceBatch(spec.yahoo_symbols[0], rows)
 
-    monkeypatch.setattr("project.data.yfinance_loader._download_price_batch", fake_download)
+    monkeypatch.setattr(
+        "project.data.yfinance_loader._download_price_batch", fake_download
+    )
     load_default_yfinance_universe(repository, period="6mo", interval="1d")
     load_default_yfinance_universe(repository, period="6mo", interval="1d")
 

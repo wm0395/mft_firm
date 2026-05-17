@@ -12,7 +12,11 @@ from project.cli_utils import (
     research_assets,
 )
 from project.research_batch import run_research_batch
-from project.research_validation import evaluation_from_output, validate_outputs, validation_payload
+from project.research_validation import (
+    evaluation_from_output,
+    validate_outputs,
+    validation_payload,
+)
 from project.strategy_dossier import build_strategy_dossier
 
 __all__ = [
@@ -20,6 +24,8 @@ __all__ = [
     "decision_action",
     "decision_reason",
     "emit",
+    "emit_error",
+    "emit_response",
     "evaluation_from_output",
     "find_asset",
     "find_evaluation",
@@ -31,3 +37,28 @@ __all__ = [
     "validate_outputs",
     "validation_payload",
 ]
+
+
+def emit_response(
+    command: str,
+    result: object,
+    *,
+    status: str = "ok",
+    warnings: tuple[str, ...] = (),
+    error: str | None = None,
+) -> None:
+    emit(
+        {
+            "command": command,
+            "status": status,
+            "result": result,
+            "warnings": list(warnings),
+            "error": error,
+        }
+    )
+
+
+def emit_error(
+    command: str, error: Exception | str, *, warnings: tuple[str, ...] = ()
+) -> None:
+    emit_response(command, None, status="error", warnings=warnings, error=str(error))

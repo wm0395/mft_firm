@@ -95,4 +95,5 @@ def test_csv_fixture_position_lifecycle(
     )
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 0
-    assert payload == [closed.__dict__]
+    assert payload["command"] == "position-management"
+    assert payload["result"] == [closed.__dict__]

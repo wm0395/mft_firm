@@ -8,37 +8,45 @@ Create or activate a Python 3.12 virtual environment, then install the project d
 
 ```bash
 pip install -r project/requirements.txt
+pip install -r project/requirements-dev.txt
 pip install -e ./codex_cli
 ```
 
-Core runtime dependencies:
-- `duckdb`
-- `mypy`
-- `psycopg[binary]`
+Runtime dependencies live in `project/requirements.txt`. Developer tooling lives in `project/requirements-dev.txt`.
 
-## Entry Point
+## Operator Workflow
 
-The project CLI is exposed through `project/main.py`, which delegates to the stabilized command handlers in `project/cli.py`.
-
-Examples:
+Start with the health and status commands:
 
 ```bash
+python project/main.py doctor
 python project/main.py init-db
-python project/main.py load-market-collector --source-database /path/to/market.duckdb --symbol AAPL
-python project/main.py sync-market-data --symbol AAPL --resolution 1d
-python project/main.py run-batch NIFTY
-python project/main.py summarize-batch NIFTY
-python project/main.py replay-evaluate AAPL 2026-05-01T10:00:00Z long hypothesis:rsi_mean_reversion
+python project/main.py workflow-status
+python project/main.py next-steps
 ```
 
-All commands accept `--database`, which defaults to `project_mft.duckdb`.
+Recommended flow:
 
-`init-db` is the only command that bootstraps schema. Read-only reporting commands open the database without writing.
-Batch and mutation commands emit a structured JSON envelope with `status`, `command`, and `result` or `error`.
+1. `doctor`
+2. `init-db`
+3. `sync-market-data`
+4. `data-quality-report`
+5. `create-dataset-snapshot`
+6. `run-strategy-research`
+7. `hypothesis-readiness`
+8. `promote-hypothesis`
 
-## market_collector Integration
+## Core Workflows
 
-If you already offload OHLCV data with `~/market_collector`, import that DuckDB output into this project with:
+### Market Data
+
+Use the Postgres-backed sync path when `MARKET_DB_URL` is available:
+
+```bash
+python project/main.py sync-market-data --symbol AAPL --symbol MSFT --resolution 1d
+```
+
+Use the collector import path when you already have a DuckDB export from a separate `market_collector` checkout:
 
 ```bash
 python project/main.py load-market-collector \
@@ -46,74 +54,97 @@ python project/main.py load-market-collector \
   --symbol AAPL
 ```
 
-The loader reads rows from the `ohlcv` table, keeps the latest row per symbol and timestamp, and persists matching `assets`, `raw_market_data`, and close-price `raw_data` records.
-
-If `market_raw.ohlcv_deduplicated` is already populated in Postgres, sync canonical rows directly into this project with:
+CSV ingestion remains available for local fixtures:
 
 ```bash
-python project/main.py sync-market-data \
+python project/main.py load-ohlcv-csv --file-path /path/to/file.csv --asset-symbol AAPL
+```
+
+### Data Quality and Snapshots
+
+Inspect quality before building a snapshot:
+
+```bash
+python project/main.py data-quality-report --symbol AAPL --symbol MSFT
+python project/main.py data-quality-report --symbol AAPL --strict
+```
+
+Build a reproducible dataset snapshot:
+
+```bash
+python project/main.py create-dataset-snapshot \
+  --name us-largecap-daily-v1 \
+  --market US \
   --symbol AAPL \
   --symbol MSFT \
-  --resolution 1d \
-  --market-db-url-env MARKET_DB_URL
+  --data-start 2026-05-01 \
+  --data-end 2026-05-20 \
+  --resolution 1d
 ```
 
-The command reads from the central Postgres view, normalizes timestamps to UTC, validates OHLCV ordering, and persists through the existing `DataRepository` path.
+### Research and Governance
 
-DuckDB remains the default offload backend for collector nodes. When a node writes directly to Postgres, use the same config shape with `backend="postgres"` and a `MARKET_DB_URL` environment variable:
-
-```python
-from market_collector.core.schemas import MarketCollectorConfig, OffloadConfig
-
-duckdb_config = MarketCollectorConfig(
-    offload=OffloadConfig(db_path="/tmp/market.duckdb"),
-)
-postgres_config = MarketCollectorConfig(
-    offload=OffloadConfig(backend="postgres", database_url_env="MARKET_DB_URL"),
-)
-```
-
-Install the Postgres client only on nodes that need it:
+Run the deterministic research workflow:
 
 ```bash
-pip install "psycopg[binary]>=3.1,<4.0"
+python project/main.py run-strategy-research \
+  --dataset-snapshot-id <snapshot_id> \
+  --hypothesis-id hypothesis:rsi_mean_reversion \
+  --asset-symbol AAPL \
+  --start-date 2026-05-01 \
+  --end-date 2026-05-20
 ```
 
-## Main Commands
+Check hypothesis promotion readiness:
 
-Pipeline and execution:
-- `init-db`
-- `load-market-collector --source-database <duckdb> [--symbol ...] [--resolution ...]`
-- `sync-market-data --symbol <symbol> [--symbol ...] [--resolution ...] [--market-db-url-env MARKET_DB_URL]`
-- `load-ohlcv-csv --file-path <csv> --asset-symbol <symbol>`
-- `run-batch <asset_id>`
-- `summarize-batch <asset_id>`
-- `review-trade-idea <trade_id> <approve|reject|watchlist>`
+```bash
+python project/main.py hypothesis-readiness hypothesis:rsi_mean_reversion
+```
 
-Research and evaluation:
-- `replay-evaluate <asset_symbol> <timestamp> <direction> <hypothesis_id>`
-- `backtest-hypothesis <hypothesis_id> <asset_symbol> <start_date> <end_date>`
-- `backtest-results`
-- `report-hypotheses --horizon {1,5,20}`
-- `hypothesis-performance`
+Review and promote hypotheses:
 
-Inspection and reporting:
-- `show-trade-idea <trade_id>`
-- `show-hypothesis-evaluations [--asset-id ...] [--hypothesis-id ...]`
-- `show-validation-failures`
-- `show-competition [--asset-id ...] [--direction ...]`
-- `show-explanation <evaluation_id>`
-- `show-signal-lineage <asset_id>`
-- `show-validation-path <evaluation_id>`
-- `list-rejected-hypotheses`
-- `regime-analysis <asset_symbol>`
-- `lineage-trace [--signal-type ...] [--hypothesis-id ...]`
-- `position-management [--asset-id ...] [--hypothesis-id ...] [--status open|closed]`
-- `advanced-report <hypothesis_id> [--asset-id ...]`
+```bash
+python project/main.py list-hypotheses
+python project/main.py show-hypothesis hypothesis:rsi_mean_reversion
+python project/main.py validate-hypothesis hypothesis:rsi_mean_reversion
+python project/main.py promote-hypothesis hypothesis:rsi_mean_reversion --to testing
+```
+
+### Inspection
+
+The inspection commands remain available for traceability and review:
+
+```bash
+python project/main.py show-trade-idea <trade_id>
+python project/main.py show-validation-path <evaluation_id>
+python project/main.py show-explanation <evaluation_id>
+python project/main.py show-validation-failures
+python project/main.py report-hypotheses --horizon 20
+python project/main.py backtest-results
+python project/main.py hypothesis-performance
+python project/main.py advanced-report hypothesis:rsi_mean_reversion
+```
+
+## CLI Output
+
+All CLI commands emit a JSON envelope:
+
+```json
+{
+  "command": "data-quality-report",
+  "status": "ok",
+  "result": {},
+  "warnings": [],
+  "error": null
+}
+```
+
+Read-only inspection commands use the same shape as mutating commands. `data-quality-report` is non-fatal by default and only exits non-zero with `--strict`.
 
 ## Data Model
 
-The database schema now includes:
+The database schema includes:
+
 - `raw_market_data`
 - `raw_data`
 - `assets`
@@ -127,6 +158,11 @@ The database schema now includes:
 - `trade_ideas`
 - `decisions`
 - `positions`
+- `research_universes`
+- `dataset_snapshots`
+- `strategy_specs`
+- `research_runs`
+- `strategy_evidence_summaries`
 
 The exported schema contract used by tests is `project.data.schema.REQUIRED_TABLES`.
 
@@ -139,6 +175,7 @@ data -> signals -> hypotheses -> trade_engine -> decision
 ```
 
 Project constraints in practice:
+
 - no upward imports across those layers
 - immutable dataclasses for core models
 - deterministic timestamps using timezone-aware UTC
@@ -160,75 +197,18 @@ Single local command:
 ./scripts/check.sh
 ```
 
-`mypy` is intentionally scoped in `pyproject.toml` to the stabilized command and data surface:
-- `project/main.py`
-- `project/cli.py`
-- `project/cli_support.py`
-- `project/cli_utils.py`
-- `project/cli_parsers.py`
-- `project/cli_readonly.py`
-- `project/research_batch.py`
-- `project/research_validation.py`
-- `project/strategy_dossier.py`
-- `project/data/repository.py`
-- `project/data/repository_base.py`
-- `project/data/repository_assets.py`
-- `project/data/repository_evaluations.py`
-- `project/data/repository_market.py`
-- `project/data/repository_research.py`
-- `project/data/repository_signals.py`
-- `project/data/repository_trading.py`
-- `project/data/schema.py`
-- `project/data/row_parsers.py`
-- `project/data/reporting_store.py`
-- `project/data/db.py`
-- `project/data/yfinance_loader.py`
-- `project/data/market_collector_loader.py`
-- `project/replay/engine.py`
-- `project/decision/models.py`
+The stabilized mypy surface is defined in `pyproject.toml` and now covers the CLI, operator workflow commands, research workflow, hypothesis registry, and the current MFT data surface.
+
+## Operator Guide
+
+See [docs/OPERATOR_GUIDE.md](docs/OPERATOR_GUIDE.md) for a workflow-oriented command guide.
 
 ## codex_cli
 
-The separate `codex_cli/` package provides the local `mft` task orchestration tool used for bounded implementation work and architecture enforcement.
+The separate `codex_cli/` package provides local task orchestration and architecture checks. Treat it as developer tooling, not runtime MFT code.
 
 Install it from the repo root:
 
 ```bash
 pip install -e ./codex_cli
 ```
-
-Common commands:
-- `mft run "implement new signal"`
-- `mft plan "refactor validation flow"`
-- `mft scratch <task_id>`
-- `mft exec <task_id>`
-- `mft execute <task_id>`
-- `mft review <task_id>`
-- `mft check architecture`
-- `mft check drift`
-- `mft diagnose <task_id>`
-- `mft heal <task_id>`
-
-Execution workflow:
-- `mft exec <task_id>` builds the execution packet as JSON without launching an external agent CLI
-- `mft execute <task_id>` launches the task in either Codex CLI or OpenCode
-- `mft review <task_id>` builds the review packet after implementation work
-- `mft complete <task_id>` marks the task complete manually after checks pass
-
-Launch examples:
-
-```bash
-mft execute task_001 --dry-run
-mft execute task_001 --provider codex --mode interactive
-mft execute task_001 --provider codex --mode oneshot --json
-mft execute task_001 --provider opencode --mode interactive
-mft execute task_001 --provider opencode --mode oneshot --json
-```
-
-Launch rules:
-- supported launch providers are `codex` and `opencode`
-- `gemini` remains packet-only for planning and review flows
-- `--mode interactive` opens the provider session in your terminal
-- `--mode oneshot` runs the provider non-interactively and returns its exit code
-- `--json` is only supported with `--mode oneshot`
-- task completion remains manual; `mft execute` records launch attempts but does not auto-complete the task
