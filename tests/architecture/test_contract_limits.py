@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 LIMITED_FILES = (
-    Path("project/cli.py"),
+    Path("project/cli/legacy.py"),
     Path("project/cli_parsers.py"),
     Path("project/cli_support.py"),
     Path("project/cli_utils.py"),

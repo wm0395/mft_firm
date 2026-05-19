@@ -39,15 +39,18 @@ def test_project_main_script_help() -> None:
     result = _run_help(["project/main.py", "--help"], repo_root)
 
     assert result.returncode == 0
-    assert "usage:" in result.stdout.lower()
+    assert "usage: mft" in result.stdout.lower()
+    assert "commands:" in result.stdout.lower()
+    assert "status" in result.stdout
 
 
 def test_project_main_module_help() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    result = _run_help(["-m", "project.main", "--help"], repo_root)
+    result = _run_help(["-m", "project.cli", "--help"], repo_root)
 
     assert result.returncode == 0
-    assert "usage:" in result.stdout.lower()
+    assert "usage: mft" in result.stdout.lower()
+    assert "setup" in result.stdout
 
 
 def test_read_only_command_skips_schema_bootstrap(

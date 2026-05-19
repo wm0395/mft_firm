@@ -2,7 +2,18 @@
 name = "mft-project"
 version = "0.0.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "click>=8.1,<9.0",
+    "pandas>=2.0,<3.0",
+    "plotly>=5.0,<6.0",
+    "rich>=13.0,<14.0",
+    "streamlit>=1.36,<2.0",
+    "streamlit-option-menu>=0.3.13,<1.0",
+    "typer>=0.12,<1.0",
+]
+
+[project.scripts]
+mft = "project.cli:app"
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.1,<4.0"]
@@ -20,12 +31,24 @@ exclude = [
 
 [tool.mypy]
 files = [
-    "project/cli.py",
+    "project/cli/legacy.py",
     "project/cli_commands.py",
     "project/cli_parsers.py",
     "project/cli_support.py",
     "project/cli_utils.py",
     "project/cli_operator.py",
+    "project/cli/app.py",
+    "project/cli/context.py",
+    "project/cli/errors.py",
+    "project/cli/formatting.py",
+    "project/cli/commands/data.py",
+    "project/cli/commands/explain.py",
+    "project/cli/commands/hypothesis.py",
+    "project/cli/commands/ideas.py",
+    "project/cli/commands/report.py",
+    "project/cli/commands/research.py",
+    "project/cli/commands/setup.py",
+    "project/cli/commands/status.py",
     "project/cli_readonly.py",
     "project/main.py",
     "project/backtesting/research_runner.py",
@@ -64,6 +87,12 @@ files = [
     "project/research/strategies.py",
     "project/research/workbench.py",
     "project/decision/models.py",
+    "project/ui",
+    "project/ui_services",
 ]
 follow_imports = "silent"
 python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = ["click", "click.*"]
+ignore_missing_imports = true

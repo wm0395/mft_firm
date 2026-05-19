@@ -2,12 +2,31 @@
 
 This guide is the workflow-oriented entry point for operating `mft_project`.
 
+## Primary Surface
+
+The default human operating layer is the Streamlit cockpit:
+
+```bash
+streamlit run project/ui/app.py
+```
+
+Use Mission Control first. It summarizes system health, data readiness,
+research state, hypothesis readiness, trade ideas, and the next recommended
+action.
+
+If `streamlit-option-menu` is installed, the cockpit sidebar uses that modern
+navigation widget and falls back to the built-in Streamlit radio when it is
+not available.
+
 ## Start Here
 
 1. `python project/main.py doctor`
 2. `python project/main.py init-db`
 3. `python project/main.py workflow-status`
 4. `python project/main.py next-steps`
+
+These commands remain useful for automation and troubleshooting, but they are
+secondary to the cockpit for manual operation.
 
 ## Market Data Workflow
 

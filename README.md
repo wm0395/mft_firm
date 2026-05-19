@@ -14,27 +14,47 @@ pip install -e ./codex_cli
 
 Runtime dependencies live in `project/requirements.txt`. Developer tooling lives in `project/requirements-dev.txt`.
 
+## Operator Cockpit
+
+The primary operator surface is the Streamlit cockpit:
+
+```bash
+streamlit run project/ui/app.py
+```
+
+The cockpit is organized around Mission Control, Data, Research, Hypotheses,
+Trade Ideas, Explainability, and Reports. It is the default way to inspect
+system health, review evidence, and decide what to do next.
+
+When `streamlit-option-menu` is installed, the sidebar uses a modern option
+menu; otherwise it falls back to the built-in Streamlit radio selector.
+
 ## Operator Workflow
 
 Start with the health and status commands:
 
 ```bash
-python project/main.py doctor
-python project/main.py init-db
-python project/main.py workflow-status
-python project/main.py next-steps
+mft status
+mft next
+mft guide
 ```
 
 Recommended flow:
 
-1. `doctor`
-2. `init-db`
-3. `sync-market-data`
-4. `data-quality-report`
-5. `create-dataset-snapshot`
-6. `run-strategy-research`
-7. `hypothesis-readiness`
-8. `promote-hypothesis`
+1. `mft status`
+2. `mft setup init`
+3. `mft data sync AAPL MSFT`
+4. `mft data quality AAPL MSFT`
+5. `mft data snapshot create AAPL MSFT --market US --from 2026-05-01 --to 2026-05-20`
+6. `mft research run hypothesis:rsi_mean_reversion AAPL --snapshot latest`
+7. `mft hypothesis check hypothesis:rsi_mean_reversion`
+8. `mft hypothesis promote hypothesis:rsi_mean_reversion --to testing`
+
+Use the cockpit for day-to-day work and the CLI when you need a direct command
+for automation, scripting, or troubleshooting.
+
+The modern grouped CLI is `mft`; `python -m project.cli` and
+`python project/main.py` mirror the same entrypoint for local runs.
 
 ## Core Workflows
 
@@ -43,7 +63,7 @@ Recommended flow:
 Use the Postgres-backed sync path when `MARKET_DB_URL` is available:
 
 ```bash
-python project/main.py sync-market-data --symbol AAPL --symbol MSFT --resolution 1d
+mft data sync AAPL MSFT --resolution 1d
 ```
 
 Use the collector import path when you already have a DuckDB export from a separate `market_collector` checkout:
@@ -65,20 +85,17 @@ python project/main.py load-ohlcv-csv --file-path /path/to/file.csv --asset-symb
 Inspect quality before building a snapshot:
 
 ```bash
-python project/main.py data-quality-report --symbol AAPL --symbol MSFT
-python project/main.py data-quality-report --symbol AAPL --strict
+mft data quality AAPL MSFT
+mft data quality AAPL --strict
 ```
 
 Build a reproducible dataset snapshot:
 
 ```bash
-python project/main.py create-dataset-snapshot \
-  --name us-largecap-daily-v1 \
+mft data snapshot create AAPL MSFT \
   --market US \
-  --symbol AAPL \
-  --symbol MSFT \
-  --data-start 2026-05-01 \
-  --data-end 2026-05-20 \
+  --from 2026-05-01 \
+  --to 2026-05-20 \
   --resolution 1d
 ```
 
@@ -87,31 +104,25 @@ python project/main.py create-dataset-snapshot \
 Run the deterministic research workflow:
 
 ```bash
-python project/main.py run-strategy-research \
-  --dataset-snapshot-id <snapshot_id> \
-  --hypothesis-id hypothesis:rsi_mean_reversion \
-  --asset-symbol AAPL \
-  --start-date 2026-05-01 \
-  --end-date 2026-05-20
+mft research run hypothesis:rsi_mean_reversion AAPL --snapshot latest
 ```
 
 Check hypothesis promotion readiness:
 
 ```bash
-python project/main.py hypothesis-readiness hypothesis:rsi_mean_reversion
+mft hypothesis check hypothesis:rsi_mean_reversion
 ```
 
 Review and promote hypotheses:
 
 ```bash
-python project/main.py list-hypotheses
-python project/main.py show-hypothesis hypothesis:rsi_mean_reversion
-python project/main.py validate-hypothesis hypothesis:rsi_mean_reversion
-python project/main.py promote-hypothesis hypothesis:rsi_mean_reversion --to testing
+mft hypothesis list
+mft hypothesis check hypothesis:rsi_mean_reversion
+mft hypothesis validate hypothesis:rsi_mean_reversion
+mft hypothesis promote hypothesis:rsi_mean_reversion --to testing
 ```
 
-Research lifecycle commands now live alongside the existing research workflow
-and use the same JSON envelope contract:
+Research lifecycle commands live alongside the existing research workflow and use the same JSON envelope contract:
 
 ```bash
 python project/main.py create-research-project --name research:rsi --description "RSI checks"
