@@ -1,0 +1,77 @@
+family_id: mcx_commodities
+supported_asset_classes:
+  - mcx_commodity_future
+  - mcx_commodity_option
+asset_class_id: mcx_commodity_future
+name: MCX commodities
+status: research_only
+description: >
+  MCX commodity futures and options used for continuous-contract research,
+  carry tests, volatility breakout work, and regime overlays.
+canonical_symbol_format:
+  futures: "MCX_FUT:<ROOT>:<YYYYMM>"
+  options: "MCX_OPT:<ROOT>:<YYYYMM>:<STRIKE>:<CE|PE>"
+symbol_mapping:
+  canonical_form:
+    futures: "MCX_FUT:<ROOT>:<YYYYMM>"
+    options: "MCX_OPT:<ROOT>:<YYYYMM>:<STRIKE>:<CE|PE>"
+  source_forms:
+    - "<ROOT>"
+    - "<ROOT><YY><MON>"
+    - "<ROOT>FUT"
+  mapping_rules:
+    - preserve root commodity code exactly
+    - encode expiry as exchange-listed contract month
+    - keep options and futures in separate instrument namespaces
+source_priority_order:
+  - source_id: mcx_official_bhavcopy
+    rationale: primary exchange source for contract prices, expiry, and open interest
+trading_calendar: MCX trading calendar with exchange holidays and commodity-specific expiry dates
+price_type:
+  futures: settlement_price
+  options: last_traded_price_or_settlement_price
+adjustment_policy:
+  futures: use explicit continuous series only
+  options: no continuity adjustment; treat each contract as a distinct instrument
+liquidity_fields:
+  primary:
+    - volume
+    - open_interest
+    - turnover
+  secondary:
+    - delivery_volume
+    - contract_count
+benchmark:
+  primary: "MCX COMDEX"
+  fallback: "front_month_continuous_series"
+point_in_time_metadata_status: required
+contract_model:
+  futures:
+    root: "<COMMODITY_ROOT>"
+    expiry: "exchange-defined monthly expiry"
+    instrument_type: "futures"
+    roll_rule:
+      trigger: "roll when the next contract dominates for 2 consecutive sessions inside the roll window, or when the front contract enters the hard exit window"
+      roll_window_sessions: 5
+      hard_cutoff_days_before_expiry: 3
+    continuous_contract_method:
+      method: "ratio_back_adjusted_front_month_chain"
+      price_basis: "settlement_price"
+    volume_oi_filter:
+      require_nonzero_volume: true
+      require_nonzero_open_interest: true
+      prefer_higher_open_interest: true
+      tie_breaker: "higher_volume"
+    near_contract_policy:
+      preferred_leg: "nearest non-expired liquid contract"
+      exclude_contracts_within_days_to_expiry: 3
+      fallback_leg: "next nearest liquid contract"
+  options:
+    expiry: "exchange-defined monthly contract cycle; weekly only if officially listed"
+    instrument_type: "options"
+    chain_selection: "nearest expiration, then strike chain around spot if enough history exists"
+known_risks:
+  - contract roll jumps
+  - delivery-window distortions
+  - thin liquidity outside a few roots
+  - series changes across exchange rule updates

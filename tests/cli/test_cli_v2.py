@@ -62,7 +62,11 @@ def test_status_next_and_json_mode(tmp_path: Path) -> None:
 def test_data_quality_and_hypothesis_list(tmp_path: Path) -> None:
     repository = _repository(tmp_path)
     asset = repository.add_asset("AAPL", "Apple", "equity", "NASDAQ")
-    _seed_market_data(repository, asset)
+    _seed_market_data(
+        repository,
+        asset,
+        base=datetime.now(UTC) - timedelta(days=19),
+    )
     repository.close()
 
     quality = CliRunner().invoke(
@@ -117,10 +121,14 @@ def _repository(tmp_path: Path) -> DataRepository:
     return repository
 
 
-def _seed_market_data(repository: DataRepository, asset: Asset) -> None:
-    base = datetime(2026, 4, 26, tzinfo=UTC)
+def _seed_market_data(
+    repository: DataRepository,
+    asset: Asset,
+    base: datetime | None = None,
+) -> None:
+    start = base or datetime(2026, 4, 26, tzinfo=UTC)
     for index in range(20):
-        timestamp = base + timedelta(days=index)
+        timestamp = start + timedelta(days=index)
         close = 100.0 + float(index)
         repository.ingest_market_data(
             asset.symbol,

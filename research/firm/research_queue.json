@@ -1,0 +1,265 @@
+{
+  "queue_name": "research_control_room",
+  "state_file": "research/projects/alpha101_formulaic_alphas/research_state.json",
+  "last_updated_utc": "2026-05-22T11:39:19Z",
+  "tasks": [
+    {
+      "task_id": "vp_research.strict_liquidity_focus_review",
+      "owner_role": "VP Research / Alpha PM",
+      "priority": 1,
+      "status": "active",
+      "objective": "Review alpha024, alpha018, alpha040, and alpha023 against the strict-liquidity focus queue and keep promotion decisions explicit.",
+      "input_paths": [
+        "research/projects/alpha101_formulaic_alphas/research_state.json",
+        "research/projects/alpha101_formulaic_alphas/capacity_audit.md",
+        "research/projects/alpha101_formulaic_alphas/blocked_lanes.md"
+      ],
+      "output_paths": [
+        "research/projects/alpha101_formulaic_alphas/research_loop_report.md",
+        "research/projects/alpha101_formulaic_alphas/next_queue.md",
+        "research/firm/daily_research_state.json",
+        "research/projects/alpha101_formulaic_alphas/review_packs/positive_focus/alpha101_positive_focus_pack.md"
+      ],
+      "blocker": null,
+      "done_conditions": [
+        "alpha024 and alpha023 remain the positive names",
+        "alpha018 remains borderline or is explicitly reclassified",
+        "alpha040 remains a holdout until evidence changes",
+        "promotion criteria remain explicit"
+      ]
+    },
+    {
+      "task_id": "vp_research.proxy_vwap_gate",
+      "owner_role": "VP Research / Alpha PM",
+      "priority": 2,
+      "status": "blocked",
+      "objective": "Keep the proxy VWAP lane blocked until real VWAP data exists.",
+      "input_paths": [
+        "research/projects/alpha101_formulaic_alphas/blocked_lanes.md",
+        "research/projects/alpha101_formulaic_alphas/research_state.json"
+      ],
+      "output_paths": [
+        "research/projects/alpha101_formulaic_alphas/blocked_lanes.md",
+        "research/projects/alpha101_formulaic_alphas/research_loop_report.md",
+        "research/projects/alpha101_formulaic_alphas/point_in_time_industry_metadata_lane.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/blocked_lanes/alpha101_blocked_lanes_pack.md"
+      ],
+      "blocker": "Real VWAP data contract missing.",
+      "done_conditions": [
+        "Proxy VWAP remains research-only until real VWAP exists",
+        "The blocker is documented in the loop report"
+      ]
+    },
+    {
+      "task_id": "vp_research.snapshot_industry_gate",
+      "owner_role": "VP Research / Alpha PM",
+      "priority": 3,
+      "status": "blocked",
+      "objective": "Keep snapshot-industry work blocked until point-in-time industry metadata exists.",
+      "input_paths": [
+        "research/projects/alpha101_formulaic_alphas/blocked_lanes.md",
+        "research/projects/alpha101_formulaic_alphas/research_state.json"
+      ],
+      "output_paths": [
+        "research/projects/alpha101_formulaic_alphas/blocked_lanes.md",
+        "research/projects/alpha101_formulaic_alphas/research_loop_report.md"
+      ],
+      "blocker": "Point-in-time industry metadata is missing.",
+      "done_conditions": [
+        "Industry-neutral promotion stays blocked until PIT metadata exists",
+        "The blocker is documented in the loop report"
+      ]
+    },
+    {
+      "task_id": "vp_research.broad_universe_bridge",
+      "owner_role": "VP Research / Alpha PM",
+      "priority": 4,
+      "status": "blocked",
+      "objective": "Define the capacity evidence required to bridge beyond high_vol_top100 without pretending broad-universe success.",
+      "input_paths": [
+        "research/projects/alpha101_formulaic_alphas/capacity_audit.md",
+        "research/projects/alpha101_formulaic_alphas/research_state.json"
+      ],
+      "output_paths": [
+        "research/projects/alpha101_formulaic_alphas/capacity_audit.md",
+        "research/projects/alpha101_formulaic_alphas/next_queue.md",
+        "research/projects/alpha101_formulaic_alphas/broad_universe_capacity_bridge.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/blocked_lanes/alpha101_blocked_lanes_pack.md"
+      ],
+      "blocker": "Results degrade outside high_vol_top100 under the current contract.",
+      "done_conditions": [
+        "Capacity evidence survives the broader universe",
+        "Broad-universe degradation remains visible until then"
+      ]
+    },
+    {
+      "task_id": "vp_research.review_pack_commitment",
+      "owner_role": "VP Research / Alpha PM",
+      "priority": 5,
+      "status": "completed",
+      "objective": "Keep notebook outputs separated from canonical status and package the review evidence.",
+      "input_paths": [
+        "research/projects/alpha101_formulaic_alphas/review_packs/README.md",
+        "research/projects/alpha101_formulaic_alphas/research_loop_report.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/positive_focus/alpha101_positive_focus_pack.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/blocked_lanes/alpha101_blocked_lanes_pack.md"
+      ],
+      "output_paths": [
+        "research/projects/alpha101_formulaic_alphas/review_packs/README.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/positive_focus/README.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/blocked_lanes/README.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/positive_focus/alpha101_positive_focus_pack.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/blocked_lanes/alpha101_blocked_lanes_pack.md"
+      ],
+      "blocker": null,
+      "done_conditions": [
+        "Review pack files exist",
+        "Notebook outputs are not treated as canonical",
+        "Review pack placement stays explicit"
+      ]
+    },
+    {
+      "task_id": "vp_data.source_registry_and_quality_gate",
+      "owner_role": "VP Data & Platform",
+      "priority": 6,
+      "status": "active",
+      "objective": "Keep source readiness, adapter status, and quality gates explicit.",
+      "input_paths": [
+        "research/firm/daily_research_state.json",
+        "research/projects/alpha101_formulaic_alphas/research_state.json"
+      ],
+      "output_paths": [
+        "research/firm/daily_research_state.json",
+        "research/projects/alpha101_formulaic_alphas/research_state.json"
+      ],
+      "blocker": null,
+      "done_conditions": [
+        "Source readiness remains explicit",
+        "License and allowed-use status remain explicit",
+        "Adapter readiness remains explicit"
+      ]
+    },
+    {
+      "task_id": "vp_data.data_contract_upgrade",
+      "owner_role": "VP Data & Platform",
+      "priority": 7,
+      "status": "queued",
+      "objective": "Extend the data contract for multi-asset lanes, point-in-time metadata, and quality reporting.",
+      "input_paths": [
+        "research/firm/daily_research_state.json",
+        "research/projects/alpha101_formulaic_alphas/research_state.json"
+      ],
+      "output_paths": [
+        "project/data_sources/models.py",
+        "project/data_sources/registry.py",
+        "project/data_sources/validation.py"
+      ],
+      "blocker": "Multi-asset contract expansion is not yet implemented in this scope.",
+      "done_conditions": [
+        "Multi-asset lanes are supported by the contract",
+        "Point-in-time metadata is represented explicitly",
+        "Quality reporting distinguishes source gaps from asset gaps"
+      ]
+    },
+    {
+      "task_id": "associate_data_sources.source_registry_and_adapter_prototypes",
+      "owner_role": "Associate Data Source",
+      "priority": 8,
+      "status": "active",
+      "objective": "Inventory free sources and prototype NSE, MCX, and FRED adapters first.",
+      "input_paths": [
+        "research/firm/daily_research_state.json",
+        "research/projects/alpha101_formulaic_alphas/research_state.json"
+      ],
+      "output_paths": [
+        "research/data_sources/source_registry.yaml",
+        "project/data_sources/__init__.py",
+        "project/data_sources/models.py",
+        "project/data_sources/registry.py",
+        "project/data_sources/validation.py"
+      ],
+      "blocker": null,
+      "done_conditions": [
+        "Source registry entries exist",
+        "Adapter status is explicit",
+        "Quality reports are explicit"
+      ]
+    },
+    {
+      "task_id": "associate_asset_classes.asset_class_registry_and_roll_rules",
+      "owner_role": "Associate Asset Class",
+      "priority": 9,
+      "status": "active",
+      "objective": "Define asset-class universes, symbol mappings, calendars, and roll rules.",
+      "input_paths": [
+        "research/firm/daily_research_state.json",
+        "research/projects/alpha101_formulaic_alphas/research_state.json"
+      ],
+      "output_paths": [
+        "research/asset_classes/asset_class_registry.yaml",
+        "research/asset_classes/indian_etfs.yaml",
+        "research/asset_classes/mcx_commodities.yaml",
+        "research/asset_classes/nse_indices.yaml",
+        "research/asset_classes/indian_equities_liquid.yaml",
+        "research/asset_classes/macro_series.yaml"
+      ],
+      "blocker": null,
+      "done_conditions": [
+        "Asset-class registry exists",
+        "Canonical symbol formats are explicit",
+        "Contract roll requirements are explicit"
+      ]
+    },
+    {
+      "task_id": "associate_math_tools.alpha_math_toolkit",
+      "owner_role": "Associate Math & Alpha Tools",
+      "priority": 10,
+      "status": "queued",
+      "objective": "Implement deterministic transform, neutralization, capacity, ensemble, and diagnostic helpers.",
+      "input_paths": [
+        "research/projects/alpha101_formulaic_alphas/research_state.json"
+      ],
+      "output_paths": [
+        "project/alpha_math/transforms.py",
+        "project/alpha_math/neutralization.py",
+        "project/alpha_math/validation.py",
+        "project/alpha_math/capacity.py",
+        "project/alpha_math/ensembles.py",
+        "project/alpha_math/diagnostics.py"
+      ],
+      "blocker": "Math toolkit work has not started in this scope.",
+      "done_conditions": [
+        "Transforms are deterministic",
+        "Validation helpers cover the required edge cases",
+        "Capacity and ensemble helpers are explicit"
+      ]
+    },
+    {
+      "task_id": "associate_validation_ops.review_pack_pipeline",
+      "owner_role": "Associate Validation & Research Ops",
+      "priority": 11,
+      "status": "active",
+      "objective": "Keep review packs, reports, and canonical state synchronized.",
+      "input_paths": [
+        "research/projects/alpha101_formulaic_alphas/review_packs/README.md",
+        "research/projects/alpha101_formulaic_alphas/research_state.json",
+        "research/projects/alpha101_formulaic_alphas/research_loop_report.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/positive_focus/alpha101_positive_focus_pack.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/blocked_lanes/alpha101_blocked_lanes_pack.md"
+      ],
+      "output_paths": [
+        "research/projects/alpha101_formulaic_alphas/review_packs/README.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/positive_focus/alpha101_positive_focus_pack.md",
+        "research/projects/alpha101_formulaic_alphas/review_packs/blocked_lanes/alpha101_blocked_lanes_pack.md",
+        "research/projects/alpha101_formulaic_alphas/research_loop_report.md",
+        "research/projects/alpha101_formulaic_alphas/next_queue.md"
+      ],
+      "blocker": null,
+      "done_conditions": [
+        "Review packs exist and are committed",
+        "State files stay current",
+        "Reports remain aligned with canonical artifacts"
+      ]
+    }
+  ]
+}

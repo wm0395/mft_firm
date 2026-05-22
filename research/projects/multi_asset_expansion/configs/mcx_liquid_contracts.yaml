@@ -1,0 +1,18 @@
+{
+  "contract_model": {
+    "root": "commodity_root",
+    "expiry": "nearest_active_contract_expiry",
+    "instrument_type": "future",
+    "roll_rule": "roll_on_volume_or_oi_lead",
+    "continuous_contract_method": "back_adjusted",
+    "volume_oi_filter": [
+      "positive_volume",
+      "positive_open_interest"
+    ],
+    "near_contract_policy": "prefer_nearest_liquid_contract"
+  },
+  "source_priority": [
+    "mcx_official_bhavcopy"
+  ],
+  "notes": "Liquid MCX contracts only; roll assumptions remain explicit."
+}

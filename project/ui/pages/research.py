@@ -5,7 +5,7 @@ from project.ui.components.evidence_table import render_evidence_table
 from project.ui.components.json_debug import render_json_debug
 from project.ui.components.status_card import render_status_cards
 from project.ui.views.common import StatusCardView
-from project.ui.views.research import get_research_page_view
+from project.ui_services.research_views import get_research_page_view
 
 
 def render(repository) -> None:
@@ -14,6 +14,7 @@ def render(repository) -> None:
     st.title("Research")
     st.caption("Research projects, runs, and strategy candidates.")
     render_status_cards(_cards(view))
+    render_json_debug("Canonical Strategy Dossier", view.strategy_dossier)
     render_evidence_table("Research Projects", view.projects)
     render_evidence_table("Research Runs", view.runs)
     render_evidence_table("Strategy Candidates", view.candidates)

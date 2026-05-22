@@ -1,0 +1,223 @@
+registry_version: 1
+owner_role: VP Data & Platform
+sources:
+  - source_id: nse_official_reports
+    name: NSE official reports and downloads
+    base_url: https://www.nseindia.com
+    asset_classes:
+      - indian_equity_cash
+      - indian_etf
+      - indian_index
+      - nse_equity_derivative
+    expected_fields:
+      - symbol
+      - timestamp
+      - trade_date
+      - open
+      - high
+      - low
+      - close
+      - volume
+      - turnover
+      - delivery_volume
+      - open_interest
+      - instrument_type
+      - expiry
+      - series
+    frequency: daily and intraday
+    history_depth: archive depth varies by report family
+    access_method: download
+    free_or_paid: free
+    license_status: restricted
+    adapter_status: prototype
+    data_quality_status: needs_review
+    notes: Prototype fixture-backed adapter for exchange reports; official website terms still prohibit automated scraping, and market data usage must stay inside the relevant NSE Data & Analytics agreements and online delivery controls.
+    owner_role: "Associate 1: Data Source Associate"
+    allowed_use: research use only; respect exchange terms
+    rate_limit_notes: Use backoff, session handling, and download throttling.
+    freshness: daily
+    reliability_rating: high
+  - source_id: mcx_official_bhavcopy
+    name: MCX official bhavcopy and historical data
+    base_url: https://www.mcxindia.com
+    asset_classes:
+      - mcx_commodity_future
+      - mcx_commodity_option
+    expected_fields:
+      - symbol
+      - root
+      - timestamp
+      - trade_date
+      - open
+      - high
+      - low
+      - close
+      - volume
+      - open_interest
+      - turnover
+      - expiry
+      - instrument_type
+      - lot_size
+    frequency: daily
+    history_depth: archive depth varies by contract family
+    access_method: download
+    free_or_paid: free
+    license_status: restricted
+    adapter_status: prototype
+    data_quality_status: needs_review
+    notes: Prototype fixture-backed adapter for contract archives; official website terms still prohibit automated scraping and copying, and contract archives need legal and structural review before any promotion.
+    owner_role: "Associate 1: Data Source Associate"
+    allowed_use: research use only; respect exchange terms
+    rate_limit_notes: Use backoff, session handling, and download throttling.
+    freshness: daily
+    reliability_rating: high
+  - source_id: rbi_dbie_data_pages
+    name: RBI DBIE and RBI data pages
+    base_url: https://dbie.rbi.org.in
+    asset_classes:
+      - macro_series
+      - fx_proxy
+    expected_fields:
+      - series_id
+      - date
+      - value
+      - frequency
+      - unit
+      - release_date
+      - revision_flag
+    frequency: series dependent
+    history_depth: multi-year, series dependent
+    access_method: web
+    free_or_paid: free
+    license_status: unknown
+    adapter_status: not_started
+    data_quality_status: not_assessed
+    notes: Use point-in-time vintage handling where available; revisions and release lags must be explicit.
+    owner_role: "Associate 1: Data Source Associate"
+    allowed_use: research use only; public macro reference data
+    rate_limit_notes: Use polite page access and cache downloads.
+    freshness: series dependent
+    reliability_rating: high
+  - source_id: fred_api
+    name: FRED API and FRED series pages
+    base_url: https://fred.stlouisfed.org
+    asset_classes:
+      - macro_series
+      - fx_proxy
+      - global_etf_proxy
+    expected_fields:
+      - series_id
+      - date
+      - value
+      - frequency
+      - unit
+      - seasonal_adjustment
+      - realtime_start
+      - realtime_end
+    frequency: series dependent
+    history_depth: multi-decade, series dependent
+    access_method: api
+    free_or_paid: free
+    license_status: restricted
+    adapter_status: prototype
+    data_quality_status: needs_review
+    notes: Prototype fixture-backed adapter for versioned series; source-level use remains restricted by third-party series ownership and owner permissions for non-personal use.
+    owner_role: "Associate 1: Data Source Associate"
+    allowed_use: research use only; public macro reference data
+    rate_limit_notes: Follow FRED API key and rate-limit guidance.
+    freshness: series dependent
+    reliability_rating: high
+  - source_id: stooq_free_daily
+    name: Stooq free daily market data
+    base_url: https://stooq.com
+    asset_classes:
+      - fx_proxy
+      - global_etf_proxy
+    expected_fields:
+      - symbol
+      - date
+      - open
+      - high
+      - low
+      - close
+      - volume
+      - currency
+    frequency: daily
+    history_depth: symbol dependent
+    access_method: download
+    free_or_paid: free
+    license_status: unknown
+    adapter_status: not_started
+    data_quality_status: not_assessed
+    notes: Footer links to terms of service, but the public terms target was not retrievable in this environment; keep the source on hold until legal review is complete.
+    owner_role: "Associate 1: Data Source Associate"
+    allowed_use: research use only; verify redistribution terms
+    rate_limit_notes: Use polite download cadence.
+    freshness: daily
+    reliability_rating: medium
+  - source_id: alpha_vantage_free_tier
+    name: Alpha Vantage free and paid endpoints
+    base_url: https://www.alphavantage.co
+    asset_classes:
+      - indian_equity_cash
+      - indian_etf
+      - fx_proxy
+      - global_etf_proxy
+      - macro_series
+    expected_fields:
+      - symbol
+      - timestamp
+      - open
+      - high
+      - low
+      - close
+      - adjusted_close
+      - volume
+      - dividend_amount
+      - split_coefficient
+    frequency: daily and intraday
+    history_depth: endpoint and plan dependent
+    access_method: api
+    free_or_paid: mixed
+    license_status: restricted
+    adapter_status: not_started
+    data_quality_status: not_assessed
+    notes: Free-tier access is personal and non-commercial only; research, testing, and monitoring are treated as commercial use, so source-level use remains restricted until a separate agreement or paid entitlement is in place.
+    owner_role: "Associate 1: Data Source Associate"
+    allowed_use: research use only; respect endpoint class and plan limits
+    rate_limit_notes: Free tier limits are strict; batch requests carefully.
+    freshness: daily and intraday
+    reliability_rating: medium
+  - source_id: yfinance_convenience
+    name: yfinance convenience wrapper
+    base_url: https://finance.yahoo.com
+    asset_classes:
+      - indian_equity_cash
+      - indian_etf
+      - indian_index
+      - fx_proxy
+      - global_etf_proxy
+    expected_fields:
+      - symbol
+      - date
+      - open
+      - high
+      - low
+      - close
+      - adj_close
+      - volume
+      - dividends
+      - splits
+    frequency: daily and intraday
+    history_depth: symbol dependent
+    access_method: api
+    free_or_paid: free
+    license_status: unknown
+    adapter_status: not_started
+    data_quality_status: not_assessed
+    notes: Convenience-only source; not allowed as the sole production source and not authoritative for exchange records.
+    owner_role: "Associate 1: Data Source Associate"
+    allowed_use: convenience only; research use only
+    rate_limit_notes: Underlying Yahoo endpoints can change without notice.
+    freshness: daily and intraday
+    reliability_rating: low

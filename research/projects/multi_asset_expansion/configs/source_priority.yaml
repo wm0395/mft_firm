@@ -1,0 +1,35 @@
+{
+  "indian_equity_cash": [
+    "nse_official_reports",
+    "yfinance_convenience"
+  ],
+  "indian_etf": [
+    "nse_official_reports",
+    "yfinance_convenience"
+  ],
+  "indian_index": [
+    "nse_official_reports",
+    "yfinance_convenience"
+  ],
+  "nse_equity_derivative": [
+    "nse_official_reports"
+  ],
+  "mcx_commodity_future": [
+    "mcx_official_bhavcopy"
+  ],
+  "mcx_commodity_option": [
+    "mcx_official_bhavcopy"
+  ],
+  "macro_series": [
+    "rbi_dbie_data_pages",
+    "fred_api"
+  ],
+  "fx_proxy": [
+    "fred_api",
+    "stooq_free_daily"
+  ],
+  "global_etf_proxy": [
+    "stooq_free_daily",
+    "yfinance_convenience"
+  ]
+}

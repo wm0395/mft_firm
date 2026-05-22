@@ -1,0 +1,212 @@
+registry_name: research_asset_class_registry
+scope: initial_multi_asset_expansion
+status: research_only
+contract_policy:
+  point_in_time_metadata: required_where_applicable
+  continuous_series: explicit_only
+  production_claims: prohibited
+asset_classes:
+  - asset_class_id: indian_equity_cash
+    file: indian_equities_liquid.yaml
+    description: Liquid NSE-listed common equity shares for cross-sectional research and capacity checks.
+    canonical_symbol_format: "NSE_EQ:<SYMBOL>"
+    source_priority_order:
+      - nse_official_reports
+      - yfinance_convenience
+    trading_calendar: NSE cash market calendar
+    price_type: adjusted_close
+    adjustment_policy: split-bonus-dividend-rights adjusted when source flags are available; raw prices only for non-return features if adjustments are absent
+    liquidity_fields:
+      - volume
+      - turnover
+      - delivery_volume
+      - average_traded_value
+      - free_float_market_cap
+    benchmark: NIFTY 500
+    known_risks:
+      - survivorship bias
+      - corporate action misalignment
+      - stale symbol metadata
+      - low-float spike risk
+    point_in_time_metadata_status: required
+  - asset_class_id: indian_etf
+    file: indian_etfs.yaml
+    description: NSE-listed exchange-traded funds used as liquid macro, sector, and index proxies.
+    canonical_symbol_format: "NSE_ETF:<SYMBOL>"
+    source_priority_order:
+      - nse_official_reports
+      - yfinance_convenience
+    trading_calendar: NSE cash market calendar
+    price_type: adjusted_close
+    adjustment_policy: use adjusted close when provided; raw close only when adjustment flags are absent and clearly marked
+    liquidity_fields:
+      - volume
+      - turnover
+      - assets_under_management
+      - average_daily_value_traded
+      - tracking_error_proxy
+    benchmark: NIFTY 500
+    known_risks:
+      - tracking error
+      - low-aum liquidity traps
+      - stale NAV versus exchange close mismatch
+      - creation-redemption frictions
+    point_in_time_metadata_status: required
+  - asset_class_id: indian_index
+    file: nse_indices.yaml
+    description: Non-tradable NSE index levels for benchmark research, regime features, and index-relative diagnostics.
+    canonical_symbol_format: "NSE_INDEX:<INDEX_NAME>"
+    source_priority_order:
+      - nse_official_reports
+      - yfinance_convenience
+    trading_calendar: NSE market calendar with index observations aligned to exchange sessions
+    price_type: index_close_level
+    adjustment_policy: index methodology close; no corporate-action backfill
+    liquidity_fields:
+      - constituent_turnover
+      - constituent_volume
+      - index_aum
+      - breadth
+    benchmark: NIFTY 50
+    known_risks:
+      - direct tradability does not exist
+      - reconstitution drift
+      - constituent history gaps
+      - benchmark leakage if membership is not point-in-time
+    point_in_time_metadata_status: required
+  - asset_class_id: nse_equity_derivative
+    file: nse_indices.yaml
+    description: NSE stock and index derivatives, including futures and options.
+    canonical_symbol_format: "NSE_DERIV:<UNDERLYING>:<INSTRUMENT>:<EXPIRY>:<STRIKE>:<OPTION_TYPE>"
+    source_priority_order:
+      - nse_official_reports
+    trading_calendar: NSE derivatives calendar
+    price_type: settlement_price_or_last_traded_price
+    adjustment_policy: continuous futures only via explicit roll series; options remain contract-specific
+    liquidity_fields:
+      - volume
+      - open_interest
+      - turnover
+      - bid_ask_spread
+      - expiry
+    benchmark: underlying_cash_or_index_spot
+    known_risks:
+      - expiry jumps
+      - roll bias
+      - contract liquidity cliffs
+      - contract spec drift
+    point_in_time_metadata_status: required
+  - asset_class_id: mcx_commodity_future
+    file: mcx_commodities.yaml
+    description: MCX commodity futures used for continuous-contract research and carry tests.
+    canonical_symbol_format: "MCX_FUT:<ROOT>:<YYYYMM>"
+    source_priority_order:
+      - mcx_official_bhavcopy
+    trading_calendar: MCX trading calendar with exchange holidays and commodity-specific expiry dates
+    price_type: settlement_price
+    adjustment_policy: ratio_back_adjusted front-month chain only via explicit roll rules
+    liquidity_fields:
+      - volume
+      - open_interest
+      - turnover
+      - delivery_volume
+      - contract_count
+    benchmark: MCX COMDEX
+    known_risks:
+      - contract roll jumps
+      - delivery-window distortions
+      - thin liquidity outside a few roots
+      - series changes across exchange rule updates
+    point_in_time_metadata_status: required
+  - asset_class_id: mcx_commodity_option
+    file: mcx_commodities.yaml
+    description: MCX commodity options used for contract-aware volatility and tail-risk studies.
+    canonical_symbol_format: "MCX_OPT:<ROOT>:<YYYYMM>:<STRIKE>:<CE|PE>"
+    source_priority_order:
+      - mcx_official_bhavcopy
+    trading_calendar: MCX trading calendar with exchange holidays and commodity-specific expiry dates
+    price_type: option_last_price_or_settlement_price
+    adjustment_policy: no continuity adjustment; each contract is distinct
+    liquidity_fields:
+      - volume
+      - open_interest
+      - turnover
+      - implied_volatility
+      - strike_distance
+    benchmark: underlying_commodity_future
+    known_risks:
+      - sparse strikes
+      - wide spreads
+      - expiry pinning
+      - chain holes
+    point_in_time_metadata_status: required
+  - asset_class_id: macro_series
+    file: macro_series.yaml
+    description: Point-in-time macro and rates series from RBI and FRED.
+    canonical_symbol_format: "MACRO:<SOURCE_ID>:<SERIES_ID>"
+    source_priority_order:
+      - rbi_dbie_data_pages
+      - fred_api
+    trading_calendar: publication calendar or business-day aligned series calendar
+    price_type: level_series
+    adjustment_policy: keep original release and revision timestamps; forward fill is diagnostics only and never for labels
+    liquidity_fields:
+      - release_lag_days
+      - revision_count
+      - update_frequency
+      - coverage_depth
+    benchmark: policy_rate_or_cpi_series
+    known_risks:
+      - revision leakage
+      - publication lag mismatch
+      - series breaks across source revisions
+      - calendar alignment errors
+    point_in_time_metadata_status: required
+  - asset_class_id: fx_proxy
+    file: macro_series.yaml
+    description: FX and currency proxy series used for regime features and overlay work.
+    canonical_symbol_format: "FX:<PAIR_OR_PROXY>"
+    source_priority_order:
+      - rbi_dbie_data_pages
+      - fred_api
+      - alpha_vantage_free_tier
+      - stooq_free_daily
+      - yfinance_convenience
+    trading_calendar: global FX session and business-day calendar
+    price_type: spot_or_proxy_close
+    adjustment_policy: raw series retained; normalize by timezone and session
+    liquidity_fields:
+      - volume_proxy
+      - spread_proxy
+      - session_coverage
+      - quote_continuity
+    benchmark: USDINR
+    known_risks:
+      - proxy mismatch
+      - holiday misalignment
+      - non-tradable pricing
+      - sparse history
+    point_in_time_metadata_status: required
+  - asset_class_id: global_etf_proxy
+    file: macro_series.yaml
+    description: Global ETF proxies used for cross-market and risk-on/risk-off research.
+    canonical_symbol_format: "GLOBAL_ETF:<SYMBOL>"
+    source_priority_order:
+      - stooq_free_daily
+      - alpha_vantage_free_tier
+      - yfinance_convenience
+    trading_calendar: listing exchange calendar
+    price_type: adjusted_close
+    adjustment_policy: corporate-action adjusted close
+    liquidity_fields:
+      - volume
+      - turnover
+      - adv20
+      - bid_ask_spread
+    benchmark: VT
+    known_risks:
+      - proxy mismatch
+      - stale ticks
+      - country holiday effects
+      - ticker reuse
+    point_in_time_metadata_status: required

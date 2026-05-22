@@ -1,0 +1,137 @@
+{
+  "items": [
+    {
+      "research_id": "mcx_continuous_futures_construction",
+      "asset_class": "mcx_commodity_future",
+      "source_dependency": [
+        "mcx_official_bhavcopy"
+      ],
+      "alpha_family": "data_construction",
+      "transform_family": [
+        "decay_linear",
+        "rolling_zscore"
+      ],
+      "validation_plan": [
+        "roll_rule_validation",
+        "purged_time_split"
+      ],
+      "expected_artifacts": [
+        "mcx_continuous_contracts.csv"
+      ],
+      "done_conditions": [
+        "Continuous contract construction is deterministic"
+      ]
+    },
+    {
+      "research_id": "mcx_carry_term_structure_feasibility",
+      "asset_class": "mcx_commodity_future",
+      "source_dependency": [
+        "mcx_official_bhavcopy"
+      ],
+      "alpha_family": "carry_term_structure",
+      "transform_family": [
+        "rank_cross_sectional",
+        "zscore_cross_sectional"
+      ],
+      "validation_plan": [
+        "term_structure_check",
+        "walk_forward_split"
+      ],
+      "expected_artifacts": [
+        "mcx_carry_feasibility.md"
+      ],
+      "done_conditions": [
+        "Carry signal feasibility is documented"
+      ]
+    },
+    {
+      "research_id": "mcx_momentum_continuous_contracts",
+      "asset_class": "mcx_commodity_future",
+      "source_dependency": [
+        "mcx_official_bhavcopy"
+      ],
+      "alpha_family": "momentum",
+      "transform_family": [
+        "decay_linear",
+        "rolling_rank",
+        "rank_cross_sectional"
+      ],
+      "validation_plan": [
+        "rank_ic",
+        "transaction_cost_stress"
+      ],
+      "expected_artifacts": [
+        "mcx_momentum_scorecard.csv"
+      ],
+      "done_conditions": [
+        "Momentum is tested on continuous contracts"
+      ]
+    },
+    {
+      "research_id": "mcx_mean_reversion_liquid_commodities",
+      "asset_class": "mcx_commodity_future",
+      "source_dependency": [
+        "mcx_official_bhavcopy"
+      ],
+      "alpha_family": "mean_reversion",
+      "transform_family": [
+        "robust_zscore",
+        "winsorize"
+      ],
+      "validation_plan": [
+        "rank_ic",
+        "purged_time_split"
+      ],
+      "expected_artifacts": [
+        "mcx_mean_reversion_review_pack.md"
+      ],
+      "done_conditions": [
+        "Mean reversion is verified on liquid commodities"
+      ]
+    },
+    {
+      "research_id": "mcx_volatility_breakout",
+      "asset_class": "mcx_commodity_future",
+      "source_dependency": [
+        "mcx_official_bhavcopy"
+      ],
+      "alpha_family": "breakout",
+      "transform_family": [
+        "rolling_zscore",
+        "participation_rate_limit"
+      ],
+      "validation_plan": [
+        "volatility_regime_buckets",
+        "transaction_cost_stress"
+      ],
+      "expected_artifacts": [
+        "mcx_volatility_breakout.md"
+      ],
+      "done_conditions": [
+        "Volatility breakout lane has a clear capacity view"
+      ]
+    },
+    {
+      "research_id": "mcx_roll_yield_proxy",
+      "asset_class": "mcx_commodity_future",
+      "source_dependency": [
+        "mcx_official_bhavcopy"
+      ],
+      "alpha_family": "roll_yield_proxy",
+      "transform_family": [
+        "contract_metadata",
+        "decay_linear"
+      ],
+      "validation_plan": [
+        "roll_yield_feasibility",
+        "contract_coverage_check"
+      ],
+      "expected_artifacts": [
+        "mcx_roll_yield_proxy.md"
+      ],
+      "done_conditions": [
+        "Roll-yield proxy only exists if contract data permits"
+      ]
+    }
+  ]
+}

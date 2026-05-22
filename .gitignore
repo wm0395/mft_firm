@@ -17,5 +17,8 @@ codex_cli/runtime/*
 research/**/.ipynb_checkpoints/
 research/**/artifacts/*
 !research/**/artifacts/README.md
+reports/research/*
+research/reports/*
+research/**/*.csv
 research/**/exports/
 research/**/tmp/

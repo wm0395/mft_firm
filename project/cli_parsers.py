@@ -63,7 +63,11 @@ def add_trade_commands(
 ) -> None:
     review_parser = subcommands.add_parser("review-trade-idea")
     review_parser.add_argument("trade_id")
-    review_parser.add_argument("action", choices=["approve", "reject", "watchlist"])
+    review_parser.add_argument(
+        "action",
+        nargs="?",
+        choices=["approve", "reject", "watchlist"],
+    )
     review_parser.add_argument("--reason")
     review_parser.add_argument("--notes", default="")
     show_trade_parser = subcommands.add_parser("show-trade-idea")

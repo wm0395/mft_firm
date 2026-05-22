@@ -1,0 +1,43 @@
+asset_class_id: indian_etf
+name: Indian ETFs
+status: research_only
+description: >
+  NSE-listed exchange-traded funds used as liquid macro, sector, and index
+  proxies for research and capacity-aware factor testing.
+canonical_symbol_format: "NSE_ETF:<SYMBOL>"
+symbol_mapping:
+  canonical_form: "NSE_ETF:<SYMBOL>"
+  source_forms:
+    - "<SYMBOL>"
+    - "<SYMBOL>.NS"
+  mapping_rules:
+    - treat ETF units as separate from common equity symbols
+    - preserve distribution-adjusted prices when available
+    - exclude closed-end funds unless explicitly tagged as ETFs by source metadata
+source_priority_order:
+  - source_id: nse_official_reports
+    rationale: primary exchange source for ETF prices and unit volumes
+  - source_id: yfinance_convenience
+    rationale: convenience-only backfill, not authoritative
+trading_calendar: NSE cash market calendar with exchange holidays removed
+price_type:
+  primary: adjusted_close
+  fallback: raw_close
+adjustment_policy:
+  distributions: use adjusted close when dividend or split adjustment is supplied
+  fallback_rule: use raw prices only if adjustments are unavailable and clearly flagged
+liquidity_fields:
+  primary:
+    - volume
+    - turnover
+  secondary:
+    - assets_under_management
+    - average_daily_value_traded
+    - tracking_error_proxy
+benchmark: "NIFTY 500"
+point_in_time_metadata_status: required
+known_risks:
+  - tracking_error
+  - low-aum liquidity traps
+  - stale NAV versus exchange close mismatch
+  - creation_redemption frictions

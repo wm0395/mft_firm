@@ -5,7 +5,7 @@ from project.ui.components.evidence_table import render_evidence_table
 from project.ui.components.json_debug import render_json_debug
 from project.ui.components.status_card import render_status_cards
 from project.ui.views.common import StatusCardView
-from project.ui.views.reports import get_reports_page_view
+from project.ui_services.reports_views import get_reports_page_view
 
 
 def render(repository) -> None:
@@ -14,6 +14,7 @@ def render(repository) -> None:
     st.title("Reports")
     st.caption("Backtests, hypothesis performance, and rejected evaluations.")
     render_status_cards(_cards(view))
+    render_json_debug("Canonical Strategy Dossier", view.strategy_dossier)
     render_evidence_table("Backtest Results", view.backtests)
     render_evidence_table("Hypothesis Performance", view.performance)
     render_evidence_table("Rejected Hypotheses", view.rejected)

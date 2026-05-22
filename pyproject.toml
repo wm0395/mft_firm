@@ -26,6 +26,7 @@ exclude = [
     ".pytest_cache",
     ".ruff_cache",
     "__pycache__",
+    "research/notebooks",
     "codex_cli/mft_codex_cli.egg-info",
 ]
 
@@ -75,6 +76,13 @@ files = [
     "project/data/snapshot_builder.py",
     "project/data/yfinance_loader.py",
     "project/data/market_collector_loader.py",
+    "project/data/contract_models.py",
+    "project/data/schema_multi_asset.py",
+    "project/data_sources",
+    "project/alpha_math",
+    "project/cli/commands/control_room.py",
+    "project/cli/commands/data_sources.py",
+    "project/research/control_room.py",
     "project/replay/engine.py",
     "project/research/__init__.py",
     "project/research/artifacts.py",
@@ -95,4 +103,8 @@ python_version = "3.12"
 
 [[tool.mypy.overrides]]
 module = ["click", "click.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pandas", "pandas.*"]
 ignore_missing_imports = true

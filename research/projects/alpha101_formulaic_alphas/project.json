@@ -1,0 +1,13 @@
+{
+  "research_project_id": "research_project:alpha101_formulaic_alphas",
+  "name": "alpha101-formulaic-alphas",
+  "description": "Alpha101 research loop for exact-OHLCV India equity formulaic alphas",
+  "dataset_snapshot_id": "dataset_snapshot:alpha101_research_factory",
+  "hypothesis_id": "hypothesis:alpha101_formulaic_alphas",
+  "status": "draft",
+  "phase": "late-stage discovery and robustness triage",
+  "state_file": "research_state.json",
+  "legacy_state_file": "alpha101_research_state.json",
+  "review_pack_dir": "review_packs",
+  "owner_role": "VP Research / Alpha PM"
+}

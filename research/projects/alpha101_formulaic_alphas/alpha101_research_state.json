@@ -1,0 +1,344 @@
+{
+  "source_of_truth": "research/notebooks/alpha_001/alpha101_research_brief.md",
+  "summary_artifacts": [
+    "research/artifacts/alpha101_research_factory/alpha101_closed_loop_summary.json",
+    "research/artifacts/alpha101_research_factory/alpha101_closed_loop_summary.md",
+    "research/artifacts/alpha101_research_factory/alpha101_strict_liquidity_primary_report.csv",
+    "research/artifacts/alpha101_research_factory/alpha101_strict_liquidity_positive_focus.csv",
+    "research/artifacts/alpha101_research_factory/alpha101_strict_liquidity_positive_focus_recomputed.csv"
+  ],
+  "active_refinements": [
+    "strict_liquidity_mask_fixed_rescore",
+    "strict_liquidity_primary_report",
+    "strict_liquidity_batch_runner",
+    "strict_liquidity_batch_cache",
+    "strict_liquidity_positive_focus_queue",
+    "winsorized_overlay_sizing",
+    "smoothed_threshold_gates",
+    "ewm10_threshold_top_bottom",
+    "snapshot_fallback_recovery",
+    "source_history_widened_1996_2026"
+  ],
+  "promoted_queue": [
+    {
+      "batch": 1,
+      "alpha_id": "alpha040",
+      "median_test_active_sharpe": 1.669713,
+      "median_test_active_cagr": 0.028283,
+      "median_test_rank_ic": 0.034546,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "winsor_zscore",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 1,
+      "alpha_id": "alpha012",
+      "median_test_active_sharpe": 1.448578,
+      "median_test_active_cagr": 0.026729,
+      "median_test_rank_ic": 0.02049,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "ewm3_overlay20"
+    },
+    {
+      "batch": 1,
+      "alpha_id": "alpha024",
+      "median_test_active_sharpe": 1.441989,
+      "median_test_active_cagr": 0.027489,
+      "median_test_rank_ic": 0.03932,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "rank_centered",
+      "best_strategy": "ewm5_overlay20"
+    },
+    {
+      "batch": 1,
+      "alpha_id": "alpha044",
+      "median_test_active_sharpe": 1.364653,
+      "median_test_active_cagr": 0.022774,
+      "median_test_rank_ic": 0.04126,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 1,
+      "alpha_id": "alpha018",
+      "median_test_active_sharpe": 1.3416,
+      "median_test_active_cagr": 0.024729,
+      "median_test_rank_ic": 0.022731,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "ewm3_overlay20"
+    },
+    {
+      "batch": 1,
+      "alpha_id": "alpha023",
+      "median_test_active_sharpe": 1.268938,
+      "median_test_active_cagr": 0.024179,
+      "median_test_rank_ic": 0.029528,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "winsor_zscore",
+      "best_strategy": "ewm5_overlay20"
+    },
+    {
+      "batch": 1,
+      "alpha_id": "alpha051",
+      "median_test_active_sharpe": 1.213014,
+      "median_test_active_cagr": 0.023337,
+      "median_test_rank_ic": 0.016318,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "winsor_zscore",
+      "best_strategy": "ewm5_overlay20"
+    },
+    {
+      "batch": 1,
+      "alpha_id": "alpha049",
+      "median_test_active_sharpe": 1.205458,
+      "median_test_active_cagr": 0.023193,
+      "median_test_rank_ic": 0.017777,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "winsor_zscore",
+      "best_strategy": "ewm5_overlay20"
+    },
+    {
+      "batch": 1,
+      "alpha_id": "alpha016",
+      "median_test_active_sharpe": 1.183597,
+      "median_test_active_cagr": 0.021042,
+      "median_test_rank_ic": 0.028471,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 1,
+      "alpha_id": "alpha034",
+      "median_test_active_sharpe": 1.087923,
+      "median_test_active_cagr": 0.018344,
+      "median_test_rank_ic": 0.027965,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "ewm3_overlay20"
+    },
+    {
+      "batch": 1,
+      "alpha_id": "alpha022",
+      "median_test_active_sharpe": 1.004016,
+      "median_test_active_cagr": 0.016076,
+      "median_test_rank_ic": 0.020154,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "ewm3_overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha026",
+      "median_test_active_sharpe": 1.505659,
+      "median_test_active_cagr": 0.026694,
+      "median_test_rank_ic": 0.030148,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "winsor_zscore",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha033",
+      "median_test_active_sharpe": 1.165859,
+      "median_test_active_cagr": 0.021484,
+      "median_test_rank_ic": 0.031767,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "ewm3_overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha013",
+      "median_test_active_sharpe": 1.137544,
+      "median_test_active_cagr": 0.019149,
+      "median_test_rank_ic": 0.022281,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha015",
+      "median_test_active_sharpe": 1.086061,
+      "median_test_active_cagr": 0.018113,
+      "median_test_rank_ic": 0.022677,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "rank_centered",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha003",
+      "median_test_active_sharpe": 0.94149,
+      "median_test_active_cagr": 0.01557,
+      "median_test_rank_ic": 0.011634,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "rank_centered",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha045",
+      "median_test_active_sharpe": 0.904456,
+      "median_test_active_cagr": 0.014872,
+      "median_test_rank_ic": 0.014302,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "ewm3_overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha038",
+      "median_test_active_sharpe": 0.889312,
+      "median_test_active_cagr": 0.017319,
+      "median_test_rank_ic": 0.025777,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "winsor_zscore",
+      "best_strategy": "ewm3_overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha068",
+      "median_test_active_sharpe": 0.88124,
+      "median_test_active_cagr": 0.014694,
+      "median_test_rank_ic": 0.015941,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "liquidity_scaled",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha088",
+      "median_test_active_sharpe": 0.720715,
+      "median_test_active_cagr": 0.01381,
+      "median_test_rank_ic": 0.031329,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "rank_centered",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha010",
+      "median_test_active_sharpe": 0.700723,
+      "median_test_active_cagr": 0.012554,
+      "median_test_rank_ic": 0.019535,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "ewm5_overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha037",
+      "median_test_active_sharpe": 0.677416,
+      "median_test_active_cagr": 0.012192,
+      "median_test_rank_ic": 0.015875,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "ewm3_overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha017",
+      "median_test_active_sharpe": 0.676792,
+      "median_test_active_cagr": 0.012479,
+      "median_test_rank_ic": 0.014812,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "winsor_zscore",
+      "best_strategy": "ewm5_overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha004",
+      "median_test_active_sharpe": 0.664159,
+      "median_test_active_cagr": 0.012152,
+      "median_test_rank_ic": 0.022507,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "winsor_zscore",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha006",
+      "median_test_active_sharpe": 0.659661,
+      "median_test_active_cagr": 0.010592,
+      "median_test_rank_ic": 0.013471,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "winsor_zscore",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha007",
+      "median_test_active_sharpe": 0.633464,
+      "median_test_active_cagr": 0.012497,
+      "median_test_rank_ic": 0.018983,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "winsor_zscore",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha055",
+      "median_test_active_sharpe": 0.615999,
+      "median_test_active_cagr": 0.010129,
+      "median_test_rank_ic": 0.020412,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "rank_centered",
+      "best_strategy": "overlay20"
+    },
+    {
+      "batch": 2,
+      "alpha_id": "alpha009",
+      "median_test_active_sharpe": 0.542992,
+      "median_test_active_cagr": 0.00959,
+      "median_test_rank_ic": 0.024941,
+      "best_mask": "high_vol_top100",
+      "best_signal_transform": "ewm3",
+      "best_strategy": "ewm3_overlay20"
+    }
+  ],
+  "blocked_lanes": [
+    {
+      "lane": "proxy_vwap",
+      "status": "blocked",
+      "reason": "blocked until real VWAP data exists; proxy-VWAP signals are research-only because typical-price VWAP is not a clean substitute for production promotion"
+    },
+    {
+      "lane": "snapshot_metadata_risk",
+      "status": "blocked",
+      "reason": "blocked until point-in-time industry metadata exists; current industry-neutral work uses current constituent metadata and is not a PIT backtest"
+    },
+    {
+      "lane": "missing_cap",
+      "status": "blocked",
+      "reason": "untestable with the current cache, so it is not part of the promoted queue"
+    },
+    {
+      "lane": "baseline_alpha001",
+      "status": "reference_only",
+      "reason": "retained as a reference lane, not part of the exact-OHLCV promotion queue"
+    }
+  ],
+  "next_hygiene_steps": [
+    "Run a strict NaN-preserving formula pass so warmup gaps do not turn into synthetic signals.",
+    "Replace proxy VWAP with real VWAP before any proxy-dependent promotion.",
+    "Replace snapshot industry metadata with point-in-time industry snapshots before any industry-neutral promotion.",
+    "Audit selected-name forward returns, stale prices, warmup NaNs, and invalid returns before treating any promoted candidate as tradable.",
+    "Re-run the promoted exact-OHLCV queue after the liquidity-notional audit, using raw traded rupee volume for capacity checks."
+  ],
+  "queue_summary": {
+    "batch_1_count": 11,
+    "batch_2_count": 17,
+    "total_promoted_exact_ohlcv": 28
+  },
+  "strict_liquidity_positive_focus": [
+    "alpha024",
+    "alpha018",
+    "alpha040",
+    "alpha023"
+  ]
+}

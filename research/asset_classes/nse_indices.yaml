@@ -1,0 +1,44 @@
+asset_class_id: indian_index
+# Registry also maps nse_equity_derivative here for review-context grouping.
+name: NSE indices
+status: research_only
+description: >
+  Non-tradable NSE index levels used for benchmark research, regime features,
+  and index-relative factor diagnostics.
+canonical_symbol_format: "NSE_INDEX:<INDEX_NAME>"
+symbol_mapping:
+  canonical_form: "NSE_INDEX:<INDEX_NAME>"
+  source_forms:
+    - "<INDEX_NAME>"
+    - "<INDEX_NAME> Index"
+  mapping_rules:
+    - normalize spaces to underscores only in the canonical form
+    - preserve the exchange-provided index name as the source reference
+    - use point-in-time constituent history when index membership is needed
+source_priority_order:
+  - source_id: nse_official_reports
+    rationale: primary official source for index levels and published metadata
+  - source_id: yfinance_convenience
+    rationale: convenience-only backfill, not authoritative
+trading_calendar: NSE market calendar with index observations aligned to exchange sessions
+price_type:
+  primary: index_close_level
+  fallback: index_open_high_low_close
+adjustment_policy:
+  corporate_actions: not applicable
+  reconstitution: require point-in-time membership when index constituents are used
+liquidity_fields:
+  primary: []
+  proxy:
+    - constituent_turnover
+    - constituent_volume
+    - index_aum
+benchmark:
+  primary: "NIFTY 500"
+  secondary: "NIFTY 50"
+point_in_time_metadata_status: required
+known_risks:
+  - direct tradability does not exist
+  - reconstitution drift
+  - constituent history gaps
+  - benchmark leakage if membership is not point-in-time

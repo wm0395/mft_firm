@@ -1,0 +1,51 @@
+asset_class_id: macro_series
+# Registry also maps fx_proxy and global_etf_proxy here for review-context grouping.
+name: Macro series
+status: research_only
+description: >
+  Point-in-time macro and rates series from RBI and FRED for regime features,
+  release-lag modeling, and cross-asset overlays.
+canonical_symbol_format: "MACRO:<SOURCE_ID>:<SERIES_ID>"
+series_families:
+  india:
+    source_priority_order:
+      - rbi_dbie_data_pages
+    canonical_prefix: "MACRO:RBI:"
+  global:
+    source_priority_order:
+      - fred_api
+    canonical_prefix: "MACRO:FRED:"
+symbol_mapping:
+  canonical_form: "MACRO:<SOURCE_ID>:<SERIES_ID>"
+  source_forms:
+    - "<SERIES_ID>"
+    - "<SOURCE_SERIES_CODE>"
+  mapping_rules:
+    - preserve the source series code exactly in raw_reference
+    - normalize spaces only when the source requires it
+    - attach release dates and revision dates when available
+source_priority_order:
+  - source_id: rbi_dbie_data_pages
+    rationale: primary India macro source for RBI series and domestic rate context
+  - source_id: fred_api
+    rationale: global fallback for rates, inflation, and regime variables
+trading_calendar: publication calendar or business-day aligned series calendar
+price_type: level_series
+adjustment_policy:
+  revisions: keep original release and revision timestamps
+  forward_fill: diagnostics_only_never_for_labels
+liquidity_fields:
+  primary: []
+  proxy:
+    - release_lag_days
+    - revision_count
+    - update_frequency
+benchmark:
+  primary: "policy_rate"
+  secondary: "CPI"
+point_in_time_metadata_status: required
+known_risks:
+  - revision leakage
+  - publication lag mismatch
+  - series breaks across source revisions
+  - calendar alignment errors

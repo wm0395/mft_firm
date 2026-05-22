@@ -1,0 +1,74 @@
+{
+  "items": [
+    {
+      "research_id": "global_etf_trend_risk_on_risk_off",
+      "asset_class": "global_etf_proxy",
+      "source_dependency": [
+        "stooq_free_daily",
+        "yfinance_convenience"
+      ],
+      "alpha_family": "trend_risk_on_risk_off",
+      "transform_family": [
+        "decay_linear",
+        "rolling_rank",
+        "rank_cross_sectional"
+      ],
+      "validation_plan": [
+        "walk_forward_split",
+        "transaction_cost_stress"
+      ],
+      "expected_artifacts": [
+        "global_etf_trend_proxy.md"
+      ],
+      "done_conditions": [
+        "Global proxy lane is explicit and non-authoritative"
+      ]
+    },
+    {
+      "research_id": "usd_inr_proxy_overlays",
+      "asset_class": "fx_proxy",
+      "source_dependency": [
+        "fred_api",
+        "stooq_free_daily"
+      ],
+      "alpha_family": "fx_overlay",
+      "transform_family": [
+        "zscore_cross_sectional",
+        "orthogonalized_ensemble"
+      ],
+      "validation_plan": [
+        "regime_bucketing",
+        "purged_time_split"
+      ],
+      "expected_artifacts": [
+        "usd_inr_proxy_overlays.md"
+      ],
+      "done_conditions": [
+        "USD/INR proxy overlays are bounded and explicit"
+      ]
+    },
+    {
+      "research_id": "crude_gold_macro_relationships",
+      "asset_class": "global_etf_proxy",
+      "source_dependency": [
+        "stooq_free_daily",
+        "fred_api"
+      ],
+      "alpha_family": "macro_relationships",
+      "transform_family": [
+        "rolling_ic",
+        "rank_ic"
+      ],
+      "validation_plan": [
+        "walk_forward_split",
+        "transaction_cost_stress"
+      ],
+      "expected_artifacts": [
+        "crude_gold_macro_relationships.md"
+      ],
+      "done_conditions": [
+        "Macro relationships are recorded as research only"
+      ]
+    }
+  ]
+}

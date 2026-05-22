@@ -1,0 +1,17 @@
+{
+  "features": [
+    "rates",
+    "inflation",
+    "currency",
+    "global_risk",
+    "commodity_shock"
+  ],
+  "source_priority": [
+    "rbi_dbie_data_pages",
+    "fred_api"
+  ],
+  "validation": [
+    "purged_time_split",
+    "regime_bucketing"
+  ]
+}

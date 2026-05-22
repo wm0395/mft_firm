@@ -1,0 +1,106 @@
+{
+  "items": [
+    {
+      "research_id": "alpha101_transfer_exact_ohlcv",
+      "asset_class": "indian_etf",
+      "source_dependency": [
+        "nse_official_reports",
+        "yfinance_convenience"
+      ],
+      "alpha_family": "exact_ohlcv_transfer",
+      "transform_family": [
+        "rank_cross_sectional",
+        "winsorize",
+        "zscore_cross_sectional"
+      ],
+      "validation_plan": [
+        "walk_forward_split",
+        "purged_time_split",
+        "turnover_penalty"
+      ],
+      "expected_artifacts": [
+        "etf_transfer_scorecard.csv",
+        "etf_transfer_review_pack.md"
+      ],
+      "done_conditions": [
+        "ETF exact-OHLCV transfer has reviewable evidence",
+        "Capacity and turnover are explicit"
+      ]
+    },
+    {
+      "research_id": "etf_momentum_mean_reversion_baseline",
+      "asset_class": "indian_etf",
+      "source_dependency": [
+        "nse_official_reports"
+      ],
+      "alpha_family": "momentum_mean_reversion",
+      "transform_family": [
+        "decay_linear",
+        "rolling_zscore",
+        "rank_cross_sectional"
+      ],
+      "validation_plan": [
+        "walk_forward_split",
+        "rank_ic",
+        "transaction_cost_stress"
+      ],
+      "expected_artifacts": [
+        "etf_momentum_mean_reversion.csv",
+        "etf_momentum_mean_reversion.md"
+      ],
+      "done_conditions": [
+        "A baseline exists for liquid ETF signals",
+        "Promotion criteria are explicit"
+      ]
+    },
+    {
+      "research_id": "etf_liquidity_capacity_baseline",
+      "asset_class": "indian_etf",
+      "source_dependency": [
+        "nse_official_reports"
+      ],
+      "alpha_family": "capacity_baseline",
+      "transform_family": [
+        "liquidity_score",
+        "capacity_estimate",
+        "turnover_penalty"
+      ],
+      "validation_plan": [
+        "liquidity_audit",
+        "transaction_cost_stress"
+      ],
+      "expected_artifacts": [
+        "etf_capacity_audit.md"
+      ],
+      "done_conditions": [
+        "ETF capacity limits are visible before promotion"
+      ]
+    },
+    {
+      "research_id": "etf_trend_macro_overlay",
+      "asset_class": "indian_etf",
+      "source_dependency": [
+        "nse_official_reports",
+        "fred_api",
+        "rbi_dbie_data_pages"
+      ],
+      "alpha_family": "trend_macro_overlay",
+      "transform_family": [
+        "rolling_ic",
+        "stability_by_regime",
+        "orthogonalized_ensemble"
+      ],
+      "validation_plan": [
+        "regime_bucketing",
+        "purged_time_split",
+        "out_of_sample_overlay_test"
+      ],
+      "expected_artifacts": [
+        "etf_trend_macro_overlay.md"
+      ],
+      "done_conditions": [
+        "Macro overlay is explicit and reproducible"
+      ]
+    }
+  ]
+}

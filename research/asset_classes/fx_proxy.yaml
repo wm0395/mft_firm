@@ -1,0 +1,47 @@
+asset_class_id: fx_proxy
+name: FX proxy lanes
+status: research_only
+description: >
+  Currency and FX proxy series used for regime overlays, cross-asset
+  normalization, and India-linked macro context, not as a production trading
+  mandate.
+canonical_symbol_format: "FX:<PAIR_OR_PROXY>"
+symbol_mapping:
+  canonical_form: "FX:<PAIR_OR_PROXY>"
+  source_forms:
+    - "USDINR"
+    - "EURUSD"
+    - "DXY"
+  mapping_rules:
+    - keep spot pairs and proxy indices in separate namespaces when sourced differently
+    - preserve the source pair code exactly in raw_reference
+    - treat weekly gaps and weekends as missing observations unless the source is synthetic
+source_priority_order:
+  - source_id: rbi_dbie
+    rationale: primary India-linked FX context where published series exist
+  - source_id: fred_api
+    rationale: fallback for global currency and dollar proxies
+  - source_id: alpha_vantage_free
+    rationale: free convenience endpoint for FX daily series after endpoint classification
+  - source_id: yfinance_convenience
+    rationale: convenience-only fallback, not authoritative
+trading_calendar: FX market sessions or daily publication calendar depending on series source
+price_type: spot_or_proxy_close
+adjustment_policy:
+  corporate_actions: not applicable
+  series_revision: keep source timestamps and revisions explicit
+liquidity_fields:
+  primary: []
+  proxy:
+    - spread_proxy
+    - update_frequency
+    - release_lag_days
+benchmark:
+  primary: "USDINR"
+  secondary: "DXY"
+point_in_time_metadata_status: required
+known_risks:
+  - source mismatch between spot and proxy series
+  - weekend and holiday gaps
+  - free endpoint limits and stale data risk
+  - TOS constraints on convenience sources

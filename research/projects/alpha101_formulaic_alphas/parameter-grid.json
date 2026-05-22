@@ -1,0 +1,40 @@
+{
+  "panel": [
+    "expanded",
+    "nifty500"
+  ],
+  "mask": [
+    "high_vol_top100",
+    "all_eligible",
+    "strict_liquidity_100m"
+  ],
+  "lane": [
+    "clean_exact_ohlcv",
+    "proxy_vwap",
+    "snapshot_metadata_risk"
+  ],
+  "cost_bps": [
+    10,
+    20,
+    35,
+    50
+  ],
+  "horizon_days": [
+    1,
+    3,
+    5,
+    10
+  ],
+  "alpha_id": [
+    "alpha040",
+    "alpha026",
+    "alpha012",
+    "alpha024",
+    "alpha044",
+    "alpha018",
+    "alpha023",
+    "alpha051",
+    "alpha049",
+    "alpha016"
+  ]
+}

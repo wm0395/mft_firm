@@ -1,0 +1,35 @@
+{
+  "source_id": "fred_api",
+  "source_url": "https://fred.stlouisfed.org",
+  "sample_date": "2026-05-21",
+  "records": [
+    {
+      "asset_class": "macro_series",
+      "asset_id": "fred_dgs10",
+      "symbol": "DGS10",
+      "timestamp": "2026-05-21",
+      "value": 4.31,
+      "frequency": "daily",
+      "unit": "percent",
+      "release_date": "2026-05-21",
+      "revision_flag": "final",
+      "realtime_start": "2026-05-21",
+      "realtime_end": "9999-12-31",
+      "point_in_time_status": "available"
+    },
+    {
+      "asset_class": "macro_series",
+      "asset_id": "fred_cpi",
+      "symbol": "CPIAUCSL",
+      "timestamp": "2026-05-21",
+      "value": 318.62,
+      "frequency": "monthly",
+      "unit": "index",
+      "release_date": "2026-05-21",
+      "revision_flag": "final",
+      "realtime_start": "2026-05-21",
+      "realtime_end": "9999-12-31",
+      "point_in_time_status": "available"
+    }
+  ]
+}

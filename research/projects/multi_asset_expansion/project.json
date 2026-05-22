@@ -1,0 +1,10 @@
+{
+  "research_project_id": "research_project:multi_asset_expansion",
+  "name": "multi-asset-expansion",
+  "description": "Deterministic research project for multi-asset and multi-source expansion",
+  "dataset_snapshot_id": "dataset_snapshot:multi_asset_expansion_bootstrap",
+  "hypothesis_id": "hypothesis:multi_asset_expansion",
+  "status": "draft",
+  "phase": "initial expansion planning",
+  "owner_role": "VP Data & Platform"
+}

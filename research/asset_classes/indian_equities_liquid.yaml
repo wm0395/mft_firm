@@ -1,0 +1,43 @@
+asset_class_id: indian_equity_cash
+name: Indian equities liquid cash market
+status: research_only
+description: >
+  Liquid NSE-listed common equity shares used for cross-sectional research,
+  exact-OHLCV factor testing, and broad-universe capacity checks.
+canonical_symbol_format: "NSE_EQ:<SYMBOL>"
+symbol_mapping:
+  canonical_form: "NSE_EQ:<SYMBOL>"
+  source_forms:
+    - "<SYMBOL>"
+    - "<SYMBOL>.NS"
+  mapping_rules:
+    - strip exchange suffixes before canonicalization
+    - preserve the raw source symbol in raw_reference fields
+    - exclude non-common-equity series unless explicitly tagged
+source_priority_order:
+  - source_id: nse_official_reports
+    rationale: primary exchange source for daily cash-market data and corporate actions
+  - source_id: yfinance_convenience
+    rationale: convenience-only backfill, never sole authority
+trading_calendar: NSE cash market calendar with exchange holidays removed
+price_type:
+  primary: adjusted_close
+  fallback: raw_close
+adjustment_policy:
+  corporate_actions: split_bonus_dividend_rights adjusted when the source provides flags
+  fallback_rule: use raw prices only for non-return features if adjustment data is absent
+liquidity_fields:
+  primary:
+    - volume
+    - turnover
+  secondary:
+    - delivery_volume
+    - average_traded_value
+    - free_float_market_cap
+benchmark: "NIFTY 500"
+point_in_time_metadata_status: required
+known_risks:
+  - survivorship_bias
+  - corporate_action_misalignment
+  - stale symbol metadata
+  - low-float spike risk in thin names

@@ -13,6 +13,19 @@ from project.cli.commands.explain import lineage as explain_lineage
 from project.cli.commands.hypothesis import check, list_hypotheses, promote, validate
 from project.cli.commands.ideas import list_ideas, review
 from project.cli.commands.report import backtests, dossier, performance, rejected
+from project.cli.commands.control_room import (
+    alpha101_status,
+    data_source_status,
+    multi_asset_status,
+    research_control_room,
+)
+from project.cli.commands.data_sources import (
+    data_source_quality_report,
+    ingest_source_sample,
+    list_data_sources,
+    show_data_source,
+    validate_data_source,
+)
 from project.cli.commands.research import run as research_run
 from project.cli.commands.setup import bootstrap, init
 from project.cli.commands.status import next_action as run_next_action
@@ -804,6 +817,205 @@ def bootstrap_cmd(
         ctx,
         "bootstrap",
         bootstrap,
+        database=database,
+        json_mode=json_mode,
+        output_format=output_format,
+        plain=plain,
+    )
+
+
+@app.command("research-control-room")
+@_common_options
+@click.pass_context
+def research_control_room_cmd(
+    ctx: click.Context,
+    database: Path | None,
+    json_mode: bool,
+    output_format: str | None,
+    plain: bool,
+) -> None:
+    _invoke(
+        ctx,
+        "research-control-room",
+        research_control_room,
+        database=database,
+        json_mode=json_mode,
+        output_format=output_format,
+        plain=plain,
+    )
+
+
+@app.command("alpha101-status")
+@_common_options
+@click.pass_context
+def alpha101_status_cmd(
+    ctx: click.Context,
+    database: Path | None,
+    json_mode: bool,
+    output_format: str | None,
+    plain: bool,
+) -> None:
+    _invoke(
+        ctx,
+        "alpha101-status",
+        alpha101_status,
+        database=database,
+        json_mode=json_mode,
+        output_format=output_format,
+        plain=plain,
+    )
+
+
+@app.command("data-source-status")
+@_common_options
+@click.pass_context
+def data_source_status_cmd(
+    ctx: click.Context,
+    database: Path | None,
+    json_mode: bool,
+    output_format: str | None,
+    plain: bool,
+) -> None:
+    _invoke(
+        ctx,
+        "data-source-status",
+        data_source_status,
+        database=database,
+        json_mode=json_mode,
+        output_format=output_format,
+        plain=plain,
+    )
+
+
+@app.command("multi-asset-status")
+@_common_options
+@click.pass_context
+def multi_asset_status_cmd(
+    ctx: click.Context,
+    database: Path | None,
+    json_mode: bool,
+    output_format: str | None,
+    plain: bool,
+) -> None:
+    _invoke(
+        ctx,
+        "multi-asset-status",
+        multi_asset_status,
+        database=database,
+        json_mode=json_mode,
+        output_format=output_format,
+        plain=plain,
+    )
+
+
+@app.command("list-data-sources")
+@_common_options
+@click.pass_context
+def list_data_sources_cmd(
+    ctx: click.Context,
+    database: Path | None,
+    json_mode: bool,
+    output_format: str | None,
+    plain: bool,
+) -> None:
+    _invoke(
+        ctx,
+        "list-data-sources",
+        list_data_sources,
+        database=database,
+        json_mode=json_mode,
+        output_format=output_format,
+        plain=plain,
+    )
+
+
+@app.command("show-data-source")
+@click.argument("source_id")
+@_common_options
+@click.pass_context
+def show_data_source_cmd(
+    ctx: click.Context,
+    source_id: str,
+    database: Path | None,
+    json_mode: bool,
+    output_format: str | None,
+    plain: bool,
+) -> None:
+    _invoke(
+        ctx,
+        "show-data-source",
+        lambda runtime: show_data_source(runtime, source_id),
+        database=database,
+        json_mode=json_mode,
+        output_format=output_format,
+        plain=plain,
+    )
+
+
+@app.command("validate-data-source")
+@click.argument("source_id")
+@_common_options
+@click.pass_context
+def validate_data_source_cmd(
+    ctx: click.Context,
+    source_id: str,
+    database: Path | None,
+    json_mode: bool,
+    output_format: str | None,
+    plain: bool,
+) -> None:
+    _invoke(
+        ctx,
+        "validate-data-source",
+        lambda runtime: validate_data_source(runtime, source_id),
+        database=database,
+        json_mode=json_mode,
+        output_format=output_format,
+        plain=plain,
+    )
+
+
+@app.command("ingest-source-sample")
+@click.argument("source_id")
+@click.option("--asset-class", "asset_class", required=True)
+@_common_options
+@click.pass_context
+def ingest_source_sample_cmd(
+    ctx: click.Context,
+    source_id: str,
+    asset_class: str,
+    database: Path | None,
+    json_mode: bool,
+    output_format: str | None,
+    plain: bool,
+) -> None:
+    _invoke(
+        ctx,
+        "ingest-source-sample",
+        lambda runtime: ingest_source_sample(runtime, source_id, asset_class),
+        database=database,
+        json_mode=json_mode,
+        output_format=output_format,
+        plain=plain,
+    )
+
+
+@app.command("data-source-quality-report")
+@click.argument("source_id")
+@_common_options
+@click.pass_context
+def data_source_quality_report_cmd(
+    ctx: click.Context,
+    source_id: str,
+    database: Path | None,
+    json_mode: bool,
+    output_format: str | None,
+    plain: bool,
+) -> None:
+    _invoke(
+        ctx,
+        "data-source-quality-report",
+        lambda runtime: data_source_quality_report(runtime, source_id),
         database=database,
         json_mode=json_mode,
         output_format=output_format,

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from project.data.schema_multi_asset import CONTRACT_SCHEMA_SQL, EXTRA_REQUIRED_TABLES
+
 
 REQUIRED_TABLES = {
     "assets",
@@ -30,7 +32,7 @@ REQUIRED_TABLES = {
 }
 
 
-SCHEMA_SQL = (
+SCHEMA_SQL: tuple[str, ...] = (
     """
     create table if not exists raw_market_data (
         id varchar primary key,
@@ -308,6 +310,8 @@ SCHEMA_SQL = (
     """,
 )
 
+REQUIRED_TABLES = REQUIRED_TABLES.union(EXTRA_REQUIRED_TABLES)
+SCHEMA_SQL = SCHEMA_SQL + CONTRACT_SCHEMA_SQL
 
 UPSERT_RESEARCH_UNIVERSE_SQL = """
 insert into research_universes values (?, ?, ?, ?, ?)

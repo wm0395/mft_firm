@@ -3,8 +3,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from project.common.models import HypothesisOutput, utc_now_iso, strategy_spec_parameters
-from project.common.models import StrategySpec
+from project.common.models import (
+    StrategySpec,
+    HypothesisOutput,
+    strategy_spec_missing_fields,
+    strategy_spec_parameters,
+    utc_now_iso,
+)
 from project.data.models import HypothesisEvaluation
 from project.data.repository import DataRepository
 from project.cli_utils import load_hypothesis_registry
@@ -153,7 +158,7 @@ def _latest_snapshot_for_universe(
         for snapshot in repository.get_dataset_snapshots()
         if snapshot.universe_id == universe_id
     ]
-    return snapshots[-1] if snapshots else None
+    return max(snapshots, key=_snapshot_sort_key, default=None)
 
 
 def _latest_evidence_summary(
@@ -167,4 +172,62 @@ def _latest_evidence_summary(
         if summary.strategy_spec_id == strategy_spec_id
         and (dataset_snapshot_id is None or summary.dataset_snapshot_id == dataset_snapshot_id)
     ]
-    return matches[-1] if matches else None
+    return max(matches, key=_evidence_sort_key, default=None)
+
+
+def tradeability_blockers(
+    strategy_spec: StrategySpec | None,
+    latest_snapshot: object | None,
+    latest_research_run: object | None,
+    best_backtest: object | None,
+    latest_evidence_summary: object | None,
+    validation_errors: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    if strategy_spec is None:
+        return ("missing_strategy_spec",)
+    blockers = list(strategy_spec_missing_fields(strategy_spec))
+    blockers.extend(_tradeability_blockers(
+        latest_snapshot,
+        latest_research_run,
+        best_backtest,
+        latest_evidence_summary,
+    ))
+    blockers.extend(validation_errors)
+    return tuple(dict.fromkeys(blockers))
+
+
+def _tradeability_blockers(
+    latest_snapshot: object | None,
+    latest_research_run: object | None,
+    best_backtest: object | None,
+    latest_evidence_summary: object | None,
+) -> list[str]:
+    blockers: list[str] = []
+    if latest_snapshot is None:
+        blockers.append("missing_dataset_snapshot")
+    if latest_research_run is None:
+        blockers.append("missing_research_run")
+    elif getattr(latest_research_run, "status", "") != "completed":
+        blockers.append("latest_research_run_not_completed")
+    if best_backtest is None:
+        blockers.append("missing_backtest_result")
+    elif latest_research_run is not None and getattr(best_backtest, "research_run_id", None) not in (None, getattr(latest_research_run, "research_run_id", None)):
+        blockers.append("best_backtest_not_on_latest_run")
+    if latest_snapshot is not None and best_backtest is not None:
+        if getattr(best_backtest, "dataset_snapshot_id", None) not in (None, getattr(latest_snapshot, "dataset_snapshot_id", None)):
+            blockers.append("best_backtest_not_on_latest_snapshot")
+    if latest_evidence_summary is None:
+        blockers.append("missing_evidence_summary")
+    elif latest_research_run is not None and getattr(latest_evidence_summary, "research_run_id", None) not in (None, getattr(latest_research_run, "research_run_id", None)):
+        blockers.append("evidence_not_on_latest_run")
+    if latest_snapshot is not None and latest_evidence_summary is not None and getattr(latest_evidence_summary, "dataset_snapshot_id", None) not in (None, getattr(latest_snapshot, "dataset_snapshot_id", None)):
+        blockers.append("evidence_not_on_latest_snapshot")
+    return blockers
+
+
+def _snapshot_sort_key(snapshot) -> tuple[str, str]:
+    return (snapshot.captured_at or snapshot.data_end or "", snapshot.dataset_snapshot_id or "")
+
+
+def _evidence_sort_key(summary) -> tuple[str, str]:
+    return (summary.created_at or "", summary.evidence_summary_id or "")

@@ -1,0 +1,18 @@
+{
+  "universe_id": "multi_asset:indian_etf_universe",
+  "asset_class": "indian_etf",
+  "benchmark": "NIFTY 50 ETF basket",
+  "symbol_format": "NSE:<ETF_SYMBOL>",
+  "source_priority": [
+    "nse_official_reports",
+    "yfinance_convenience"
+  ],
+  "liquidity_filters": [
+    "positive_volume",
+    "positive_turnover",
+    "top_liquidity_by_notional"
+  ],
+  "expected_price_type": "adjusted_close",
+  "currency": "INR",
+  "notes": "ETF universe starts with liquid India-listed ETFs only."
+}

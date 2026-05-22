@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import uuid4
 
 from project.cli_support import decision_action, decision_reason, load_json
@@ -10,6 +10,7 @@ from project.common.models import utc_now_iso
 from project.data.models import HypothesisEvaluation
 from project.data.repository import DataRepository
 from project.decision.models import Decision
+from project.decision.system import decide_trade
 
 
 @dataclass(frozen=True)
@@ -96,19 +97,18 @@ def get_trade_ideas_page_view(
 def submit_trade_decision(
     repository: DataRepository,
     trade_id: str,
-    action: str,
-    reason: str | None,
-    notes: str,
+    action: str | None = None,
+    reason: str | None = None,
+    notes: str = "",
 ) -> Decision:
-    normalized_action = "watchlist" if action == "watch" else action
-    decision = Decision(
-        decision_id=f"decision:{uuid4()}",
-        trade_id=trade_id,
-        action=decision_action(normalized_action),
-        structured_reason=decision_reason(reason),
-        notes=notes,
-        created_at=utc_now_iso(),
+    trade_idea = next(
+        (idea for idea in repository.get_trade_ideas() if idea.trade_id == trade_id),
+        None,
     )
+    if trade_idea is None:
+        msg = f"Trade idea {trade_id} not found"
+        raise ValueError(msg)
+    decision = _build_decision(trade_idea, action, reason, notes)
     repository.persist_decision(decision)
     return decision
 
@@ -200,4 +200,26 @@ def _decision_history(repository: DataRepository, trade_id: str) -> tuple[TradeD
             created_at=row[5],
         )
         for row in decisions
+    )
+
+
+def _build_decision(
+    trade_idea: TradeIdea,
+    action: str | None,
+    reason: str | None,
+    notes: str = "",
+) -> Decision:
+    if action is None and reason is None:
+        return replace(decide_trade(trade_idea), notes=notes)
+    if action is None:
+        msg = "manual trade review requires an action"
+        raise ValueError(msg)
+    normalized_action = "watchlist" if action == "watch" else action
+    return Decision(
+        decision_id=f"decision:{uuid4()}",
+        trade_id=trade_idea.trade_id,
+        action=decision_action(normalized_action),
+        structured_reason=decision_reason(reason),
+        notes=notes,
+        created_at=utc_now_iso(),
     )

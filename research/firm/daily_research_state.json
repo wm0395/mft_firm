@@ -1,0 +1,141 @@
+{
+  "state_name": "daily_research_state",
+  "state_as_of_utc": "2026-05-22T00:00:00Z",
+  "canonical_alpha101_state": "research/projects/alpha101_formulaic_alphas/research_state.json",
+  "legacy_alpha101_state": "research/projects/alpha101_formulaic_alphas/alpha101_research_state.json",
+  "legacy_alpha101_state_status": "superseded",
+  "source_of_truth": "research/notebooks/alpha_001/alpha101_research_brief.md",
+  "active_projects": [
+    {
+      "project_id": "research_project:alpha101_formulaic_alphas",
+      "name": "alpha101-formulaic-alphas",
+      "status": "draft",
+      "phase": "late-stage discovery and robustness triage"
+    }
+  ],
+  "current_alpha_lanes": [
+    {"lane_id": "exact_ohlcv", "status": "active"},
+    {"lane_id": "strict_liquidity_audit", "status": "active"},
+    {"lane_id": "proxy_vwap", "status": "blocked"},
+    {"lane_id": "snapshot_industry_metadata", "status": "blocked"},
+    {"lane_id": "broad_universe_degradation", "status": "blocked"}
+  ],
+  "asset_class_lanes": [
+    {"asset_class_id": "indian_equity_cash", "status": "active"},
+    {"asset_class_id": "indian_etf", "status": "planned"},
+    {"asset_class_id": "indian_index", "status": "planned"},
+    {"asset_class_id": "nse_equity_derivative", "status": "planned"},
+    {"asset_class_id": "mcx_commodity_future", "status": "planned"},
+    {"asset_class_id": "mcx_commodity_option", "status": "planned"},
+    {"asset_class_id": "macro_series", "status": "planned"},
+    {"asset_class_id": "fx_proxy", "status": "planned"},
+    {"asset_class_id": "global_etf_proxy", "status": "planned"}
+  ],
+  "data_source_lanes": [
+    {"source_id": "nse_official_reports", "status": "planned"},
+    {"source_id": "mcx_official_bhavcopy", "status": "planned"},
+    {"source_id": "rbi_dbie_data_pages", "status": "planned"},
+    {"source_id": "fred_api", "status": "planned"},
+    {"source_id": "stooq_free_daily", "status": "planned"},
+    {"source_id": "alpha_vantage_free_tier", "status": "planned"},
+    {"source_id": "yfinance_convenience", "status": "convenience_only"}
+  ],
+  "review_pack_status": "committed review packs available",
+  "blocked_lanes": [
+    {
+      "lane": "proxy_vwap",
+      "status": "blocked",
+      "reason": "Proxy-VWAP signals are research-only until real VWAP data exists."
+    },
+    {
+      "lane": "snapshot_industry_metadata",
+      "status": "blocked",
+      "reason": "Snapshot industry metadata is not point-in-time yet."
+    },
+    {
+      "lane": "broad_universe_degradation",
+      "status": "blocked",
+      "reason": "The current contract degrades outside high_vol_top100."
+    }
+  ],
+  "promoted_alphas": [
+    "alpha040",
+    "alpha012",
+    "alpha024",
+    "alpha044",
+    "alpha018",
+    "alpha023",
+    "alpha051",
+    "alpha049",
+    "alpha016",
+    "alpha034",
+    "alpha022"
+  ],
+  "demoted_alphas": [
+    "alpha026",
+    "alpha033",
+    "alpha013",
+    "alpha015",
+    "alpha003",
+    "alpha045",
+    "alpha038",
+    "alpha068",
+    "alpha088",
+    "alpha010",
+    "alpha037",
+    "alpha017",
+    "alpha004",
+    "alpha006",
+    "alpha007",
+    "alpha055",
+    "alpha009"
+  ],
+  "active_focus_queue": [
+    {
+      "alpha_id": "alpha024",
+      "status": "positive",
+      "strict_liquidity_active_sharpe": 0.8390
+    },
+    {
+      "alpha_id": "alpha018",
+      "status": "borderline",
+      "strict_liquidity_active_sharpe": -0.0618
+    },
+    {
+      "alpha_id": "alpha040",
+      "status": "holdout",
+      "strict_liquidity_active_sharpe": -0.7584
+    },
+    {
+      "alpha_id": "alpha023",
+      "status": "positive",
+      "strict_liquidity_active_sharpe": 0.2970
+    }
+  ],
+  "next_actions": [
+    "Run a strict NaN-preserving formula pass.",
+    "Replace proxy VWAP with real VWAP before any proxy-dependent promotion.",
+    "Replace snapshot industry metadata with point-in-time industry snapshots before any industry-neutral promotion.",
+    "Audit selected-name forward returns, stale prices, warmup NaNs, and invalid returns before treating any promoted candidate as tradable.",
+    "Re-run the promoted exact-OHLCV queue after the liquidity-notional audit.",
+    "Use the committed review packs for future promotion reviews."
+  ],
+  "promotion_summary": {
+    "total_exact_ohlcv": 28,
+    "batch_1_promotions": 11,
+    "batch_2_near_misses": 17,
+    "strict_liquidity_audit": "current_baseline",
+    "median_active_sharpe": -1.0911,
+    "positive_sharpe_rate": 0.1429,
+    "validation_pass_rate": "nan",
+    "validation_failures_reported": 0
+  },
+  "role_workstreams": {
+    "vp_research": "research/firm/vp_research_queue.md",
+    "vp_data_platform": "research/firm/vp_data_platform_queue.md",
+    "associate_data_sources": "research/firm/associate_data_sources_queue.md",
+    "associate_asset_classes": "research/firm/associate_asset_classes_queue.md",
+    "associate_math_tools": "research/firm/associate_math_tools_queue.md",
+    "associate_validation_ops": "research/firm/associate_validation_ops_queue.md"
+  }
+}

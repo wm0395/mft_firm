@@ -1,0 +1,96 @@
+{
+  "items": [
+    {
+      "research_id": "rbi_fred_regime_features",
+      "asset_class": "macro_series",
+      "source_dependency": [
+        "rbi_dbie_data_pages",
+        "fred_api"
+      ],
+      "alpha_family": "regime_features",
+      "transform_family": [
+        "zscore_cross_sectional",
+        "stability_by_regime"
+      ],
+      "validation_plan": [
+        "purged_time_split",
+        "regime_bucketing"
+      ],
+      "expected_artifacts": [
+        "macro_regime_features.md"
+      ],
+      "done_conditions": [
+        "Macro regime features are explicit and reproducible"
+      ]
+    },
+    {
+      "research_id": "rates_inflation_currency_proxies",
+      "asset_class": "macro_series",
+      "source_dependency": [
+        "rbi_dbie_data_pages",
+        "fred_api"
+      ],
+      "alpha_family": "macro_proxies",
+      "transform_family": [
+        "rolling_ic",
+        "rank_cross_sectional"
+      ],
+      "validation_plan": [
+        "walk_forward_split",
+        "purged_time_split"
+      ],
+      "expected_artifacts": [
+        "rates_inflation_currency_proxies.md"
+      ],
+      "done_conditions": [
+        "Rate, inflation, and currency proxies are explicit"
+      ]
+    },
+    {
+      "research_id": "equity_regime_overlay",
+      "asset_class": "macro_series",
+      "source_dependency": [
+        "rbi_dbie_data_pages",
+        "fred_api"
+      ],
+      "alpha_family": "equity_overlay",
+      "transform_family": [
+        "orthogonalized_ensemble",
+        "stability_by_universe"
+      ],
+      "validation_plan": [
+        "regime_bucketing",
+        "out_of_sample_overlay_test"
+      ],
+      "expected_artifacts": [
+        "equity_regime_overlay.md"
+      ],
+      "done_conditions": [
+        "Equity overlay is reproducible and bounded"
+      ]
+    },
+    {
+      "research_id": "commodity_regime_overlay",
+      "asset_class": "macro_series",
+      "source_dependency": [
+        "rbi_dbie_data_pages",
+        "fred_api"
+      ],
+      "alpha_family": "commodity_overlay",
+      "transform_family": [
+        "orthogonalized_ensemble",
+        "rank_cross_sectional"
+      ],
+      "validation_plan": [
+        "regime_bucketing",
+        "purged_time_split"
+      ],
+      "expected_artifacts": [
+        "commodity_regime_overlay.md"
+      ],
+      "done_conditions": [
+        "Commodity overlay is reproducible and bounded"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+asset_class_id: global_etf_proxy
+name: Global ETF proxy lanes
+status: research_only
+description: >
+  Free-source daily OHLCV proxies for global risk-on and risk-off regime work,
+  broad cross-market overlays, and non-India benchmark comparison.
+canonical_symbol_format: "GLOBAL_ETF:<SYMBOL>"
+symbol_mapping:
+  canonical_form: "GLOBAL_ETF:<SYMBOL>"
+  source_forms:
+    - "<SYMBOL>"
+    - "<SYMBOL>.US"
+  mapping_rules:
+    - keep exchange suffixes only in raw references
+    - prefer adjusted close when the source supplies it
+    - exclude delisted names unless the source explicitly preserves history
+source_priority_order:
+  - source_id: stooq
+    rationale: primary free daily OHLCV fallback when license and coverage are acceptable
+  - source_id: yfinance_convenience
+    rationale: convenience-only backfill, not authoritative
+  - source_id: alpha_vantage_free
+    rationale: free endpoint fallback after endpoint classification
+trading_calendar: source-specific market calendar with exchange holidays removed where available
+price_type:
+  primary: adjusted_close
+  fallback: raw_close
+adjustment_policy:
+  distributions: use adjusted close when dividend or split adjustment is available
+  fallback_rule: use raw prices only if adjustments are unavailable and clearly flagged
+liquidity_fields:
+  primary:
+    - volume
+    - turnover
+  secondary:
+    - average_daily_value_traded
+    - tracking_error_proxy
+benchmark:
+  primary: "VT"
+  secondary: "ACWI"
+point_in_time_metadata_status: required
+known_risks:
+  - stale or incomplete history in free sources
+  - ticker lifecycle and delisting gaps
+  - source-to-source adjustment mismatches
+  - license or TOS restrictions on downstream reuse

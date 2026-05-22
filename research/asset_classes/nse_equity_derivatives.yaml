@@ -1,0 +1,70 @@
+asset_class_id: nse_equity_derivative
+name: NSE equity derivatives
+status: research_only
+description: >
+  Listed NSE single-stock and index futures/options used only when contract
+  metadata, expiry history, and liquidity flags are explicit.
+canonical_symbol_format: "NSE_DERIV:<UNDERLYING>:<INSTRUMENT>:<EXPIRY>:<STRIKE>:<OPTION_TYPE>"
+symbol_mapping:
+  canonical_form: "NSE_DERIV:<UNDERLYING>:<INSTRUMENT>:<EXPIRY>:<STRIKE>:<OPTION_TYPE>"
+  source_forms:
+    - "<UNDERLYING>"
+    - "<UNDERLYING>FUT"
+    - "<UNDERLYING>CE"
+    - "<UNDERLYING>PE"
+  mapping_rules:
+    - keep futures and options in separate instrument namespaces
+    - encode expiry in YYYYMM or exchange-listed weekly code
+    - encode strike only for options
+source_priority_order:
+  - source_id: nse_derivatives_reports
+    rationale: primary exchange source for listed contracts, expiry, and open interest
+  - source_id: nse_derivatives_archive
+    rationale: fallback for missing sessions and contract repair
+trading_calendar: NSE derivative market calendar with expiry-day alignment
+price_type:
+  futures: settlement_price
+  options: last_traded_price_or_settlement_price
+adjustment_policy:
+  futures: continuous series only after explicit roll handling
+  options: no continuity adjustment; treat each contract as a distinct instrument
+liquidity_fields:
+  primary:
+    - volume
+    - open_interest
+    - turnover
+  secondary:
+    - bid_ask_spread_proxy
+    - contract_count
+benchmark:
+  futures: "underlying_cash_or_index_spot"
+  options: "underlying_cash_or_index_spot"
+point_in_time_metadata_status: required
+contract_model:
+  futures:
+    root: "<UNDERLYING>"
+    expiry: "exchange-listed monthly or weekly expiry"
+    instrument_type: "futures"
+    roll_rule:
+      trigger: "roll from front to next liquid contract during the final 5 trading sessions before expiry, or earlier if the next contract dominates for 2 consecutive sessions"
+      hard_cutoff_days_before_expiry: 3
+    continuous_contract_method:
+      method: "ratio_back_adjusted_front_month_chain"
+      price_basis: "settlement_price"
+    volume_oi_filter:
+      require_nonzero_volume: true
+      require_nonzero_open_interest: true
+      prefer_higher_open_interest: true
+    near_contract_policy:
+      preferred_leg: "nearest non-expired liquid contract"
+      fallback_leg: "next nearest liquid contract"
+  options:
+    root: "<UNDERLYING>"
+    expiry: "exchange-listed weekly then monthly if present"
+    instrument_type: "options"
+    chain_selection: "nearest expiration, then at-the-money chain when a single strike is required"
+known_risks:
+  - weekly expiry shifts
+  - contract spec changes
+  - low open interest in thin single-stock names
+  - roll gaps if continuity rules are not explicit
