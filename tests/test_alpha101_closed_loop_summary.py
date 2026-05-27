@@ -79,6 +79,10 @@ def test_summarize_closed_loop_reads_artifacts(tmp_path: Path) -> None:
     )
     shortlist.to_csv(tmp_path / MODULE.SHORTLIST_FILE, index=False)
     strict.to_csv(tmp_path / MODULE.STRICT_LIQUIDITY_FILE, index=False)
+    pd.DataFrame([{"alpha_id": "stale", "median_test_active_sharpe": -1.0}]).to_csv(
+        tmp_path / MODULE.STRICT_LIQUIDITY_POSITIVE_FOCUS_FILE,
+        index=False,
+    )
     validation.to_csv(tmp_path / MODULE.VALIDATION_FILE, index=False)
     batch2.to_csv(tmp_path / MODULE.BATCH2_SHORTLIST_FILE, index=False)
 
@@ -130,10 +134,13 @@ def test_summarize_closed_loop_falls_back_to_snapshot(tmp_path: Path) -> None:
 
     summary = MODULE.summarize_closed_loop(tmp_path)
 
-    assert summary["shortlist_rows"] == 1
+    assert summary["shortlist_rows"] == 2
+    assert summary["shortlist_rows_source"] == "snapshot_status_counts"
     assert summary["strict_liquidity_rows"] == 1
     assert summary["strict_liquidity_positive_focus_rows"] == 1
     assert summary["strict_liquidity_positive_focus"][0]["alpha_id"] == "alpha040"
+    assert summary["validation_pass_rate"] is None
+    assert summary["validation_status"] == "missing"
     assert summary["promoted_exact_ohlcv_rows"] == 1
     assert summary["shortlist_final_status_counts"] == {"discard": "2"}
     assert summary["top_batch2_shortlist"][0]["alpha_id"] == "alpha026"

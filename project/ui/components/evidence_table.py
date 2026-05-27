@@ -7,11 +7,15 @@ from project.ui._streamlit import get_streamlit
 
 def render_evidence_table(title: str, rows) -> None:
     st = get_streamlit()
-    st.subheader(title)
-    if not rows:
-        st.caption("No records.")
-        return
-    st.dataframe(pd.DataFrame([_row_data(row) for row in rows]), use_container_width=True)
+    rows = tuple(rows)
+    with st.container(border=True):
+        st.subheader(title)
+        if not rows:
+            st.caption("No records captured yet.")
+            return
+        frame = pd.DataFrame([_row_data(row) for row in rows])
+        st.caption(f"{len(rows)} records")
+        st.dataframe(frame, use_container_width=True)
 
 
 def _row_data(row) -> dict[str, object]:

@@ -18,6 +18,15 @@ POSITIVE_FOCUS_PATH = Path("research/artifacts/alpha101_research_factory/alpha10
 CACHE_DIR = Path("research/artifacts/alpha101_research_factory/_strict_batches")
 FINAL_CSV = Path("research/artifacts/alpha101_research_factory/alpha101_strict_liquidity_primary_report.csv")
 BATCH_SIZE = 4
+SHORTLIST_COLUMNS = {
+    "panel",
+    "alpha_id",
+    "robustness_lane",
+    "input_quality_tier",
+    "final_status",
+    "best_signal_transform",
+    "best_strategy",
+}
 
 
 def aggregate_strict_batches(frame: pd.DataFrame) -> pd.DataFrame:
@@ -43,8 +52,19 @@ def batch_ranges(total: int, size: int) -> list[tuple[int, int]]:
     return [(start, min(total, start + size)) for start in range(0, total, size)]
 
 
+def is_compatible_shortlist(path: Path) -> bool:
+    if not path.exists():
+        return False
+    columns = set(pd.read_csv(path, nrows=0).columns)
+    return SHORTLIST_COLUMNS.issubset(columns)
+
+
 def resolve_shortlist_path() -> Path:
-    return POSITIVE_FOCUS_PATH if POSITIVE_FOCUS_PATH.exists() else SHORTLIST_PATH
+    if is_compatible_shortlist(POSITIVE_FOCUS_PATH):
+        return POSITIVE_FOCUS_PATH
+    if is_compatible_shortlist(SHORTLIST_PATH):
+        return SHORTLIST_PATH
+    raise FileNotFoundError("No schema-compatible strict-liquidity shortlist found")
 
 
 def write_batch(shortlist: pd.DataFrame, start: int, end: int) -> pd.DataFrame:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from project.data.db import DuckDBAccess
 from project.data.repository_assets import RepositoryAssetsMixin
 from project.data.repository_base import DataRepositoryBase
@@ -43,3 +45,10 @@ class DataRepository(
 ):
     def __init__(self, db: DuckDBAccess) -> None:
         super().__init__(db)
+
+
+def build_repository(
+    database_path: str | Path,
+    read_only: bool = False,
+) -> DataRepository:
+    return DataRepository(DuckDBAccess(database_path, read_only=read_only))

@@ -45,6 +45,15 @@ def can_complete(task: Task) -> bool:
     )
 
 
+def next_required_reviewer(task: Task) -> str:
+    required = task.required_reviewers or ("architecture_reviewer",)
+    latest = _latest_review_status_by_reviewer(task)
+    for reviewer in required:
+        if latest.get(reviewer) != REVIEW_APPROVED:
+            return reviewer
+    return required[-1]
+
+
 def review_decision(text: str) -> str:
     lowered = text.lower()
     if "review decision: approve" in lowered:
@@ -66,11 +75,22 @@ def _digest(path: Path) -> str:
 def _required_reviewers_approved(task: Task) -> bool:
     required = set(task.required_reviewers or ("architecture_reviewer",))
     approved = {
-        str(review.get("reviewer"))
-        for review in task.review_history
-        if str(review.get("review_status", review.get("decision", ""))) == REVIEW_APPROVED
+        reviewer
+        for reviewer, status in _latest_review_status_by_reviewer(task).items()
+        if reviewer in required and status == REVIEW_APPROVED
     }
     return required.issubset(approved)
+
+
+def _latest_review_status_by_reviewer(task: Task) -> dict[str, str]:
+    latest: dict[str, str] = {}
+    for review in task.review_history:
+        reviewer = str(review.get("reviewer", ""))
+        if not reviewer:
+            continue
+        status = str(review.get("review_status", review.get("decision", "")))
+        latest[reviewer] = status
+    return latest
 
 
 def _latest_diff_guard_passed(task: Task) -> bool:

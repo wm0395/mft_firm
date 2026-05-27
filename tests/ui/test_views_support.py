@@ -30,6 +30,7 @@ from project.ui_services.mission_control import get_mission_control_view
 from project.ui_services.reports_views import get_reports_page_view
 from project.ui_services.research_views import get_research_page_view
 from project.ui_services.trade_idea_views import get_trade_ideas_page_view
+from project.ui.views import mission_control as mission_control_views
 
 
 def _empty_repository(tmp_path) -> DataRepository:
@@ -113,6 +114,11 @@ def _assert_seeded_repository_views(
 def _assert_seeded_summary_views(mission, data, reports, research) -> None:
     assert mission.health == "Warning"
     assert mission.recommended_action.command == "hypothesis-readiness"
+    assert mission.recommended_action.target_page == "Hypotheses"
+    assert mission.recommended_action.workflow_context_key == "workflow_action_command"
+    assert mission.recommended_action.workflow_context_value == "hypothesis-readiness"
+    assert mission.recommended_action.is_executable is True
+    assert mission.recommended_action.disabled_reason is None
     assert any(
         card.label == "Trade Ideas" and card.value == "1" for card in mission.cards
     )
@@ -123,6 +129,54 @@ def _assert_seeded_summary_views(mission, data, reports, research) -> None:
     assert len(reports.rejected) == 1
     assert len(research.projects) == 1
     assert len(research.runs) == 1
+
+
+def test_mission_control_recommended_action_contract_maps_pages() -> None:
+    cases: tuple[tuple[dict[str, object], str, str], ...] = (
+        ({"next_recommended_command": "init-db"}, "Data", "Initialize the database"),
+        (
+            {"next_recommended_command": "sync-market-data"},
+            "Data",
+            "Sync market data",
+        ),
+        (
+            {"next_recommended_command": "create-dataset-snapshot"},
+            "Data",
+            "Create a dataset snapshot",
+        ),
+        (
+            {"next_recommended_command": "data-quality-report"},
+            "Data",
+            "Review data quality",
+        ),
+        (
+            {"next_recommended_command": "hypothesis-readiness"},
+            "Hypotheses",
+            "Review hypothesis readiness",
+        ),
+        (
+            {"next_recommended_command": "run-strategy-research"},
+            "Research",
+            "Run research",
+        ),
+        ({"next_recommended_command": "promote-hypothesis"}, "Trade Ideas", "Review trade ideas"),
+        ({}, "Trade Ideas", "Review trade ideas"),
+    )
+
+    for workflow, expected_page, expected_title in cases:
+        action = mission_control_views._recommended_action(workflow)
+        assert action.target_page == expected_page
+        assert action.title == expected_title
+        if workflow.get("next_recommended_command"):
+            assert action.is_executable is True
+            assert action.workflow_context_key == "workflow_action_command"
+            assert action.workflow_context_value == workflow["next_recommended_command"]
+            assert action.disabled_reason is None
+        else:
+            assert action.is_executable is False
+            assert action.workflow_context_key is None
+            assert action.workflow_context_value is None
+            assert action.disabled_reason == "No recommended action is available."
 
 
 def _assert_seeded_detail_views(

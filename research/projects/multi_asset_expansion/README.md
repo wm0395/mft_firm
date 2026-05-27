@@ -18,3 +18,9 @@ The queue files define the first executable research work. The config files
 define conservative source priority and universe assumptions. No source is
 treated as production-ready without ingestion, quality checks, and reviewed
 artifacts.
+
+The current Alpha101 transfer scope is documented in
+[reports/alpha101_transfer_scope.md](./reports/alpha101_transfer_scope.md).
+
+The committed review pack is documented in
+[review_packs/alpha101_transfer_pack.md](./review_packs/alpha101_transfer_pack.md).

@@ -5,6 +5,6 @@
   "dataset_snapshot_id": "dataset_snapshot:multi_asset_expansion_bootstrap",
   "hypothesis_id": "hypothesis:multi_asset_expansion",
   "status": "draft",
-  "phase": "initial expansion planning",
+  "phase": "alpha101 transfer lane scaffolding",
   "owner_role": "VP Data & Platform"
 }

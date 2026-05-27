@@ -23,7 +23,7 @@ IGNORED_PACKAGE_DIRS = (
 )
 
 
-def test_editable_install_exposes_mft_command_from_repo_root(tmp_path: Path) -> None:
+def test_editable_install_exposes_ai_code_command_from_repo_root(tmp_path: Path) -> None:
     checkout_root = _create_checkout(tmp_path)
     install_env = _install_environment()
     _run([sys.executable, "-m", "venv", ".venv"], checkout_root, install_env)
@@ -32,29 +32,30 @@ def test_editable_install_exposes_mft_command_from_repo_root(tmp_path: Path) -> 
     workspace_env = os.environ.copy()
     workspace_env["PATH"] = _path_with_bin(checkout_root / ".venv" / "bin", workspace_env)
     _create_provider_stub(checkout_root / ".venv" / "bin" / "codex")
+    _create_provider_stub(checkout_root / ".venv" / "bin" / "opencode")
 
-    help_result = _run(["mft", "--help"], checkout_root, workspace_env)
-    assert "usage: mft" in help_result.stdout
+    help_result = _run(["ai_code", "--help"], checkout_root, workspace_env)
+    assert "usage: ai_code" in help_result.stdout
 
-    list_result = _run(["mft", "list"], checkout_root, workspace_env)
+    list_result = _run(["ai_code", "list"], checkout_root, workspace_env)
     assert json.loads(list_result.stdout) == {"status": "ready", "tasks": []}
 
-    run_result = _run(["mft", "run", "test bounded task"], checkout_root, workspace_env)
+    run_result = _run(["ai_code", "run", "test bounded task"], checkout_root, workspace_env)
     run_payload = json.loads(run_result.stdout)
     assert run_payload["task"]["id"] == "task_001"
 
-    exec_result = _run(["mft", "exec", "task_001"], checkout_root, workspace_env)
+    exec_result = _run(["ai_code", "exec", "task_001"], checkout_root, workspace_env)
     exec_payload = json.loads(exec_result.stdout)
     assert exec_payload["execution"]["task_id"] == "task_001"
 
     dry_run_result = _run(
-        ["mft", "execute", "task_001", "--dry-run", "--mode", "oneshot"],
+        ["ai_code", "execute", "task_001", "--dry-run", "--mode", "oneshot"],
         checkout_root,
         workspace_env,
     )
     dry_run_payload = json.loads(dry_run_result.stdout)
-    assert dry_run_payload["launch"]["provider"] == "codex"
-    assert dry_run_payload["launch"]["command"][0] == str(checkout_root / ".venv" / "bin" / "codex")
+    assert dry_run_payload["launch"]["provider"] == "opencode"
+    assert dry_run_payload["launch"]["command"][0] == str(checkout_root / ".venv" / "bin" / "opencode")
 
 
 def _create_checkout(root: Path) -> Path:

@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "research_id": "alpha101_index_reference_transfer",
+      "asset_class": "indian_index",
+      "source_dependency": [
+        "nse_official_reports",
+        "yfinance_convenience"
+      ],
+      "alpha_family": "index_relative_transfer",
+      "transform_family": [
+        "rank_cross_sectional",
+        "rolling_ic",
+        "stability_by_universe"
+      ],
+      "validation_plan": [
+        "walk_forward_split",
+        "purged_time_split",
+        "rank_ic"
+      ],
+      "expected_artifacts": [
+        "index_transfer_scorecard.csv",
+        "index_transfer_review_pack.md"
+      ],
+      "done_conditions": [
+        "Alpha101 transfer to NSE index levels is explicit",
+        "Point-in-time constituent history remains required"
+      ]
+    }
+  ]
+}
+

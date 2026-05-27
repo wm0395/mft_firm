@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from pathlib import Path
 
 from project.ui import app
 from project.ui.pages.mission_control import _navigate_to_action
+from project.ui.state import WorkflowContext
 
 
 class _FakeSidebar:
@@ -53,6 +55,7 @@ class _FakeRepository:
 def test_app_main_seeds_state_and_dispatches_selected_page(monkeypatch) -> None:
     fake_st = _FakeStreamlit("Research")
     render_calls: list[str] = []
+    built_paths: list[Path] = []
 
     def _make_render(page: str):
         def _render(_repository) -> None:
@@ -60,9 +63,12 @@ def test_app_main_seeds_state_and_dispatches_selected_page(monkeypatch) -> None:
 
         return _render
 
+    def _build_repository(path: Path) -> _FakeRepository:
+        built_paths.append(path)
+        return _FakeRepository(path)
+
     monkeypatch.setattr(app, "get_streamlit", lambda: fake_st)
-    monkeypatch.setattr(app, "DuckDBAccess", lambda path: Path(path))
-    monkeypatch.setattr(app, "DataRepository", _FakeRepository)
+    monkeypatch.setattr(app, "build_repository", _build_repository)
     monkeypatch.setattr(
         app,
         "PAGES",
@@ -72,12 +78,14 @@ def test_app_main_seeds_state_and_dispatches_selected_page(monkeypatch) -> None:
 
     app.main()
 
+    assert "DuckDBAccess" not in app.__dict__
     assert fake_st.page_config == {"page_title": "MFT Operator Cockpit", "layout": "wide"}
     assert fake_st.session_state["ui_page"] == "Research"
     assert fake_st.session_state["selected_hypothesis_id"] == ""
     assert fake_st.session_state["selected_trade_id"] == ""
     assert fake_st.session_state["selected_evaluation_id"] == ""
     assert fake_st.session_state["selected_research_project_id"] == ""
+    assert fake_st.session_state["workflow_context"] is None
     assert fake_st.sidebar.radio_args == (
         "Section",
         (
@@ -86,12 +94,14 @@ def test_app_main_seeds_state_and_dispatches_selected_page(monkeypatch) -> None:
             "Research",
             "Hypotheses",
             "Trade Ideas",
+            "Positions",
             "Explainability",
             "Reports",
         ),
         0,
     )
     assert fake_st.sidebar.text_input_args == ("Database path", "project_mft.duckdb")
+    assert built_paths == [Path("cockpit.duckdb")]
     assert render_calls == ["Research"]
 
 
@@ -110,5 +120,31 @@ def test_navigate_to_action_routes_to_expected_page(monkeypatch) -> None:
         fake_st.session_state.clear()
         _navigate_to_action(fake_st, command)
         assert fake_st.session_state["ui_page"] == expected_page
+        context = fake_st.session_state["workflow_context"]
+        assert isinstance(context, WorkflowContext)
+        assert context.command == command
+        assert context.target_page == expected_page
         assert fake_st.rerun_calls == 1
         fake_st.rerun_calls = 0
+
+
+def test_navigate_to_action_uses_structured_fields(monkeypatch) -> None:
+    fake_st = _FakeStreamlit("Mission Control")
+    action = SimpleNamespace(
+        command="hypothesis-readiness",
+        title="Review hypothesis readiness",
+        explanation="The workflow is ready for human review.",
+        button_label="Review Hypothesis",
+    )
+
+    _navigate_to_action(fake_st, action)
+
+    context = fake_st.session_state["workflow_context"]
+    assert isinstance(context, WorkflowContext)
+    assert fake_st.session_state["ui_page"] == "Hypotheses"
+    assert context.source_page == "Mission Control"
+    assert context.command == "hypothesis-readiness"
+    assert context.target_page == "Hypotheses"
+    assert context.title == "Review hypothesis readiness"
+    assert context.explanation == "The workflow is ready for human review."
+    assert context.button_label == "Review Hypothesis"

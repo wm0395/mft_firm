@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import concurrent.futures as futures
+import gc
+import json
 from pathlib import Path
 
 import numpy as np
@@ -30,6 +32,7 @@ from research.alpha101_engine import (
     winsorized_zscore,
 )
 from research.alpha101_formulas import FORMULA_REGISTRY, compute_alpha, registry_frame
+from research.alpha101_portfolio_cache import average_names, backtests_by_cost, portfolio_row_from_backtests
 
 
 PANELS = ("nifty500", "expanded")
@@ -37,6 +40,7 @@ HORIZONS = (1, 3, 5, 10)
 PRIMARY_HORIZON = 5
 COST_GRID = (10.0, 20.0, 35.0, 50.0)
 TASK_TABLES = ("formula_validation", "metric_panel", "decay_report", "portfolio_report")
+FACTORY_PROGRESS_FILE = "alpha101_factory_task_progress.json"
 ERA_SPLITS = (
     ("2018_2020", "2018-01-01", "2020-12-31"),
     ("2021_2023", "2021-01-01", "2023-12-31"),
@@ -213,23 +217,34 @@ def portfolio_signal_transforms(family: str) -> tuple[str, ...]:
 
 def build_portfolio_weights(signal: pd.DataFrame, mask: pd.DataFrame, strategy: str) -> pd.DataFrame:
     rebalance = weekly_rebalance_mask(signal.index)
+    signal_reb = signal.loc[rebalance]
+    mask_reb = mask.loc[rebalance]
     if strategy == "equal_weight":
-        return carry_on_rebalance(equal_weight_targets(mask), rebalance)
+        return carry_on_rebalance(sparse_rebalance_targets(equal_weight_targets(mask_reb), signal.index), rebalance)
     if strategy == "top10":
-        return carry_on_rebalance(top_bucket_weights(signal, mask, 10), rebalance)
+        return carry_on_rebalance(sparse_rebalance_targets(top_bucket_weights(signal_reb, mask_reb, 10), signal.index), rebalance)
     if strategy == "long_short_10":
-        return carry_on_rebalance(long_short_weights(signal, mask, 10), rebalance)
+        return carry_on_rebalance(sparse_rebalance_targets(long_short_weights(signal_reb, mask_reb, 10), signal.index), rebalance)
     if strategy == "score_tilt":
-        return carry_on_rebalance(score_tilt_weights(signal, mask, 0.25), rebalance)
+        return carry_on_rebalance(sparse_rebalance_targets(score_tilt_weights(signal_reb, mask_reb, 0.25), signal.index), rebalance)
     if strategy == "overlay20":
-        return carry_on_rebalance(overlay_weights(signal, mask, 0.20), rebalance, partial=0.50)
+        return carry_on_rebalance(sparse_rebalance_targets(overlay_weights(signal_reb, mask_reb, 0.20), signal.index), rebalance, partial=0.50)
     if strategy == "ewm3_overlay20":
-        return carry_on_rebalance(overlay_weights(signal.ewm(span=3, min_periods=2, adjust=False).mean(), mask, 0.20), rebalance, partial=0.50)
+        smoothed = signal.ewm(span=3, min_periods=2, adjust=False).mean().loc[rebalance]
+        return carry_on_rebalance(sparse_rebalance_targets(overlay_weights(smoothed, mask_reb, 0.20), signal.index), rebalance, partial=0.50)
     if strategy == "ewm5_overlay20":
-        return carry_on_rebalance(overlay_weights(signal.ewm(span=5, min_periods=3, adjust=False).mean(), mask, 0.20), rebalance, partial=0.50)
+        smoothed = signal.ewm(span=5, min_periods=3, adjust=False).mean().loc[rebalance]
+        return carry_on_rebalance(sparse_rebalance_targets(overlay_weights(smoothed, mask_reb, 0.20), signal.index), rebalance, partial=0.50)
     if strategy == "ewm10_overlay20":
-        return carry_on_rebalance(overlay_weights(signal.ewm(span=10, min_periods=5, adjust=False).mean(), mask, 0.20), rebalance, partial=0.50)
+        smoothed = signal.ewm(span=10, min_periods=5, adjust=False).mean().loc[rebalance]
+        return carry_on_rebalance(sparse_rebalance_targets(overlay_weights(smoothed, mask_reb, 0.20), signal.index), rebalance, partial=0.50)
     raise ValueError(f"Unknown portfolio strategy: {strategy}")
+
+
+def sparse_rebalance_targets(targets: pd.DataFrame, index: pd.Index) -> pd.DataFrame:
+    sparse = pd.DataFrame(np.nan, index=index, columns=targets.columns)
+    sparse.loc[targets.index] = targets
+    return sparse
 
 
 def compatible_portfolios(family: str) -> tuple[str, ...]:
@@ -394,12 +409,31 @@ def evaluate_alpha_panel(args: tuple[str, str]) -> dict[str, pd.DataFrame]:
         if mask.sum(axis=1).replace(0, np.nan).median() < 20:
             continue
         benchmark = build_portfolio_weights(raw.where(mask), mask, "equal_weight")
+        benchmark_by_cost = backtests_by_cost(benchmark, next_returns, COST_GRID)
         for transform_name, oriented in oriented_by_transform.items():
             signal = oriented.where(mask)
             for strategy in compatible_portfolios(spec.family):
                 weights = build_portfolio_weights(signal, mask, strategy)
+                alpha_by_cost = backtests_by_cost(weights, next_returns, COST_GRID)
+                avg_names = average_names(weights)
+                labels = {
+                    "panel": panel_name,
+                    "alpha_id": alpha_id,
+                    "family": spec.family,
+                    "signal_transform": transform_name,
+                    "mask": mask_name,
+                    "strategy": strategy,
+                }
                 for cost_bps in COST_GRID:
-                    portfolio_rows.append(portfolio_row(panel_name, alpha_id, spec.family, transform_name, mask_name, strategy, cost_bps, weights, benchmark, next_returns))
+                    portfolio_rows.append(
+                        portfolio_row_from_backtests(
+                            labels,
+                            cost_bps,
+                            alpha_by_cost[cost_bps],
+                            benchmark_by_cost[cost_bps],
+                            avg_names,
+                        )
+                    )
     return {
         "formula_validation": pd.DataFrame(formula_rows),
         "metric_panel": pd.DataFrame(metric_rows),
@@ -431,6 +465,107 @@ def evaluate_alpha_panel_cached(args: tuple[str, str], refresh: bool = False) ->
     for name, frame in result.items():
         frame.to_csv(paths[name], index=False)
     return result
+
+
+def write_alpha_panel_cache(args: tuple[str, str], refresh: bool = False) -> tuple[str, str]:
+    alpha_id, panel_name = args
+    paths = task_cache_paths(alpha_id, panel_name)
+    if not refresh and all(path.exists() for path in paths.values()):
+        return args
+    result = evaluate_alpha_panel(args)
+    for path in paths.values():
+        path.parent.mkdir(parents=True, exist_ok=True)
+    for name, frame in result.items():
+        frame.to_csv(paths[name], index=False)
+    del result
+    gc.collect()
+    return args
+
+
+def factory_tasks() -> list[tuple[str, str]]:
+    return [(spec.alpha_id, panel_name) for panel_name in PANELS for spec in FORMULA_REGISTRY]
+
+
+def clear_panel_cache() -> None:
+    load_panel.cache_clear()
+    gc.collect()
+
+
+def task_cache_complete(task: tuple[str, str]) -> bool:
+    return all(path.exists() for path in task_cache_paths(*task).values())
+
+
+def missing_factory_tasks(tasks: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    return [task for task in tasks if not task_cache_complete(task)]
+
+
+def write_factory_progress(tasks: list[tuple[str, str]]) -> None:
+    completed = len(tasks) - len(missing_factory_tasks(tasks))
+    payload = {"total_tasks": len(tasks), "completed_tasks": completed, "missing_tasks": len(tasks) - completed}
+    path = ALPHA101_ARTIFACT_DIR / FACTORY_PROGRESS_FILE
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def load_factory_task_results(tasks: list[tuple[str, str]]) -> list[dict[str, pd.DataFrame]]:
+    missing = missing_factory_tasks(tasks)
+    if missing:
+        sample = ", ".join(f"{alpha}:{panel}" for alpha, panel in missing[:5])
+        raise RuntimeError(f"Alpha101 task cache incomplete: {len(missing)} missing tasks ({sample})")
+    return [{name: read_cached_frame(path) for name, path in task_cache_paths(*task).items()} for task in tasks]
+
+
+def _limited_missing_tasks(tasks: list[tuple[str, str]], task_limit: int | None) -> list[tuple[str, str]]:
+    missing = missing_factory_tasks(tasks)
+    return missing[:task_limit] if task_limit is not None else missing
+
+
+def fill_factory_task_cache(
+    tasks: list[tuple[str, str]],
+    workers: int,
+    refresh: bool,
+    progress: bool,
+    task_limit: int | None = None,
+) -> None:
+    tasks_to_run = tasks if refresh else _limited_missing_tasks(tasks, task_limit)
+    if workers <= 1:
+        _fill_factory_task_cache_serial(tasks_to_run, len(tasks), refresh, progress)
+    else:
+        _fill_factory_task_cache_parallel(tasks_to_run, len(tasks), workers, refresh, progress)
+    write_factory_progress(tasks)
+
+
+def _fill_factory_task_cache_serial(
+    tasks_to_run: list[tuple[str, str]],
+    total_tasks: int,
+    refresh: bool,
+    progress: bool,
+) -> None:
+    current_panel = ""
+    for i, task in enumerate(tasks_to_run, start=1):
+        if task[1] != current_panel:
+            clear_panel_cache()
+            current_panel = task[1]
+        write_alpha_panel_cache(task, refresh=refresh)
+        gc.collect()
+        if progress:
+            print(f"[alpha101] cached {i}/{len(tasks_to_run)} of {total_tasks} {task[0]} {task[1]}", flush=True)
+    clear_panel_cache()
+
+
+def _fill_factory_task_cache_parallel(
+    tasks_to_run: list[tuple[str, str]],
+    total_tasks: int,
+    workers: int,
+    refresh: bool,
+    progress: bool,
+) -> None:
+    with futures.ProcessPoolExecutor(max_workers=workers) as pool:
+        future_map = {pool.submit(write_alpha_panel_cache, task, refresh): task for task in tasks_to_run}
+        for i, future in enumerate(futures.as_completed(future_map), start=1):
+            task = future_map[future]
+            future.result()
+            if progress:
+                print(f"[alpha101] cached {i}/{len(tasks_to_run)} of {total_tasks} {task[0]} {task[1]}", flush=True)
 
 
 def transform_compatibility_frame() -> pd.DataFrame:
@@ -539,7 +674,13 @@ def final_report_markdown(leaderboard: pd.DataFrame, registry: pd.DataFrame, for
     ])
 
 
-def run_alpha101_factory(max_workers: int | None = None, refresh: bool = False, progress: bool = True, reaggregate: bool = False) -> dict[str, pd.DataFrame]:
+def run_alpha101_factory(
+    max_workers: int | None = None,
+    refresh: bool = False,
+    progress: bool = True,
+    reaggregate: bool = False,
+    task_limit: int | None = None,
+) -> dict[str, pd.DataFrame]:
     ALPHA101_ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     paths = {
         "registry": ALPHA101_ARTIFACT_DIR / "alpha101_formula_registry.csv",
@@ -564,27 +705,10 @@ def run_alpha101_factory(max_workers: int | None = None, refresh: bool = False, 
     op_validation = operator_validation()
     family = registry[["alpha_id", "family"]].copy()
     compatibility = transform_compatibility_frame()
-    tasks = [(spec.alpha_id, panel_name) for spec in FORMULA_REGISTRY for panel_name in PANELS]
+    tasks = factory_tasks()
     workers = max_workers if max_workers is not None else min(4, len(tasks))
-    results = []
-    if workers <= 1:
-        for i, task in enumerate(tasks, start=1):
-            results.append(evaluate_alpha_panel_cached(task, refresh=refresh and not reaggregate))
-            if progress:
-                print(f"[alpha101] {i}/{len(tasks)} completed {task[0]} {task[1]}", flush=True)
-    else:
-        with futures.ProcessPoolExecutor(max_workers=workers) as pool:
-            future_map = {pool.submit(evaluate_alpha_panel_cached, task, refresh and not reaggregate): task for task in tasks}
-            for i, future in enumerate(futures.as_completed(future_map), start=1):
-                task = future_map[future]
-                result = future.result()
-                results.append(result)
-                if progress:
-                    formula = result["formula_validation"]
-                    status = "computed"
-                    if not formula.empty and not bool(formula["computed"].fillna(False).iloc[0]):
-                        status = str(formula["reason"].fillna("failed").iloc[0])[:80]
-                    print(f"[alpha101] {i}/{len(tasks)} completed {task[0]} {task[1]}: {status}", flush=True)
+    fill_factory_task_cache(tasks, workers, refresh=refresh and not reaggregate, progress=progress, task_limit=task_limit)
+    results = load_factory_task_results(tasks)
 
     formula_validation = pd.concat([r["formula_validation"] for r in results], ignore_index=True)
     metric_panel = pd.concat([r["metric_panel"] for r in results if not r["metric_panel"].empty], ignore_index=True)

@@ -6,6 +6,8 @@ import sys
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from .launch_policy import default_execution_target, default_review_target
+
 if TYPE_CHECKING:
     from .memory_store import MemoryStore
     from .paths import ProjectPaths
@@ -23,7 +25,13 @@ DEFAULT_DONE_CONDITIONS = (
     "typing passes",
     "no architecture violations",
 )
-DEFAULT_REQUIRED_REVIEWERS = ("architecture_reviewer",)
+DEFAULT_REQUIRED_REVIEWERS = (
+    "architecture_reviewer",
+    "complexity_reviewer",
+    "determinism_auditor",
+    "financial_logic_auditor",
+    "test_failure_reviewer",
+)
 DEFAULT_EXEC_BUDGET = 1200
 DEFAULT_REVIEW_BUDGET = 900
 LAUNCH_PROVIDERS = ("codex", "opencode")
@@ -50,7 +58,7 @@ def _launcher_tools():
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="mft")
+    parser = argparse.ArgumentParser(prog="ai_code")
     subcommands = parser.add_subparsers(dest="command", required=True)
     _add_task_parser(subcommands, "run", "Create task, context, packets, and summary")
     _add_task_parser(subcommands, "plan", "Create a planning artifact")
@@ -87,12 +95,12 @@ def build_parser() -> argparse.ArgumentParser:
     run_fix_parser.add_argument("--dry-run", action="store_true")
     run_review_parser = subcommands.add_parser("run-review", help="Run the review step for an implemented or fix-ready task")
     run_review_parser.add_argument("task_id")
-    run_review_parser.add_argument("--provider", choices=LAUNCH_PROVIDERS, default="codex")
+    run_review_parser.add_argument("--provider", choices=LAUNCH_PROVIDERS)
     run_review_parser.add_argument("--budget", type=int, default=DEFAULT_REVIEW_BUDGET)
     run_review_parser.add_argument("--json", action="store_true")
     run_review_parser.add_argument("--model")
-    run_review_parser.add_argument("--persona", default="architecture_reviewer")
-    queue_parser = subcommands.add_parser("run-queue", help="Run active tasks sequentially with Codex cooldown handling")
+    run_review_parser.add_argument("--persona")
+    queue_parser = subcommands.add_parser("run-queue", help="Run active tasks sequentially with OpenCode rate-limit handling")
     queue_parser.add_argument("--provider", choices=LAUNCH_PROVIDERS)
     queue_parser.add_argument("--budget", type=int, default=DEFAULT_EXEC_BUDGET)
     queue_parser.add_argument("--json", action="store_true")
@@ -104,7 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
     review_parser = subcommands.add_parser("review", help="Build review packet for a task")
     review_parser.add_argument("task_id")
     review_parser.add_argument("--provider", choices=("codex", "gemini", "opencode"))
-    review_parser.add_argument("--persona", default="architecture_reviewer")
+    review_parser.add_argument("--persona")
     review_parser.add_argument("--budget", type=int, default=DEFAULT_REVIEW_BUDGET)
     scratch_parser = subcommands.add_parser("scratch", help="Show or create a task scratchpad")
     scratch_parser.add_argument("task_id")
@@ -189,6 +197,7 @@ def _dispatch(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: Scratchp
 def _run_or_plan(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: ScratchpadStore, memory: MemoryStore) -> int:
     build_index, _, retrieve_context = _cache_tools()
     from .planner import plan_task
+    from .workflow import next_required_reviewer
 
     task = _create_task(tasks, args.task)
     scratchpad = scratchpads.create(task)
@@ -201,7 +210,15 @@ def _run_or_plan(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: Scrat
         planned_task = planned_task.with_workflow_stage("planned")
         tasks.save(planned_task)
     execution = _build_packet(planned_task, paths, scratchpad, context, planned_task.recommended_provider, DEFAULT_EXEC_BUDGET)
-    review = _build_review(planned_task, paths, scratchpad, context, "gemini", "architecture_reviewer", DEFAULT_REVIEW_BUDGET)
+    review = _build_review(
+        planned_task,
+        paths,
+        scratchpad,
+        context,
+        "opencode",
+        next_required_reviewer(planned_task),
+        DEFAULT_REVIEW_BUDGET,
+    )
     summary = memory.create_summary(planned_task, planned_task.objective, f"Prepared {planned_task.route} workflow.", ("task", planned_task.route))
     persisted = planned_task.with_packet(execution).with_memory_ref(summary.ref)
     tasks.save(persisted)
@@ -241,18 +258,24 @@ def _execution_payload(args, tasks: TaskStore, scratchpads: ScratchpadStore, pat
     _, _, retrieve_context = _cache_tools()
     task = tasks.get(args.task_id)
     scratchpad = scratchpads.read(task.id)
-    provider = args.provider or task.recommended_provider
+    provider = args.provider or "opencode"
     context = retrieve_context(paths, task.objective)
     return _build_packet(task, paths, scratchpad, context, provider, args.budget)
 
 
 def _review_payload(args, tasks: TaskStore, scratchpads: ScratchpadStore, paths: ProjectPaths) -> dict[str, object]:
     _, _, retrieve_context = _cache_tools()
+    from .workflow import next_required_reviewer
+
     task = tasks.get(args.task_id)
     scratchpad = scratchpads.read(task.id)
-    provider = args.provider or "gemini"
+    persona = args.persona or next_required_reviewer(task)
+    provider = args.provider or "opencode"
+    if provider in {"codex", "opencode"}:
+        target = default_review_target(persona, provider, args.model)
+        provider = target.provider
     context = retrieve_context(paths, task.objective)
-    return _build_review(task, paths, scratchpad, context, provider, args.persona, args.budget)
+    return _build_review(task, paths, scratchpad, context, provider, persona, args.budget)
 
 
 def _execute_command(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: ScratchpadStore) -> int:
@@ -260,38 +283,55 @@ def _execute_command(args, paths: ProjectPaths, tasks: TaskStore, scratchpads: S
     build_launch_command, launch_task = _launcher_tools()
     task = tasks.get(args.task_id)
     scratchpad = scratchpads.read(task.id)
-    provider = args.provider or task.recommended_provider
-    if provider not in LAUNCH_PROVIDERS:
+    provider = args.provider or "opencode"
+    if provider == "gemini":
         raise ValueError(f"Unsupported launch provider: {provider}")
+    target = default_execution_target(task.objective, task.route, provider, args.model)
+    target_provider = target.provider
+    target_model = target.model
     context = retrieve_context(paths, task.objective)
-    execution = _build_packet(task, paths, scratchpad, context, provider, args.budget)
+    execution = _build_packet(task, paths, scratchpad, context, target_provider, args.budget)
     if args.dry_run:
-        command = build_launch_command(provider, args.mode, str(execution["prompt"]), paths.workspace_root, args.model, args.json)
+        command = build_launch_command(
+            target_provider,
+            args.mode,
+            str(execution["prompt"]),
+            paths.workspace_root,
+            target_model,
+            args.json,
+        )
         return _print_json(
             {
                 "status": "ready",
                 "launch": {
-                    "provider": provider,
+                    "provider": target_provider,
                     "mode": args.mode,
                     "budget": args.budget,
                     "json_output": args.json,
-                    "model": args.model,
+                    "model": target_model,
                     "command": command,
                     "token_estimate": execution["token_estimate"],
                 },
             }
         )
     started_at = _timestamp()
-    launch = launch_task(provider, args.mode, str(execution["prompt"]), paths.workspace_root, args.model, args.json)
+    launch = launch_task(
+        target_provider,
+        args.mode,
+        str(execution["prompt"]),
+        paths.workspace_root,
+        target_model,
+        args.json,
+    )
     finished_at = _timestamp()
     record = {
         "kind": "launch",
         "task_id": task.id,
-        "provider": provider,
+        "provider": target_provider,
         "mode": args.mode,
         "command": list(launch.command),
         "budget": args.budget,
-        "model": args.model,
+        "model": target_model,
         "json_output": args.json,
         "exit_code": launch.exit_code,
         "started_at": started_at,
@@ -508,7 +548,7 @@ def _heal_payload(task_id: str, tasks: TaskStore, scratchpads: ScratchpadStore, 
     context = retrieve_context(paths, task.objective)
     return self_heal(
         task.id,
-        lambda: _build_packet(task, paths, scratchpad, context, task.recommended_provider, DEFAULT_EXEC_BUDGET),
+        lambda: _build_packet(task, paths, scratchpad, context, "opencode", DEFAULT_EXEC_BUDGET),
         lambda: check_architecture(),
         lambda: diagnose_task(task, paths),
         lambda diagnosis: build_fix_prompt(task, diagnosis),

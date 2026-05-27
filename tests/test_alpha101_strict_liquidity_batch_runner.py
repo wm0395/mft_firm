@@ -18,22 +18,33 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
-def test_resolve_shortlist_prefers_positive_focus(tmp_path: Path, monkeypatch: Any) -> None:
+def test_resolve_shortlist_prefers_compatible_positive_focus(tmp_path: Path, monkeypatch: Any) -> None:
     positive = tmp_path / "alpha101_strict_liquidity_positive_focus.csv"
     shortlist = tmp_path / "promoted_exact_shortlist_filled.csv"
-    positive.write_text("alpha_id\nalpha024\n")
-    shortlist.write_text("alpha_id\nalpha040\n")
+    positive.write_text(compatible_shortlist_csv("alpha024"))
+    shortlist.write_text(compatible_shortlist_csv("alpha040"))
     monkeypatch.setattr(MODULE, "POSITIVE_FOCUS_PATH", positive)
     monkeypatch.setattr(MODULE, "SHORTLIST_PATH", shortlist)
 
     assert MODULE.resolve_shortlist_path() == positive
 
 
-def test_resolve_shortlist_falls_back_to_promoted_shortlist(tmp_path: Path, monkeypatch: Any) -> None:
+def test_resolve_shortlist_falls_back_when_positive_focus_schema_is_report(tmp_path: Path, monkeypatch: Any) -> None:
     positive = tmp_path / "alpha101_strict_liquidity_positive_focus.csv"
     shortlist = tmp_path / "promoted_exact_shortlist_filled.csv"
-    shortlist.write_text("alpha_id\nalpha040\n")
+    positive.write_text("panel,alpha_id,median_test_active_sharpe\nexpanded,alpha024,0.8\n")
+    shortlist.write_text(compatible_shortlist_csv("alpha040"))
     monkeypatch.setattr(MODULE, "POSITIVE_FOCUS_PATH", positive)
     monkeypatch.setattr(MODULE, "SHORTLIST_PATH", shortlist)
 
     assert MODULE.resolve_shortlist_path() == shortlist
+
+
+def compatible_shortlist_csv(alpha_id: str) -> str:
+    return "\n".join(
+        [
+            "panel,alpha_id,robustness_lane,input_quality_tier,final_status,best_signal_transform,best_strategy",
+            f"expanded,{alpha_id},clean_exact_ohlcv,exact_ohlcv,promote_to_deeper_research,winsor_zscore,overlay20",
+            "",
+        ]
+    )

@@ -7,6 +7,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from .launch_policy import opencode_config_json
+
 
 LAUNCH_PROVIDERS = ("codex", "opencode")
 INTERACTIVE = "interactive"
@@ -47,7 +49,7 @@ def launch_task(
 ) -> LaunchResult:
     _validate_launch(provider, mode, json_output)
     command = build_launch_command(provider, mode, prompt, workspace, model, json_output)
-    env = _build_env(workspace)
+    env = _build_env(workspace, provider)
     if mode == INTERACTIVE:
         interactive_result: subprocess.CompletedProcess[str] = subprocess.run(command, check=False, env=env, text=True)
         return LaunchResult(provider, mode, tuple(command), interactive_result.returncode, "", "", json_output, model)
@@ -146,32 +148,66 @@ def _opencode_command(
     return command
 
 
-def _build_env(workspace: Path) -> dict[str, str]:
+def _build_env(workspace: Path, provider: str = "codex") -> dict[str, str]:
     env = os.environ.copy()
     root = str(workspace)
     existing = env.get("PYTHONPATH")
     env["PYTHONPATH"] = root if not existing else f"{root}{os.pathsep}{existing}"
-    env.update(_provider_runtime_env(workspace))
+    env.update(_provider_runtime_env(workspace, provider))
     return env
 
 
-def _provider_runtime_env(workspace: Path) -> dict[str, str]:
-    runtime_root = workspace / "codex_cli" / "runtime" / "codex"
+def _provider_runtime_env(workspace: Path, provider: str) -> dict[str, str]:
+    runtime_root = workspace / "codex_cli" / "runtime" / provider
+    if provider == "opencode":
+        return _opencode_runtime_env(runtime_root)
+    return _codex_runtime_env(runtime_root)
+
+
+def _codex_runtime_env(runtime_root: Path) -> dict[str, str]:
     home = runtime_root / "home"
     config_home = runtime_root / "xdg" / "config"
+    data_home = runtime_root / "xdg" / "data"
     state_home = runtime_root / "xdg" / "state"
     cache_home = runtime_root / "xdg" / "cache"
     codex_home = home / ".codex"
     temp_home = runtime_root / "tmp"
     mypy_cache = runtime_root / "mypy_cache"
-    for path in (home, config_home, state_home, cache_home, codex_home, temp_home, mypy_cache):
+    for path in (home, config_home, data_home, state_home, cache_home, codex_home, temp_home, mypy_cache):
         path.mkdir(parents=True, exist_ok=True)
     return {
         "HOME": str(home),
         "XDG_CONFIG_HOME": str(config_home),
+        "XDG_DATA_HOME": str(data_home),
         "XDG_STATE_HOME": str(state_home),
         "XDG_CACHE_HOME": str(cache_home),
         "CODEX_HOME": str(codex_home),
+        "TMPDIR": str(temp_home),
+        "TMP": str(temp_home),
+        "TEMP": str(temp_home),
+        "MYPY_CACHE_DIR": str(mypy_cache),
+    }
+
+
+def _opencode_runtime_env(runtime_root: Path) -> dict[str, str]:
+    home = runtime_root / "home"
+    config_home = runtime_root / "xdg" / "config"
+    data_home = runtime_root / "xdg" / "data"
+    state_home = runtime_root / "xdg" / "state"
+    cache_home = runtime_root / "xdg" / "cache"
+    temp_home = runtime_root / "tmp"
+    mypy_cache = runtime_root / "mypy_cache"
+    config_path = config_home / "opencode.json"
+    for path in (home, config_home, data_home, state_home, cache_home, temp_home, mypy_cache):
+        path.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(opencode_config_json(), encoding="utf-8")
+    return {
+        "HOME": str(home),
+        "XDG_CONFIG_HOME": str(config_home),
+        "XDG_DATA_HOME": str(data_home),
+        "XDG_STATE_HOME": str(state_home),
+        "XDG_CACHE_HOME": str(cache_home),
+        "OPENCODE_CONFIG": str(config_path),
         "TMPDIR": str(temp_home),
         "TMP": str(temp_home),
         "TEMP": str(temp_home),

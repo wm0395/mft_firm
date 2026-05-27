@@ -8,6 +8,10 @@ from project.cli_support import load_json
 from project.data.quality import build_data_quality_report
 from project.data.repository import DataRepository
 from project.ui.views.common import StatusCardView, WorkflowStepView
+from project.ui.views.mission_control_actions import (
+    recommended_action_text,
+    target_page,
+)
 
 
 @dataclass(frozen=True)
@@ -16,6 +20,11 @@ class RecommendedActionView:
     explanation: str
     button_label: str
     command: str
+    target_page: str
+    workflow_context_key: str | None
+    workflow_context_value: str | None
+    is_executable: bool
+    disabled_reason: str | None
 
 
 @dataclass(frozen=True)
@@ -321,30 +330,18 @@ def _quality_warnings(report: object) -> tuple[WarningView, ...]:
 
 def _recommended_action(workflow: dict[str, object]) -> RecommendedActionView:
     command = str(workflow.get("next_recommended_command", ""))
-    mapping = {
-        "init-db": ("Initialize the database", "The schema is not ready yet.", "Initialize Database"),
-        "sync-market-data": ("Sync market data", "Assets are missing market rows.", "Sync Market Data"),
-        "create-dataset-snapshot": (
-            "Create a dataset snapshot",
-            "Research needs a reproducible snapshot.",
-            "Create Snapshot",
-        ),
-        "run-strategy-research": (
-            "Run research",
-            "No research run exists yet.",
-            "Run Research",
-        ),
-        "hypothesis-readiness": (
-            "Review hypothesis readiness",
-            "The workflow is ready for human review.",
-            "Review Hypothesis",
-        ),
-    }
-    title, explanation, button = mapping.get(
+    title, explanation, button = recommended_action_text(command)
+    return RecommendedActionView(
+        title,
+        explanation,
+        button,
         command,
-        ("Review trade ideas", "Trade review is the next human step.", "Review Trade Ideas"),
+        target_page(command),
+        "workflow_action_command" if command else None,
+        command or None,
+        bool(command),
+        None if command else "No recommended action is available.",
     )
-    return RecommendedActionView(title, explanation, button, command)
 
 
 def _health_state(

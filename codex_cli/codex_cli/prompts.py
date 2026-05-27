@@ -21,7 +21,7 @@ KNOWN_FAILURES = (
 PROVIDER_HINTS = {
     "codex": "Paste this packet into Codex CLI as the implementation prompt.",
     "gemini": "Use this packet in Gemini as the planning or review prompt.",
-    "opencode": "Use this packet in OpenCode for bulk execution or test generation.",
+    "opencode": "Use this packet in OpenCode as the primary execution or review prompt.",
 }
 
 

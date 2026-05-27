@@ -139,7 +139,7 @@ def _wheel_text() -> str:
 
 
 def _entry_points_text() -> str:
-    return "[console_scripts]\nmft = codex_cli.cli:main\n"
+    return "[console_scripts]\nai_code = codex_cli.cli:main\n"
 
 
 def _record_contents(records: list[tuple[str, bytes]], dist_info: str) -> str:

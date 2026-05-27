@@ -325,6 +325,8 @@ def carry_on_rebalance(targets: pd.DataFrame, rebalance_mask: pd.Series, partial
             columns=targets.columns,
         )
         return targets.where(row_mask, np.nan).ffill().fillna(0.0)
+    if band == 0.0:
+        return carry_on_partial_rebalance(targets, rebalance_mask, partial)
     weights = pd.DataFrame(0.0, index=targets.index, columns=targets.columns)
     last = pd.Series(0.0, index=targets.columns)
     for i, date in enumerate(targets.index):
@@ -341,6 +343,24 @@ def carry_on_rebalance(targets: pd.DataFrame, rebalance_mask: pd.Series, partial
             last = target.reindex(targets.columns).fillna(0.0)
         weights.loc[date] = last
     return weights
+
+
+def carry_on_partial_rebalance(targets: pd.DataFrame, rebalance_mask: pd.Series, partial: float) -> pd.DataFrame:
+    weights = pd.DataFrame(np.nan, index=targets.index, columns=targets.columns)
+    rebalance_dates = targets.index[rebalance_mask.to_numpy()]
+    if len(targets.index) and (not len(rebalance_dates) or rebalance_dates[0] != targets.index[0]):
+        rebalance_dates = rebalance_dates.insert(0, targets.index[0])
+    last = pd.Series(0.0, index=targets.columns)
+    for date in rebalance_dates:
+        target = targets.loc[date].fillna(0.0)
+        if partial < 1.0:
+            target = last + partial * (target - last)
+        total = target.abs().sum()
+        if total > 0 and target.sum() > 0:
+            target = target / target.sum()
+        last = target.reindex(targets.columns).fillna(0.0)
+        weights.loc[date] = last
+    return weights.ffill().fillna(0.0)
 
 
 def normalized_positive(frame: pd.DataFrame) -> pd.DataFrame:

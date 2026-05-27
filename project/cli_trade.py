@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 from dataclasses import replace
 from pathlib import Path
 from collections.abc import Callable
@@ -42,6 +43,7 @@ from project.cli_research import (
     show_research_project,
     show_research_run,
 )
+from project.tracking.positions import open_position
 
 
 Handler = Callable[[argparse.Namespace], int]
@@ -63,7 +65,8 @@ def review_trade_idea(
         return 1
     decision = _review_decision(trade_idea, action, reason, notes)
     repository.persist_decision(decision)
-    emit_response("review-trade-idea", decision.__dict__)
+    warnings = _approval_position_warnings(repository, trade_idea, action, decision)
+    emit_response("review-trade-idea", decision.__dict__, warnings=warnings)
     return 0
 
 
@@ -305,3 +308,32 @@ def _review_decision(
         notes=notes,
         created_at=utc_now_iso(),
     )
+
+
+def _approval_position_warnings(
+    repository: DataRepository,
+    trade_idea: TradeIdea,
+    action: str | None,
+    decision: Decision,
+) -> tuple[str, ...]:
+    if action != "approve" or decision.action != "approve":
+        return ()
+    entry_price = _entry_price_from_snapshot(trade_idea.signals_snapshot)
+    if entry_price is None:
+        return (
+            "Approval persisted, but no usable positive entry price was found in "
+            "signals_snapshot['close'], signals_snapshot['entry_price'], or "
+            "signals_snapshot['price']; no position was created.",
+        )
+    repository.persist_position(open_position(trade_idea.trade_id, entry_price))
+    return ()
+
+
+def _entry_price_from_snapshot(signals_snapshot: dict[str, float]) -> float | None:
+    for field_name in ("close", "entry_price", "price"):
+        value = signals_snapshot.get(field_name)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            price = float(value)
+            if math.isfinite(price) and price > 0:
+                return price
+    return None

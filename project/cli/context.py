@@ -7,8 +7,7 @@ from typing import Iterator, Literal, cast
 
 from rich.console import Console
 
-from project.data.db import DuckDBAccess
-from project.data.repository import DataRepository
+from project.data.repository import DataRepository, build_repository
 
 
 OutputMode = Literal["human", "json", "plain"]
@@ -57,7 +56,7 @@ def build_context(database: Path, output_mode: OutputMode) -> CLIContext:
 def open_repository(database: Path, read_only: bool) -> Iterator[DataRepository]:
     if read_only and not database.exists():
         raise FileNotFoundError(f"database not found: {database}")
-    repository = DataRepository(DuckDBAccess(database, read_only=read_only))
+    repository = build_repository(database, read_only=read_only)
     try:
         yield repository
     finally:

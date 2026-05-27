@@ -23,6 +23,10 @@ def _prepare_task(tmp_path: Path, monkeypatch, objective: str = "implement signa
     _git(tmp_path, "add", "AGENTS.md", ".gitignore", "project/signals/__init__.py")
     _git(tmp_path, "commit", "-m", "initial")
     assert main(["run", objective]) == 0
+    task_path = tmp_path / "codex_cli" / "tasks" / "active" / "task_001.json"
+    task = json.loads(task_path.read_text(encoding="utf-8"))
+    task["required_reviewers"] = ["architecture_reviewer"]
+    task_path.write_text(json.dumps(task, indent=2) + "\n", encoding="utf-8")
 
 
 def _patch_checks(monkeypatch, status: str = "pass") -> None:
@@ -124,9 +128,11 @@ def test_run_queue_cools_down_and_retries_codex_limit(tmp_path: Path, monkeypatc
     output = json.loads(capsys.readouterr().out)
     assert output["status"] == "completed"
     assert output["processed_tasks"] == 1
-    assert output["cooldowns"] == 1
-    assert sleeps == [18000]
-    assert output["history"][0]["status"] == "cooldown"
+    assert output["cooldowns"] == 0
+    assert output["switches"] == 1
+    assert sleeps == []
+    assert output["history"][0]["status"] == "switch"
+    assert output["history"][0]["to_model"] == "anthropic/claude-sonnet-4.5"
 
 
 def test_run_queue_cools_down_on_codex_429_error(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -151,9 +157,11 @@ def test_run_queue_cools_down_on_codex_429_error(tmp_path: Path, monkeypatch, ca
 
     output = json.loads(capsys.readouterr().out)
     assert output["status"] == "completed"
-    assert output["cooldowns"] == 1
-    assert sleeps == [18000]
-    assert output["history"][0]["status"] == "cooldown"
+    assert output["cooldowns"] == 0
+    assert output["switches"] == 1
+    assert sleeps == []
+    assert output["history"][0]["status"] == "switch"
+    assert output["history"][0]["to_model"] == "anthropic/claude-sonnet-4.5"
 
 
 def test_run_queue_stops_on_non_limit_failure(tmp_path: Path, monkeypatch, capsys) -> None:

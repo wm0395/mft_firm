@@ -74,6 +74,8 @@ def _copy_research_fixture_tree(root: Path) -> Path:
         "research/projects/alpha101_formulaic_alphas/research_state.json",
         "research/projects/multi_asset_expansion/project.json",
         "research/projects/multi_asset_expansion/queues/indian_etfs_queue.yaml",
+        "research/projects/multi_asset_expansion/queues/nse_indices_queue.yaml",
+        "research/projects/multi_asset_expansion/queues/nse_equity_derivatives_queue.yaml",
         "research/projects/multi_asset_expansion/queues/mcx_queue.yaml",
         "research/projects/multi_asset_expansion/queues/macro_queue.yaml",
         "research/projects/multi_asset_expansion/queues/global_proxy_queue.yaml",

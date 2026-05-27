@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "research_id": "alpha101_continuous_derivative_transfer",
+      "asset_class": "nse_equity_derivative",
+      "source_dependency": [
+        "nse_official_reports"
+      ],
+      "alpha_family": "continuous_contract_transfer",
+      "transform_family": [
+        "decay_linear",
+        "rolling_rank",
+        "zscore_cross_sectional"
+      ],
+      "validation_plan": [
+        "roll_rule_validation",
+        "purged_time_split",
+        "transaction_cost_stress"
+      ],
+      "expected_artifacts": [
+        "derivative_transfer_scorecard.csv",
+        "derivative_transfer_review_pack.md"
+      ],
+      "done_conditions": [
+        "Continuous futures transfer is explicit",
+        "Roll rules remain documented and contract-specific"
+      ]
+    }
+  ]
+}
+

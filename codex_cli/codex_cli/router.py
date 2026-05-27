@@ -15,10 +15,8 @@ def route(objective: str) -> str:
 
 def recommend_provider(objective: str, route_name: str) -> str:
     text = objective.lower()
-    if _contains(text, BULK_MARKERS):
+    if _contains(text, BULK_MARKERS) or _contains(text, REVIEW_MARKERS) or route_name in {"planner", "executor"}:
         return "opencode"
-    if route_name == "planner" or _contains(text, REVIEW_MARKERS):
-        return "gemini"
     return "codex"
 
 

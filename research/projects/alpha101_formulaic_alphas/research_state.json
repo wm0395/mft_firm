@@ -13,6 +13,8 @@
     "research/artifacts/alpha101_research_factory/alpha101_strict_liquidity_primary_report.csv",
     "research/artifacts/alpha101_research_factory/alpha101_strict_liquidity_positive_focus.csv",
     "research/artifacts/alpha101_research_factory/alpha101_strict_liquidity_positive_focus_recomputed.csv",
+    "research/artifacts/alpha101_research_factory/alpha101_tradeable_strategy_metrics.csv",
+    "research/artifacts/alpha101_research_factory/alpha101_tradeable_strategy_metrics.md",
     "research/projects/alpha101_formulaic_alphas/review_packs/positive_focus/alpha101_positive_focus_pack.md",
     "research/projects/alpha101_formulaic_alphas/review_packs/blocked_lanes/alpha101_blocked_lanes_pack.md",
     "research/projects/alpha101_formulaic_alphas/point_in_time_industry_metadata_lane.md",
@@ -42,7 +44,7 @@
     "strict_liquidity_audit": "current_baseline",
     "median_active_sharpe": -1.0911,
     "positive_sharpe_rate": 0.1429,
-    "validation_pass_rate": "nan",
+    "validation_pass_rate": "missing",
     "validation_failures_reported": 0
   },
   "promotion_criteria": [
@@ -62,19 +64,17 @@
     ],
     "positive": [
       "alpha024",
+      "alpha018",
+      "alpha040",
       "alpha023"
     ],
-    "borderline": [
-      "alpha018"
-    ],
-    "holdout": [
-      "alpha040"
-    ],
+    "borderline": [],
+    "holdout": [],
     "focus_metrics": {
-      "alpha024": 0.839,
-      "alpha018": -0.0618,
-      "alpha040": -0.7584,
-      "alpha023": 0.297
+      "alpha024": 0.7515,
+      "alpha018": 0.6291,
+      "alpha040": 0.232,
+      "alpha023": 0.2201
     }
   },
   "promoted_alphas": [
@@ -150,6 +150,18 @@
     "batch_1_count": 11,
     "batch_2_count": 17,
     "total_promoted_exact_ohlcv": 28
+  },
+  "tradeability_decision": {
+    "artifact": "research/artifacts/alpha101_research_factory/alpha101_tradeable_strategy_metrics.md",
+    "cache_status": "incomplete_factory_cache",
+    "strict_liquidity_tradeable_candidates": [
+      "alpha024",
+      "alpha018",
+      "alpha040",
+      "alpha023"
+    ],
+    "strict_liquidity_holdouts": [],
+    "research_only_reason": "Full strict-liquidity evidence now exists for the 28 promoted exact-OHLCV names; 24 names remain strict-liquidity holdouts and 13 still need full metrics-audit rows refreshed."
   },
   "role_workstreams": {
     "vp_research": "research/firm/vp_research_queue.md",

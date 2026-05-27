@@ -12,6 +12,7 @@ from .diff_guard import (
     evaluate_diff_guard,
     snapshot_worktree_status,
 )
+from .launch_policy import DEFAULT_EXECUTION_PROVIDER, default_execution_target, is_rate_limit_text
 from .executor import execute_task
 from .launcher import ONESHOT, LAUNCH_PROVIDERS, build_launch_command, launch_task
 from .managed_state import persist_managed_state
@@ -21,11 +22,7 @@ from .paths import ProjectPaths
 from .reviewer import review_task
 from .scratchpad import ScratchpadStore
 from .tasks import TaskStore
-from .workflow import changed_files, snapshot_task_files
-
-
-REVIEW_PROVIDER = "gemini"
-REVIEW_PERSONA = "architecture_reviewer"
+from .workflow import changed_files, next_required_reviewer, snapshot_task_files
 
 
 @dataclass(frozen=True)
@@ -39,6 +36,18 @@ class RunTaskOptions:
     checks_enabled: bool
     dry_run: bool
 
+    def with_target(self, provider: str | None, model: str | None) -> "RunTaskOptions":
+        return RunTaskOptions(
+            provider=provider,
+            budget=self.budget,
+            json_output=self.json_output,
+            model=model,
+            resume=self.resume,
+            review_enabled=self.review_enabled,
+            checks_enabled=self.checks_enabled,
+            dry_run=self.dry_run,
+        )
+
 
 def run_task_command(
     task_id: str,
@@ -50,35 +59,35 @@ def run_task_command(
     review_budget: int,
 ) -> dict[str, object]:
     task = tasks.get(task_id)
-    provider = _resolve_provider(task, options.provider)
+    target = _resolve_execution_target(task, options.provider, options.model)
     scratchpad = _load_scratchpad(task, scratchpads)
     context = _build_context(task, paths, memory, scratchpad, options.resume)
-    packet = execute_task(task, paths, scratchpad, context, provider, options.budget)
+    packet = execute_task(task, paths, scratchpad, context, target.provider, options.budget)
     command = build_launch_command(
-        provider,
+        target.provider,
         ONESHOT,
         packet.prompt,
         paths.workspace_root,
-        options.model,
+        target.model,
         options.json_output,
     )
     if options.dry_run:
-        return _dry_run_payload(task, provider, options, packet, context, command)
+        return _dry_run_payload(task, target, options, packet, context, command)
     scope_paths = _task_scope(task)
     if not options.resume:
         dirty_paths = _dirty_scope_paths(paths, scope_paths)
         if dirty_paths is None:
-            return _diff_guard_unavailable_payload(task, packet, provider, options, command)
+            return _diff_guard_unavailable_payload(task, packet, target, options, command)
         if dirty_paths:
-            return _preflight_blocked_payload(task, packet, provider, options, command, dirty_paths)
-    return _run_managed_task(task, provider, options, paths, tasks, scratchpads, memory, packet, context, command, review_budget)
+            return _preflight_blocked_payload(task, packet, target, options, command, dirty_paths)
+    return _run_managed_task(task, target, options, paths, tasks, scratchpads, memory, packet, context, command, review_budget)
 
 
-def _resolve_provider(task: Task, explicit_provider: str | None) -> str:
-    provider = explicit_provider or task.recommended_provider
+def _resolve_execution_target(task: Task, explicit_provider: str | None, model: str | None):
+    provider = explicit_provider or DEFAULT_EXECUTION_PROVIDER
     if provider not in LAUNCH_PROVIDERS:
         raise ValueError(f"Unsupported managed provider: {provider}")
-    return provider
+    return default_execution_target(task.objective, task.route, provider, model)
 
 
 def _load_scratchpad(task: Task, scratchpads: ScratchpadStore) -> str:
@@ -121,7 +130,7 @@ def _memory_documents(memory: MemoryStore, refs: tuple[str, ...]) -> list[str]:
 
 def _dry_run_payload(
     task: Task,
-    provider: str,
+    target,
     options: RunTaskOptions,
     packet: ExecutionPacket,
     context: tuple[str, ...],
@@ -132,11 +141,11 @@ def _dry_run_payload(
         "task_id": task.id,
         "managed_steps": _planned_steps(options),
         "launch": {
-            "provider": provider,
+            "provider": target.provider,
             "mode": ONESHOT,
             "budget": options.budget,
             "json_output": options.json_output,
-            "model": options.model,
+            "model": target.model,
             "command": command,
             "token_estimate": packet.token_estimate,
             "context_items": len(context),
@@ -163,7 +172,7 @@ def _planned_steps(options: RunTaskOptions) -> list[str]:
 
 def _run_managed_task(
     task: Task,
-    provider: str,
+    target,
     options: RunTaskOptions,
     paths: ProjectPaths,
     tasks: TaskStore,
@@ -179,11 +188,11 @@ def _run_managed_task(
     before_snapshot = snapshot_task_files(paths.workspace_root, scope_paths)
     diff_before = _snapshot_worktree_status(paths)
     launch = launch_task(
-        provider,
+        target.provider,
         ONESHOT,
         packet.prompt,
         paths.workspace_root,
-        options.model,
+        target.model,
         options.json_output,
     )
     finished_at = utc_now()
@@ -198,7 +207,8 @@ def _run_managed_task(
         check_record = _maybe_run_checks(paths, options.checks_enabled)
     run_record = _build_run_record(
         task,
-        provider,
+        target.provider,
+        target.model,
         options,
         command,
         launch,
@@ -277,7 +287,15 @@ def _maybe_create_review(
         return None
     scratchpad = scratchpads.render(task)
     review_context = (*context, "Provider Output Summary:\n" + _extract_summary(provider_output, "", ()))
-    packet = review_task(task, paths, scratchpad, review_context, REVIEW_PROVIDER, REVIEW_PERSONA, review_budget)
+    packet = review_task(
+        task,
+        paths,
+        scratchpad,
+        review_context,
+        DEFAULT_EXECUTION_PROVIDER,
+        next_required_reviewer(task),
+        review_budget,
+    )
     record = packet.to_dict()
     record["kind"] = "review"
     record["status"] = "generated"
@@ -294,6 +312,7 @@ def _maybe_run_checks(paths: ProjectPaths, enabled: bool) -> dict[str, object] |
 def _build_run_record(
     task: Task,
     provider: str,
+    model: str | None,
     options: RunTaskOptions,
     command: list[str],
     launch,
@@ -309,6 +328,7 @@ def _build_run_record(
     status = _run_status(launch.exit_code, check_record, options.checks_enabled, implementation_files, diff_guard)
     summary = _extract_summary(launch.stdout, launch.stderr, events)
     files_changed = _files_changed(implementation_files, diff_guard)
+    open_issues = _open_issues(status, launch.stderr, check_record, diff_guard)
     return {
         "kind": "managed_run",
         "task_id": task.id,
@@ -316,7 +336,7 @@ def _build_run_record(
         "mode": ONESHOT,
         "command": command,
         "budget": options.budget,
-        "model": options.model,
+        "model": model,
         "json_output": options.json_output,
         "resume": options.resume,
         "review_enabled": options.review_enabled,
@@ -332,11 +352,12 @@ def _build_run_record(
         "files_changed": list(files_changed),
         "implementation_status": "verified" if status == "implemented" else "missing",
         "checks_run": _check_names(check_record),
-        "open_issues": _open_issues(status, launch.stderr, check_record, diff_guard),
+        "open_issues": open_issues,
         "final_decision": _final_decision(status),
         "context_refs": list(artifact_refs.values()),
         "artifacts": artifact_refs,
         "diff_guard": diff_guard,
+        "rate_limited": is_rate_limit_text(summary, launch.stdout, launch.stderr, "\n".join(open_issues)),
     }
 
 
@@ -506,7 +527,7 @@ def _files_changed(
 def _preflight_blocked_payload(
     task: Task,
     packet: ExecutionPacket,
-    provider: str,
+    target,
     options: RunTaskOptions,
     command: list[str],
     dirty_paths: tuple[str, ...],
@@ -515,11 +536,11 @@ def _preflight_blocked_payload(
     run_record = {
         "kind": "managed_run",
         "task_id": task.id,
-        "provider": provider,
+        "provider": target.provider,
         "mode": ONESHOT,
         "command": command,
         "budget": options.budget,
-        "model": options.model,
+        "model": target.model,
         "json_output": options.json_output,
         "resume": options.resume,
         "review_enabled": options.review_enabled,
@@ -540,6 +561,7 @@ def _preflight_blocked_payload(
         "context_refs": [],
         "artifacts": {},
         "diff_guard": None,
+        "rate_limited": False,
     }
     return {
         "status": "active",
@@ -554,7 +576,7 @@ def _preflight_blocked_payload(
 def _diff_guard_unavailable_payload(
     task: Task,
     packet: ExecutionPacket,
-    provider: str,
+    target,
     options: RunTaskOptions,
     command: list[str],
 ) -> dict[str, object]:
@@ -562,11 +584,11 @@ def _diff_guard_unavailable_payload(
     run_record = {
         "kind": "managed_run",
         "task_id": task.id,
-        "provider": provider,
+        "provider": target.provider,
         "mode": ONESHOT,
         "command": command,
         "budget": options.budget,
-        "model": options.model,
+        "model": target.model,
         "json_output": options.json_output,
         "resume": options.resume,
         "review_enabled": options.review_enabled,
@@ -587,6 +609,7 @@ def _diff_guard_unavailable_payload(
         "context_refs": [],
         "artifacts": {},
         "diff_guard": {"status": "diff_unavailable", "changed_files": [], "undeclared_files": [], "scope_ok": False},
+        "rate_limited": False,
     }
     return {
         "status": "active",

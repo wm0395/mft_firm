@@ -64,6 +64,8 @@ def test_review_record_parses_strict_json() -> None:
             }
         ),
         "",
+        "codex",
+        None,
         RunReviewOptions(provider="codex", budget=900, model=None, json_output=False, persona="architecture_reviewer"),
         ["codex"],
         "2026-05-12T00:00:00+00:00",
@@ -108,6 +110,8 @@ def test_review_record_parses_jsonl_agent_message() -> None:
             )
         ),
         "",
+        "codex",
+        None,
         RunReviewOptions(provider="codex", budget=900, model=None, json_output=True, persona="architecture_reviewer"),
         ["codex"],
         "2026-05-12T00:00:00+00:00",
@@ -131,6 +135,8 @@ def test_malformed_review_output_blocks_completion(tmp_path: Path, monkeypatch) 
         0,
         "Review Decision: approve",
         "",
+        "codex",
+        None,
         RunReviewOptions(provider="codex", budget=900, model=None, json_output=False, persona="architecture_reviewer"),
         ["codex"],
         "2026-05-12T00:00:00+00:00",

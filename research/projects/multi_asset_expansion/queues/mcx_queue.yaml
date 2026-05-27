@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "research_id": "alpha101_mcx_continuous_transfer",
+      "asset_class": "mcx_commodity_future",
+      "source_dependency": [
+        "mcx_official_bhavcopy"
+      ],
+      "alpha_family": "continuous_contract_transfer",
+      "transform_family": [
+        "decay_linear",
+        "rolling_rank",
+        "rank_cross_sectional"
+      ],
+      "validation_plan": [
+        "roll_rule_validation",
+        "purged_time_split",
+        "transaction_cost_stress"
+      ],
+      "expected_artifacts": [
+        "alpha101_mcx_transfer_scorecard.csv",
+        "alpha101_mcx_transfer_review_pack.md"
+      ],
+      "done_conditions": [
+        "Alpha101 transfer to MCX continuous contracts is explicit",
+        "Roll bias and liquidity filters remain explicit"
+      ]
+    },
+    {
       "research_id": "mcx_continuous_futures_construction",
       "asset_class": "mcx_commodity_future",
       "source_dependency": [

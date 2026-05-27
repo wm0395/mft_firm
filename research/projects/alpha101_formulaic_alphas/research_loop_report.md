@@ -19,21 +19,29 @@
 
 - Point-in-time industry lane: `point_in_time_industry_metadata_lane.md`
 - Broad-universe bridge: `broad_universe_capacity_bridge.md`
+- Tradeability metrics: `research/artifacts/alpha101_research_factory/alpha101_tradeable_strategy_metrics.md`
 
 ## Current Metrics
 
 - Strict-liquidity baseline median active Sharpe: `-1.0911`
 - Strict-liquidity positive-Sharpe rate: `14.29%`
-- Validation pass rate: `nan`
+- Validation pass rate: `missing`
 - Validation failures reported: `0`
 - Source history floor: `1996-01-01`
 
 ## Focus Queue
 
-- `alpha024`: positive, current strict-liquidity active Sharpe `0.8390`
-- `alpha018`: borderline, current strict-liquidity active Sharpe `-0.0618`
-- `alpha040`: holdout, current strict-liquidity active Sharpe `-0.7584`
-- `alpha023`: positive, current strict-liquidity active Sharpe `0.2970`
+- `alpha024`: positive, current strict-liquidity active Sharpe `0.7515`
+- `alpha018`: positive, current strict-liquidity active Sharpe `0.6291`
+- `alpha040`: positive, current strict-liquidity active Sharpe `0.2320`
+- `alpha023`: positive, current strict-liquidity active Sharpe `0.2201`
+
+## Tradeability Decision
+
+- Strict-liquidity tradeable candidates: `alpha024`, `alpha018`, `alpha040`, `alpha023`
+- Strict-liquidity holdouts: 24 promoted exact-OHLCV names.
+- Metrics-audit gaps: 13 promoted exact-OHLCV names need full audit metrics refreshed.
+- Factory task cache remains incomplete: `42/202` tasks complete.
 
 ## Blockers
 

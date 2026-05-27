@@ -159,6 +159,9 @@ def build_multi_asset_status_payload(root: Path) -> dict[str, Any]:
         "project_status": project.get("status", "not_created")
         if isinstance(project, dict)
         else "not_created",
+        "project_phase": project.get("phase", "unknown")
+        if isinstance(project, dict)
+        else "unknown",
         "asset_class_count": len(asset_classes),
         "asset_classes": asset_classes,
         "queues": queues,
@@ -178,6 +181,7 @@ def build_weekly_review_payload(root: Path) -> dict[str, Any]:
         "restricted_source_licenses": data_sources["restricted_licenses"],
         "unknown_source_licenses": data_sources["unknown_licenses"],
         "multi_asset_project_status": multi_asset["project_status"],
+        "multi_asset_project_phase": multi_asset["project_phase"],
     }
 
 

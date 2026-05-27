@@ -8,12 +8,17 @@ from project.ui._streamlit import get_streamlit
 def render_hypothesis_card(card, on_select: Callable[[], None] | None = None) -> None:
     st = get_streamlit()
     with st.container(border=True):
-        st.caption(f"{card.status.upper()} | v{card.version}")
+        st.caption(f"{card.status.upper()} • v{card.version}")
         st.subheader(card.name)
-        st.write(card.hypothesis_id)
+        st.caption(card.hypothesis_id)
         st.caption(f"Readiness: {card.readiness}")
-        st.caption(f"Required: {', '.join(card.required_signals) or 'none'}")
+        st.write(f"Required signals: {', '.join(card.required_signals) or 'none'}")
         if card.blockers:
             st.caption(f"Blockers: {', '.join(card.blockers)}")
-        if on_select is not None and st.button("Open", key=f"open-{card.hypothesis_id}"):
+        else:
+            st.caption("No readiness blockers.")
+        if on_select is not None and st.button(
+            "Open",
+            key=f"open-{card.hypothesis_id}",
+        ):
             on_select()

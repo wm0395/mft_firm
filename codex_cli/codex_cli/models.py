@@ -55,7 +55,7 @@ class Task:
     status: str = ACTIVE
     workflow_stage: str = "tasked"
     route: str = "executor"
-    recommended_provider: str = "codex"
+    recommended_provider: str = "opencode"
     subtasks: tuple[Subtask, ...] = ()
     review_status: str = "pending"
     implementation_status: str = "pending"
@@ -86,7 +86,7 @@ class Task:
             status=str(data.get("status", ACTIVE)),
             workflow_stage=str(data.get("workflow_stage", "tasked")),
             route=str(data.get("route", "executor")),
-            recommended_provider=str(data.get("recommended_provider", "codex")),
+            recommended_provider=str(data.get("recommended_provider", "opencode")),
             subtasks=tuple(Subtask.from_dict(item) for item in data.get("subtasks", ())),
             review_status=str(data.get("review_status", "pending")),
             implementation_status=str(data.get("implementation_status", "pending")),

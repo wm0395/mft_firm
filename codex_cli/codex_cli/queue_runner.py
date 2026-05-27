@@ -4,6 +4,14 @@ import time
 from dataclasses import dataclass
 from typing import cast
 
+from .launch_policy import (
+    DEFAULT_EXECUTION_PROVIDER,
+    LaunchTarget,
+    default_execution_target,
+    default_review_target,
+    is_rate_limit_text,
+    next_launch_target,
+)
 from .managed_runner import RunTaskOptions, run_task_command
 from .managed_state import build_completion_record
 from .memory_store import MemoryStore
@@ -12,18 +20,7 @@ from .paths import ProjectPaths
 from .review_runner import RunReviewOptions, run_review_command
 from .scratchpad import ScratchpadStore
 from .tasks import TaskStore
-from .workflow import can_complete
-
-
-LIMIT_MARKERS = (
-    "429",
-    "rate limit",
-    "usage limit",
-    "limit reached",
-    "try again in",
-    "too many requests",
-    "quota",
-)
+from .workflow import can_complete, next_required_reviewer
 
 
 @dataclass(frozen=True)
@@ -36,6 +33,18 @@ class QueueRunOptions:
     review_enabled: bool
     checks_enabled: bool
     cooldown_seconds: int
+
+    def with_target(self, provider: str | None, model: str | None) -> "QueueRunOptions":
+        return QueueRunOptions(
+            provider=provider,
+            budget=self.budget,
+            json_output=self.json_output,
+            model=model,
+            resume=self.resume,
+            review_enabled=self.review_enabled,
+            checks_enabled=self.checks_enabled,
+            cooldown_seconds=self.cooldown_seconds,
+        )
 
     def with_resume(self, resume: bool) -> "QueueRunOptions":
         return QueueRunOptions(
@@ -60,17 +69,19 @@ def run_task_queue(
 ) -> dict[str, object]:
     completed = 0
     cooldowns = 0
+    switches = 0
     history: list[dict[str, object]] = []
     while True:
         active = tasks.list_active()
         if not active:
-            return _completed_payload(completed, cooldowns, history)
+            return _completed_payload(completed, cooldowns, switches, history)
         task = active[0]
         payload = _advance_task(task, paths, tasks, scratchpads, memory, review_budget, options)
-        entry = cast(dict[str, object], payload["entry"])
+        entries = cast(tuple[dict[str, object], ...], payload.get("entries", ()))
         outcome = str(payload["status"])
-        history.append(entry)
-        if entry["status"] == "cooldown":
+        history.extend(entries)
+        switches += sum(1 for entry in entries if str(entry["status"]) == "switch")
+        if any(str(entry["status"]) == "cooldown" for entry in entries):
             cooldowns += 1
             time.sleep(options.cooldown_seconds)
             continue
@@ -79,7 +90,7 @@ def run_task_queue(
             continue
         if outcome == "active":
             continue
-        return _stopped_payload(payload, completed, cooldowns, history)
+        return _stopped_payload(payload, completed, cooldowns, switches, history)
 
 
 def _run_next_task(
@@ -123,14 +134,28 @@ def _advance_task(
     if task.workflow_stage in {"tasked", "planned"}:
         return _implementation_step(task.id, False, paths, tasks, scratchpads, memory, review_budget, options)
     if task.workflow_stage == "fix_ready":
+        if not options.review_enabled:
+            return {
+                "status": "stopped",
+                "entries": ({"task_id": task.id, "status": "blocked", "step": "review_disabled"},),
+            }
         return _implementation_step(task.id, True, paths, tasks, scratchpads, memory, review_budget, options)
-    if task.workflow_stage == "implemented":
+    if task.workflow_stage in {"implemented", "reviewed"}:
+        if can_complete(task):
+            completed = build_completion_record(task)
+            tasks.save(completed)
+            return {"status": "completed", "entries": (_completion_entry(completed),)}
+        if not options.review_enabled:
+            return {
+                "status": "stopped",
+                "entries": ({"task_id": task.id, "status": "blocked", "step": "review_disabled"},),
+            }
         return _review_step(task.id, paths, tasks, scratchpads, memory, review_budget, options)
     if can_complete(task):
         completed = build_completion_record(task)
         tasks.save(completed)
-        return {"status": "completed", "entry": {"task_id": task.id, "status": "completed", "step": "complete"}}
-    return {"status": "stopped", "entry": {"task_id": task.id, "status": "blocked", "step": task.workflow_stage}}
+        return {"status": "completed", "entries": (_completion_entry(completed),)}
+    return {"status": "stopped", "entries": ({"task_id": task.id, "status": "blocked", "step": task.workflow_stage},)}
 
 
 def _implementation_step(
@@ -143,12 +168,33 @@ def _implementation_step(
     review_budget: int,
     options: QueueRunOptions,
 ) -> dict[str, object]:
-    payload = _run_next_task(task_id, paths, tasks, scratchpads, memory, review_budget, options.with_resume(resume))
-    run = cast(dict[str, object], payload["run"])
-    if _is_codex_limit(run):
-        return {"status": "active", "entry": _cooldown_entry(run, options.cooldown_seconds), "last_payload": payload}
-    entry_status = "active" if str(run["status"]) == "implemented" else "stopped"
-    return {"status": entry_status, "entry": _history_entry(run), "last_payload": payload}
+    target = _resolve_execution_target(tasks.get(task_id), options)
+    seen = {target}
+    entries: list[dict[str, object]] = []
+    current = target
+    while True:
+        payload = _run_next_task(
+            task_id,
+            paths,
+            tasks,
+            scratchpads,
+            memory,
+            review_budget,
+            options.with_target(current.provider, current.model).with_resume(resume),
+        )
+        run = cast(dict[str, object], payload["run"])
+        if _is_rate_limited_record(run):
+            next_target = next_launch_target(current)
+            if next_target in seen:
+                entries.append(_cooldown_entry(run, options.cooldown_seconds, current, "implement"))
+                return {"status": "active", "entries": tuple(entries), "last_payload": payload}
+            entries.append(_switch_entry(run, current, next_target, "implement"))
+            seen.add(next_target)
+            current = next_target
+            continue
+        entries.append(_history_entry(run))
+        entry_status = "active" if str(run["status"]) == "implemented" else "stopped"
+        return {"status": entry_status, "entries": tuple(entries), "last_payload": payload}
 
 
 def _review_step(
@@ -160,50 +206,105 @@ def _review_step(
     review_budget: int,
     options: QueueRunOptions,
 ) -> dict[str, object]:
-    payload = run_review_command(
-        task_id,
-        RunReviewOptions(
-            provider=options.provider or "codex",
-            budget=review_budget,
-            model=options.model,
-            json_output=options.json_output,
-            persona="architecture_reviewer",
-        ),
-        paths,
-        tasks,
-        scratchpads,
-        memory,
-    )
-    run = cast(dict[str, object], payload["review_run"])
-    if _is_codex_limit(run):
-        return {"status": "active", "entry": _cooldown_entry(run, options.cooldown_seconds), "last_payload": payload}
     task = tasks.get(task_id)
-    if task.workflow_stage == "fix_ready":
-        return {"status": "active", "entry": _review_history_entry(run), "last_payload": payload}
-    if can_complete(task):
-        completed = build_completion_record(task)
-        tasks.save(completed)
-        return {"status": "completed", "entry": {"task_id": task.id, "status": "completed", "step": "complete"}, "last_payload": payload}
-    return {"status": "stopped", "entry": _review_history_entry(run), "last_payload": payload}
+    persona = next_required_reviewer(task)
+    target = _resolve_review_target(persona, options)
+    seen = {target}
+    entries: list[dict[str, object]] = []
+    current = target
+    while True:
+        payload = run_review_command(
+            task_id,
+            RunReviewOptions(
+                provider=current.provider,
+                budget=review_budget,
+                model=current.model,
+                json_output=options.json_output,
+                persona=persona,
+            ),
+            paths,
+            tasks,
+            scratchpads,
+            memory,
+        )
+        run = cast(dict[str, object], payload["review_run"])
+        if _is_rate_limited_record(run):
+            next_target = next_launch_target(current)
+            if next_target in seen:
+                entries.append(_cooldown_entry(run, options.cooldown_seconds, current, "review"))
+                return {"status": "active", "entries": tuple(entries), "last_payload": payload}
+            entries.append(_switch_entry(run, current, next_target, "review"))
+            seen.add(next_target)
+            current = next_target
+            continue
+        entries.append(_review_history_entry(run))
+        task = tasks.get(task_id)
+        if can_complete(task):
+            completed = build_completion_record(task)
+            tasks.save(completed)
+            entries.append(_completion_entry(completed))
+            return {"status": "completed", "entries": tuple(entries), "last_payload": payload}
+        return {"status": "active", "entries": tuple(entries), "last_payload": payload}
+
+
+def _resolve_execution_target(task: Task, options: QueueRunOptions) -> LaunchTarget:
+    provider = options.provider or DEFAULT_EXECUTION_PROVIDER
+    if provider not in {"codex", "opencode"}:
+        raise ValueError(f"Unsupported queue provider: {provider}")
+    return default_execution_target(task.objective, task.route, provider, options.model)
+
+
+def _resolve_review_target(persona: str, options: QueueRunOptions) -> LaunchTarget:
+    provider = options.provider or DEFAULT_EXECUTION_PROVIDER
+    if provider not in {"codex", "opencode"}:
+        raise ValueError(f"Unsupported queue provider: {provider}")
+    return default_review_target(persona, provider, options.model)
 
 
 def _history_entry(run: dict[str, object]) -> dict[str, object]:
     return {
         "task_id": str(run["task_id"]),
         "provider": str(run["provider"]),
+        "model": run.get("model"),
         "status": str(run["status"]),
         "exit_code": _int_value(run["exit_code"]),
         "finished_at": str(run["finished_at"]),
+        "rate_limited": bool(run.get("rate_limited", False)),
         "step": "implement",
     }
 
 
-def _cooldown_entry(run: dict[str, object], cooldown_seconds: int) -> dict[str, object]:
+def _switch_entry(
+    run: dict[str, object],
+    current: LaunchTarget,
+    next_target: LaunchTarget,
+    step: str,
+) -> dict[str, object]:
     return {
         "task_id": str(run["task_id"]),
         "provider": str(run["provider"]),
+        "model": run.get("model"),
+        "status": "switch",
+        "step": step,
+        "from_provider": current.provider,
+        "from_model": current.model,
+        "to_provider": next_target.provider,
+        "to_model": next_target.model,
+        "exit_code": _int_value(run["exit_code"]),
+        "finished_at": str(run["finished_at"]),
+        "rate_limited": True,
+    }
+
+
+def _cooldown_entry(run: dict[str, object], cooldown_seconds: int, current: LaunchTarget, step: str) -> dict[str, object]:
+    return {
+        "task_id": str(run["task_id"]),
+        "provider": current.provider,
+        "model": current.model,
         "status": "cooldown",
+        "step": step,
         "cooldown_seconds": cooldown_seconds,
+        "rate_limited": True,
     }
 
 
@@ -211,20 +312,31 @@ def _review_history_entry(run: dict[str, object]) -> dict[str, object]:
     return {
         "task_id": str(run["task_id"]),
         "provider": str(run["provider"]),
+        "model": run.get("model"),
         "status": str(run["decision"]),
         "exit_code": _int_value(run["exit_code"]),
         "finished_at": str(run["finished_at"]),
+        "rate_limited": bool(run.get("rate_limited", False)),
+        "reviewer": str(run.get("reviewer", "")),
         "step": "review",
     }
 
 
-def _is_codex_limit(run: dict[str, object]) -> bool:
-    if str(run["provider"]) != "codex":
-        return False
-    if _int_value(run.get("exit_code", 0)) == 0 and str(run.get("status", "")) != "provider_failed":
-        return False
-    text = "\n".join(_run_text(run)).lower()
-    return any(marker in text for marker in LIMIT_MARKERS)
+def _completion_entry(task: Task) -> dict[str, object]:
+    return {"task_id": task.id, "status": "completed", "step": "complete"}
+
+
+def _is_rate_limited_record(run: dict[str, object]) -> bool:
+    if bool(run.get("rate_limited", False)):
+        return True
+    open_issues = [str(item) for item in cast(list[object], run.get("open_issues", []))]
+    parts = (
+        str(run.get("summary", "")),
+        str(run.get("stdout", "")),
+        str(run.get("stderr", "")),
+        *open_issues,
+    )
+    return is_rate_limit_text(*parts)
 
 
 def _int_value(value: object) -> int:
@@ -241,11 +353,17 @@ def _run_text(run: dict[str, object]) -> tuple[str, ...]:
     return (summary, *issues)
 
 
-def _completed_payload(completed: int, cooldowns: int, history: list[dict[str, object]]) -> dict[str, object]:
+def _completed_payload(
+    completed: int,
+    cooldowns: int,
+    switches: int,
+    history: list[dict[str, object]],
+) -> dict[str, object]:
     return {
         "status": "completed",
         "processed_tasks": completed,
         "cooldowns": cooldowns,
+        "switches": switches,
         "history": history,
         "last_payload": None,
         "stop_reason": None,
@@ -256,6 +374,7 @@ def _stopped_payload(
     payload: dict[str, object],
     completed: int,
     cooldowns: int,
+    switches: int,
     history: list[dict[str, object]],
 ) -> dict[str, object]:
     last_payload = cast(dict[str, object], payload.get("last_payload") or {})
@@ -264,6 +383,7 @@ def _stopped_payload(
         "status": "stopped",
         "processed_tasks": completed,
         "cooldowns": cooldowns,
+        "switches": switches,
         "history": history,
         "last_payload": last_payload,
         "stop_reason": str(run.get("status") or run.get("decision") or "blocked"),

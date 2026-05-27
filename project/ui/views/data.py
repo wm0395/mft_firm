@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from project.cli_operator import _workflow_status_payload
 from project.data.quality import build_data_quality_report
 from project.data.repository import DataRepository
 from project.data.snapshot_builder import DatasetSnapshotBuildResult, create_dataset_snapshot
@@ -55,12 +56,14 @@ class DataPageView:
     snapshots: tuple[SnapshotRowView, ...]
     default_snapshot: SnapshotDefaultsView
     quality_status: str
+    workflow_next_command: str
     debug_payload: dict[str, Any]
 
 
 def get_data_page_view(repository: DataRepository) -> DataPageView:
     assets = tuple(repository.list_assets())
-    quality = _quality_rows(repository, assets)
+    quality_report = _quality_report(repository, assets)
+    quality = _quality_rows(quality_report)
     snapshots = tuple(
         SnapshotRowView(
             snapshot.dataset_snapshot_id,
@@ -79,11 +82,13 @@ def get_data_page_view(repository: DataRepository) -> DataPageView:
         ),
         quality_rows=quality,
         snapshots=snapshots,
-        default_snapshot=_default_snapshot_view(assets),
+        default_snapshot=_default_snapshot_view(assets, quality_report),
         quality_status=_quality_status(quality),
+        workflow_next_command=_workflow_next_command(repository),
         debug_payload={
             "assets": [asset.__dict__ for asset in assets],
             "snapshots": [snapshot.__dict__ for snapshot in snapshots],
+            "workflow": _workflow_status_payload(repository),
         },
     )
 
@@ -110,13 +115,18 @@ def create_snapshot(
     )
 
 
-def _quality_rows(
+def _quality_report(
     repository: DataRepository,
     assets: tuple[Any, ...],
-) -> tuple[QualityRowView, ...]:
+):
     if not assets:
+        return None
+    return build_data_quality_report(repository, tuple(asset.symbol for asset in assets))
+
+
+def _quality_rows(report) -> tuple[QualityRowView, ...]:
+    if report is None:
         return ()
-    report = build_data_quality_report(repository, tuple(asset.symbol for asset in assets))
     return tuple(
         QualityRowView(
             symbol=item.symbol,
@@ -129,19 +139,49 @@ def _quality_rows(
     )
 
 
-def _default_snapshot_view(assets: tuple[Any, ...]) -> SnapshotDefaultsView:
+def _default_snapshot_view(
+    assets: tuple[Any, ...],
+    report,
+) -> SnapshotDefaultsView:
     symbols = tuple(asset.symbol for asset in assets)
     market = assets[0].market if assets else "NSE"
-    today = datetime.now(UTC).date().isoformat()
+    start, end = _quality_date_bounds(report)
     return SnapshotDefaultsView(
         name="Operator Snapshot",
         market=market,
         symbols=symbols,
-        data_start=today,
-        data_end=today,
+        data_start=start,
+        data_end=end,
         resolution="1d",
         description="Created from the MFT Operator Cockpit",
     )
+
+
+def _quality_date_bounds(report) -> tuple[str, str]:
+    if report is None:
+        today = datetime.now(UTC).date().isoformat()
+        return today, today
+    timestamps = [
+        timestamp
+        for item in report.symbols
+        for timestamp in (item.min_timestamp, item.max_timestamp)
+        if timestamp is not None
+    ]
+    if not timestamps:
+        today = datetime.now(UTC).date().isoformat()
+        return today, today
+    dates = tuple(_date_only(timestamp) for timestamp in timestamps)
+    return min(dates), max(dates)
+
+
+def _date_only(value: str) -> str:
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    return datetime.fromisoformat(normalized).date().isoformat()
+
+
+def _workflow_next_command(repository: DataRepository) -> str:
+    workflow = _workflow_status_payload(repository)
+    return str(workflow["next_recommended_command"])
 
 
 def _issues(errors: tuple[str, ...], warnings: tuple[str, ...]) -> str:
@@ -156,4 +196,3 @@ def _quality_status(rows: tuple[QualityRowView, ...]) -> str:
     if any(row.status == "warn" for row in rows):
         return "warn"
     return "ok"
-

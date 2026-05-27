@@ -23,6 +23,10 @@ def _prepare_task(tmp_path: Path, monkeypatch, objective: str = "implement signa
     _git(tmp_path, "add", "AGENTS.md", ".gitignore", "project/signals/__init__.py")
     _git(tmp_path, "commit", "-m", "initial")
     assert main(["run", objective]) == 0
+    task_path = tmp_path / "codex_cli" / "tasks" / "active" / "task_001.json"
+    task = json.loads(task_path.read_text(encoding="utf-8"))
+    task["required_reviewers"] = ["architecture_reviewer"]
+    task_path.write_text(json.dumps(task, indent=2) + "\n", encoding="utf-8")
 
 
 def _patch_provider(
@@ -103,7 +107,8 @@ def test_run_task_moves_task_to_implemented_after_green_checks(tmp_path: Path, m
     assert task["workflow_stage"] == "implemented"
     assert task["implementation_status"] == "verified"
     assert task["review_status"] == "generated"
-    assert task["run_history"][-1]["provider"] == "codex"
+    assert task["run_history"][-1]["provider"] == "opencode"
+    assert task["run_history"][-1]["model"] == "google/gemini-2.5-pro"
     assert task["check_history"][-1]["status"] == "pass"
     latest = json.loads((tmp_path / "codex_cli" / "memory" / "runs" / "task_001" / "latest.json").read_text(encoding="utf-8"))
     assert latest["run"]["status"] == "implemented"
@@ -119,6 +124,7 @@ def test_run_task_keeps_opencode_task_active_until_review(tmp_path: Path, monkey
 
     output = json.loads(capsys.readouterr().out)
     assert output["task"]["run_history"][-1]["provider"] == "opencode"
+    assert output["task"]["run_history"][-1]["model"] == "openai/gpt-5.1-codex"
     assert output["task"]["status"] == "active"
     assert output["task"]["workflow_stage"] == "implemented"
 

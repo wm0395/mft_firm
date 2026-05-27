@@ -19,11 +19,22 @@ def test_materialize_reports_builds_control_room_artifacts(tmp_path: Path) -> No
     assert payloads["alpha101_status"]["promoted_total"] == 28
     assert payloads["data_source_status"]["source_count"] == 7
     assert payloads["multi_asset_status"]["project_status"] == "draft"
+    assert payloads["multi_asset_status"]["project_phase"] == "alpha101 transfer lane scaffolding"
+    assert any(
+        item.get("research_id") == "alpha101_mcx_continuous_transfer"
+        for item in payloads["multi_asset_status"]["queues"]
+    )
 
     control_room_markdown = (reports_dir / "research_control_room.md").read_text(encoding="utf-8")
+    multi_asset_markdown = (reports_dir / "multi_asset_status.md").read_text(encoding="utf-8")
     assert "# Research Control Room" in control_room_markdown
     assert "project_id=research_project:alpha101_formulaic_alphas" in control_room_markdown
     assert "alpha_id=alpha024" in control_room_markdown
+    assert "vp_research.strict_liquidity_focus_review" in control_room_markdown
+    assert "project_phase: alpha101 transfer lane scaffolding" in multi_asset_markdown
+    assert "alpha101_mcx_continuous_transfer" in multi_asset_markdown
+    weekly_review_markdown = (reports_dir / "weekly_review.md").read_text(encoding="utf-8")
+    assert "multi_asset_project_phase: alpha101 transfer lane scaffolding" in weekly_review_markdown
 
 
 def _copy_research_fixture_tree(root: Path) -> None:
@@ -36,6 +47,8 @@ def _copy_research_fixture_tree(root: Path) -> None:
         "research/projects/alpha101_formulaic_alphas/research_state.json",
         "research/projects/multi_asset_expansion/project.json",
         "research/projects/multi_asset_expansion/queues/indian_etfs_queue.yaml",
+        "research/projects/multi_asset_expansion/queues/nse_indices_queue.yaml",
+        "research/projects/multi_asset_expansion/queues/nse_equity_derivatives_queue.yaml",
         "research/projects/multi_asset_expansion/queues/mcx_queue.yaml",
         "research/projects/multi_asset_expansion/queues/macro_queue.yaml",
         "research/projects/multi_asset_expansion/queues/global_proxy_queue.yaml",

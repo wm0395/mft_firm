@@ -39,6 +39,16 @@ def counts_from_snapshot(rows: object, label_key: str, value_key: str) -> dict[s
     return counts
 
 
+def snapshot_count_total(counts: dict[str, object]) -> int | None:
+    total = 0
+    for value in counts.values():
+        try:
+            total += int(value)
+        except (TypeError, ValueError):
+            return None
+    return total if counts else None
+
+
 def _top_rows(frame: pd.DataFrame, sort_col: str, limit: int = 10) -> list[dict[str, object]]:
     if frame.empty or sort_col not in frame.columns:
         return []
@@ -61,10 +71,27 @@ def positive_focus_rows(frame: pd.DataFrame, sort_col: str, limit: int = 8) -> l
     return _top_rows(focus, sort_col, limit)
 
 
+def strict_positive_focus(frame: pd.DataFrame) -> list[dict[str, object]]:
+    if frame.empty or "median_test_active_sharpe" not in frame.columns:
+        return []
+    working = frame.copy()
+    working["median_test_active_sharpe"] = pd.to_numeric(working["median_test_active_sharpe"], errors="coerce")
+    focus = working[working["median_test_active_sharpe"].gt(0)].copy()
+    if "positive_test_sharpe_rate" in focus.columns:
+        rate = pd.to_numeric(focus["positive_test_sharpe_rate"], errors="coerce")
+        focus = focus[rate.ge(0.75)].copy()
+    return _top_rows(focus, "median_test_active_sharpe", 8)
+
+
+def validation_pass_rate(validation: pd.DataFrame) -> float | None:
+    if validation.empty or "passed" not in validation.columns:
+        return None
+    return float(validation["passed"].astype(bool).mean())
+
+
 def summarize_closed_loop(artifact_dir: Path) -> dict[str, object]:
     shortlist = read_csv_if_exists(artifact_dir / SHORTLIST_FILE)
     strict_liquidity = read_csv_if_exists(artifact_dir / STRICT_LIQUIDITY_FILE)
-    strict_positive_frame = read_csv_if_exists(artifact_dir / STRICT_LIQUIDITY_POSITIVE_FOCUS_FILE)
     validation = read_csv_if_exists(artifact_dir / VALIDATION_FILE)
     batch2_shortlist = read_csv_if_exists(artifact_dir / BATCH2_SHORTLIST_FILE)
     snapshot = read_snapshot_if_exists(artifact_dir / SNAPSHOT_FILE)
@@ -77,17 +104,18 @@ def summarize_closed_loop(artifact_dir: Path) -> dict[str, object]:
         batch2_shortlist = frame_from_rows(cast(list[dict[str, object]], batch2.get("results", [])))
         if strict_liquidity.empty and not shortlist.empty and "selected_mask" in shortlist.columns:
             strict_liquidity = shortlist[shortlist["selected_mask"].eq("strict_liquidity_100m")].copy()
-    strict_positive_frame = strict_positive_frame if not strict_positive_frame.empty else frame_from_rows(positive_focus_rows(strict_liquidity, "median_test_active_sharpe"))
     strict_numeric = strict_liquidity.copy()
     if not strict_numeric.empty and "median_test_active_sharpe" in strict_numeric.columns:
         strict_numeric["median_test_active_sharpe"] = pd.to_numeric(strict_numeric["median_test_active_sharpe"], errors="coerce")
-    strict_positive = strict_positive_frame.to_dict(orient="records") if not strict_positive_frame.empty else positive_focus_rows(strict_numeric, "median_test_active_sharpe")
-    pass_rate = float(validation["passed"].astype(bool).mean()) if not validation.empty and "passed" in validation.columns else float("nan")
+    strict_positive = strict_positive_focus(strict_numeric)
+    pass_rate = validation_pass_rate(validation)
     batch1_counts = cast(object, cast(dict[str, object], reports.get("robustness_batch1", {})).get("final_status_counts", []))
     shortlist_counts = shortlist["final_status"].value_counts(dropna=False).to_dict() if "final_status" in shortlist.columns and not used_snapshot else counts_from_snapshot(batch1_counts, "final_status", "candidates")
+    shortlist_rows = snapshot_count_total(shortlist_counts) if used_snapshot else len(shortlist)
     summary = {
         "artifact_dir": str(artifact_dir),
-        "shortlist_rows": int(len(shortlist)),
+        "shortlist_rows": int(shortlist_rows if shortlist_rows is not None else len(shortlist)),
+        "shortlist_rows_source": "snapshot_status_counts" if used_snapshot and shortlist_rows is not None else "csv_or_rows",
         "shortlist_final_status_counts": shortlist_counts,
         "strict_liquidity_rows": int(len(strict_liquidity)),
         "strict_liquidity_median_test_active_sharpe": float(strict_numeric["median_test_active_sharpe"].median()) if not strict_numeric.empty and "median_test_active_sharpe" in strict_numeric.columns else float("nan"),
@@ -97,6 +125,7 @@ def summarize_closed_loop(artifact_dir: Path) -> dict[str, object]:
         "strict_liquidity_positive_focus": strict_positive,
         "validation_rows": int(len(validation)),
         "validation_pass_rate": pass_rate,
+        "validation_status": "present" if pass_rate is not None else "missing",
         "validation_failed_checks": validation.loc[~validation["passed"].astype(bool), "check"].tolist() if not validation.empty and {"passed", "check"}.issubset(validation.columns) else [],
         "batch2_shortlist_rows": int(len(batch2_shortlist)),
         "promoted_exact_ohlcv_rows": int(shortlist.query("final_status == 'promote_to_deeper_research' and input_quality_tier == 'exact_ohlcv'").shape[0]) if not shortlist.empty and {"final_status", "input_quality_tier"}.issubset(shortlist.columns) else 0,
@@ -109,6 +138,11 @@ def summarize_closed_loop(artifact_dir: Path) -> dict[str, object]:
 
 def format_closed_loop_markdown(summary: dict[str, object]) -> str:
     validation_failures = cast(list[str], summary["validation_failed_checks"])
+    pass_rate = summary["validation_pass_rate"]
+    pass_rate_text = "missing" if pass_rate is None else str(pass_rate)
+    failures_text = "Validation evidence missing" if summary["validation_status"] == "missing" else "None"
+    if validation_failures:
+        failures_text = ", ".join(validation_failures)
     return "\n".join(
         [
             "# Alpha101 Closed Loop Summary",
@@ -120,10 +154,11 @@ def format_closed_loop_markdown(summary: dict[str, object]) -> str:
             f"- strict_liquidity_median_test_active_sharpe: `{summary['strict_liquidity_median_test_active_sharpe']}`",
             f"- strict_liquidity_positive_sharpe_rate: `{summary['strict_liquidity_positive_sharpe_rate']}`",
             f"- strict_liquidity_positive_focus_rows: `{summary['strict_liquidity_positive_focus_rows']}`",
-            f"- validation_pass_rate: `{summary['validation_pass_rate']}`",
+            f"- validation_pass_rate: `{pass_rate_text}`",
+            f"- validation_status: `{summary['validation_status']}`",
             "",
             "## Validation Failures",
-            ", ".join(validation_failures) if validation_failures else "None",
+            failures_text,
             "",
             "## Strict Liquidity Positive Focus",
             json.dumps(summary["strict_liquidity_positive_focus"], indent=2, sort_keys=True),
@@ -142,7 +177,7 @@ def write_closed_loop_summary(artifact_dir: Path) -> tuple[Path, Path]:
     json_path = artifact_dir / SUMMARY_JSON
     md_path = artifact_dir / SUMMARY_MD
     positive_focus_path = artifact_dir / STRICT_LIQUIDITY_POSITIVE_FOCUS_FILE
-    json_path.write_text(json.dumps(summary, indent=2, sort_keys=True))
+    json_path.write_text(json.dumps(summary, allow_nan=False, indent=2, sort_keys=True))
     md_path.write_text(format_closed_loop_markdown(summary))
     pd.DataFrame(cast(list[dict[str, object]], summary["strict_liquidity_positive_focus"])).to_csv(positive_focus_path, index=False)
     return json_path, md_path

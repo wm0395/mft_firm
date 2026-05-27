@@ -10,7 +10,7 @@
 
 - Median active Sharpe: `-1.0911`
 - Positive-Sharpe rate: `14.29%`
-- Validation pass rate: `nan`
+- Validation pass rate: `missing`
 - Validation failures reported: `0`
 
 ## Bridge Artifacts
@@ -22,8 +22,8 @@
 
 - `alpha024`: positive
 - `alpha023`: positive
-- `alpha018`: borderline
-- `alpha040`: holdout
+- `alpha018`: positive
+- `alpha040`: positive
 
 ## Interpretation
 

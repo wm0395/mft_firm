@@ -13,6 +13,7 @@ from research.alpha101_factory import run_alpha101_factory  # noqa: E402
 from research.alpha101_robustness import run_alpha101_robustness_batch2  # noqa: E402
 from research.alpha101_robustness_batch_runner import run_alpha101_robustness_batches  # noqa: E402
 from research.alpha101_closed_loop import write_closed_loop_summary  # noqa: E402
+from research.alpha101_tradeability import write_tradeability_metrics  # noqa: E402
 
 
 def rebuild_alpha101(refresh: bool = True) -> None:
@@ -21,6 +22,7 @@ def rebuild_alpha101(refresh: bool = True) -> None:
     run_alpha101_robustness_batches(refresh=refresh, progress=True)
     run_alpha101_robustness_batch2(refresh=refresh, progress=True)
     write_closed_loop_summary(Path("research/artifacts/alpha101_research_factory"))
+    write_tradeability_metrics(Path("research/artifacts/alpha101_research_factory"))
 
 
 if __name__ == "__main__":

@@ -110,6 +110,7 @@ def render_multi_asset_status_markdown(payload: dict[str, Any]) -> str:
         "",
         f"- generated_at: {payload['generated_at']}",
         f"- project_status: {payload['project_status']}",
+        f"- project_phase: {payload['project_phase']}",
         f"- asset_class_count: {payload['asset_class_count']}",
         "",
         "## Asset Classes",
@@ -156,13 +157,14 @@ def render_weekly_review_markdown(payload: dict[str, Any]) -> str:
         _bullet_lines(payload["restricted_source_licenses"]),
         "",
         f"- multi_asset_project_status: {payload['multi_asset_project_status']}",
+        f"- multi_asset_project_phase: {payload['multi_asset_project_phase']}",
     ]
     return "\n".join(lines).strip() + "\n"
 
 
 def _queue_rows(entries: Any) -> tuple[tuple[str, str, str, str], ...]:
     rows = []
-    if not isinstance(entries, list):
+    if not isinstance(entries, (list, tuple)):
         return ()
     for entry in entries:
         if not isinstance(entry, dict):
@@ -180,7 +182,7 @@ def _queue_rows(entries: Any) -> tuple[tuple[str, str, str, str], ...]:
 
 def _multi_asset_queue_rows(entries: Any) -> tuple[tuple[str, str, str], ...]:
     rows = []
-    if not isinstance(entries, list):
+    if not isinstance(entries, (list, tuple)):
         return ()
     for entry in entries:
         if not isinstance(entry, dict):

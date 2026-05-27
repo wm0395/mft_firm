@@ -1,6 +1,17 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from collections.abc import MutableMapping
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowContext:
+    source_page: str
+    target_page: str
+    command: str
+    title: str = ""
+    explanation: str = ""
+    button_label: str = ""
 
 
 DEFAULT_STATE = {
@@ -9,6 +20,7 @@ DEFAULT_STATE = {
     "selected_trade_id": "",
     "selected_evaluation_id": "",
     "selected_research_project_id": "",
+    "workflow_context": None,
 }
 
 
@@ -19,6 +31,12 @@ def ensure_state(state: MutableMapping[str, object]) -> None:
 
 def set_selected_page(state: MutableMapping[str, object], page: str) -> None:
     state["ui_page"] = page
+
+
+def set_workflow_context(
+    state: MutableMapping[str, object], context: WorkflowContext | None
+) -> None:
+    state["workflow_context"] = context
 
 
 def set_selected_hypothesis(state: MutableMapping[str, object], hypothesis_id: str) -> None:

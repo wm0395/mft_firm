@@ -5,15 +5,22 @@ from pathlib import Path
 
 import pytest
 
+import project.ui.pages.trade_ideas as trade_ideas_page
+from project.common.models import (
+    DecisionAction,
+    DecisionReason,
+    TradeIdea,
+    utc_now_iso,
+)
+from project.data.repository import DataRepository
 from project.decision.models import Decision
 from project.decision.system import decide_trade
-from project.data.repository import DataRepository
-from project.common.models import DecisionAction, DecisionReason
-import project.ui.pages.trade_ideas as trade_ideas_page
 from project.ui_services.trade_idea_views import (
+    approval_position_warning,
     get_trade_ideas_page_view,
     submit_trade_decision,
 )
+from project.tracking.positions import open_position
 
 from tests.ui.test_views_support import _seed_repository
 
@@ -80,6 +87,69 @@ def test_create_snapshot_and_trade_decision_mutations(tmp_path: Path) -> None:
         repository.close()
 
 
+def test_trade_ideas_detail_approve_creates_open_position_and_no_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, detail, fake_st, trade_id = _prepare_trade_detail_approval_case(
+        tmp_path,
+        {"close": 112.0, "entry_price": 111.0, "price": 110.0},
+    )
+    try:
+        monkeypatch.setattr(
+            trade_ideas_page, "render_evidence_table", lambda *_args, **_kwargs: None
+        )
+        trade_ideas_page._render_detail(fake_st, detail, repository)
+
+        assert fake_st.success_messages == ["Recorded approve decision"]
+        assert fake_st.warning_messages == []
+        assert fake_st.errors == []
+        assert fake_st.rerun_calls == 1
+        assert repository.get_decisions(trade_id)[0][2] == "approve"
+        assert repository.get_positions(status="open") == (
+            open_position(trade_id, 112.0),
+        )
+        assert approval_position_warning(repository, trade_id, "approve") is None
+    finally:
+        repository.close()
+
+
+@pytest.mark.parametrize(
+    ("signals_snapshot", "expected_warning"),
+    [
+        ({}, "missing"),
+        ({"close": 0.0}, "non-positive"),
+        ({"close": "n/a"}, "non-numeric"),
+    ],
+)
+def test_trade_ideas_detail_approval_warns_without_usable_price(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    signals_snapshot: dict[str, object],
+    expected_warning: str,
+) -> None:
+    repository, detail, fake_st, trade_id = _prepare_trade_detail_approval_case(
+        tmp_path,
+        signals_snapshot,
+        trade_id_suffix=expected_warning,
+    )
+    try:
+        monkeypatch.setattr(
+            trade_ideas_page, "render_evidence_table", lambda *_args, **_kwargs: None
+        )
+        trade_ideas_page._render_detail(fake_st, detail, repository)
+
+        assert fake_st.success_messages == ["Recorded approve decision"]
+        assert fake_st.warning_messages == [
+            approval_position_warning(repository, trade_id, "approve")
+        ]
+        assert fake_st.errors == []
+        assert fake_st.rerun_calls == 1
+        assert repository.get_decisions(trade_id)[0][2] == "approve"
+        assert repository.get_positions(status="open") == ()
+    finally:
+        repository.close()
+
+
 def test_trade_decision_defaults_to_shared_rules(tmp_path: Path) -> None:
     repository, _, trade_id, _ = _seed_repository(tmp_path)
     try:
@@ -95,6 +165,34 @@ def test_trade_decision_defaults_to_shared_rules(tmp_path: Path) -> None:
         assert repository.get_decisions(trade_id)[0][2] == expected.action
     finally:
         repository.close()
+
+
+def _prepare_trade_detail_approval_case(
+    tmp_path: Path,
+    signals_snapshot: dict[str, object],
+    *,
+    trade_id_suffix: str = "close",
+) -> tuple[DataRepository, object, _FakeTradeIdeasStreamlit, str]:
+    repository, _, base_trade_id, _ = _seed_repository(tmp_path)
+    base_trade = next(
+        idea for idea in repository.get_trade_ideas() if idea.trade_id == base_trade_id
+    )
+    trade_id = f"{base_trade_id}:approve:{trade_id_suffix}"
+    repository.persist_trade_idea(
+        TradeIdea(
+            trade_id=trade_id,
+            asset_id=base_trade.asset_id,
+            hypothesis_id=base_trade.hypothesis_id,
+            version=base_trade.version,
+            direction=base_trade.direction,
+            confidence=base_trade.confidence,
+            signals_snapshot=signals_snapshot,  # type: ignore[arg-type]
+            timestamp=utc_now_iso(),
+        )
+    )
+    detail = _trade_detail(repository, trade_id)
+    fake_st = _FakeTradeIdeasStreamlit(auto_review=True)
+    return repository, detail, fake_st, trade_id
 
 
 def _trade_detail(repository: DataRepository, trade_id: str):
@@ -196,6 +294,7 @@ class _FakeTradeIdeasStreamlit:
         self.notes = notes
         self.success_messages: list[str] = []
         self.errors: list[str] = []
+        self.warning_messages: list[str] = []
         self.rerun_calls = 0
 
     def __getattr__(self, name: str):
@@ -217,6 +316,8 @@ class _FakeTradeIdeasStreamlit:
             return self._success
         if name == "error":
             return self._error
+        if name == "warning":
+            return self._warning
         if name == "rerun":
             return self._rerun
         raise AttributeError(name)
@@ -236,6 +337,9 @@ class _FakeTradeIdeasStreamlit:
 
     def _error(self, message: str) -> None:
         self.errors.append(message)
+
+    def _warning(self, message: str) -> None:
+        self.warning_messages.append(message)
 
     def _rerun(self) -> None:
         self.rerun_calls += 1

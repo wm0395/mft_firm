@@ -11,7 +11,7 @@ survives beyond `high_vol_top100`.
 - Audit lane: `strict_liquidity_100m`
 - Median active Sharpe: `-1.0911`
 - Positive-Sharpe rate: `14.29%`
-- Validation pass rate: `nan`
+- Validation pass rate: `missing`
 
 ## Evidence Gap
 
@@ -36,4 +36,3 @@ Results still degrade outside `high_vol_top100`.
 - `capacity_audit.md`
 - `blocked_lanes.md`
 - `review_packs/blocked_lanes/alpha101_blocked_lanes_pack.md`
-

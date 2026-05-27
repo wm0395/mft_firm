@@ -53,8 +53,8 @@ Recommended flow:
 Use the cockpit for day-to-day work and the CLI when you need a direct command
 for automation, scripting, or troubleshooting.
 
-The modern grouped CLI is `mft`; `python -m project.cli` and
-`python project/main.py` mirror the same entrypoint for local runs.
+The modern grouped CLI is `mft`; prefer it for the supported commands in this
+guide. Some compatibility examples below still use `python project/main.py`.
 
 ## Core Workflows
 
@@ -122,7 +122,8 @@ mft hypothesis validate hypothesis:rsi_mean_reversion
 mft hypothesis promote hypothesis:rsi_mean_reversion --to testing
 ```
 
-Research lifecycle commands live alongside the existing research workflow and use the same JSON envelope contract:
+Some research lifecycle commands still use the compatibility entrypoint and
+the same JSON envelope contract:
 
 ```bash
 python project/main.py create-research-project --name research:rsi --description "RSI checks"
@@ -141,7 +142,7 @@ workspace layout, and artifact review rules.
 
 ### Inspection
 
-The inspection commands remain available for traceability and review:
+The compatibility entrypoint also exposes these read-only inspection commands:
 
 ```bash
 python project/main.py show-trade-idea <trade_id>
@@ -241,3 +242,5 @@ Install it from the repo root:
 ```bash
 pip install -e ./codex_cli
 ```
+
+The installed command is `ai_code`.

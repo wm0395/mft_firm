@@ -16,5 +16,6 @@ def render_action_panel(
     st = get_streamlit()
     with st.container(border=True):
         st.subheader(title)
+        st.caption("Recommended next step")
         st.write(explanation)
-        st.button(button_label, key=key, on_click=on_click)
+        st.button(button_label, key=key, on_click=on_click, type="primary")

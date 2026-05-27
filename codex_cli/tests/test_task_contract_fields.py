@@ -23,7 +23,13 @@ def test_run_creates_task_with_contract_fields(tmp_path, monkeypatch, capsys) ->
         "typing passes",
         "no architecture violations",
     ]
-    assert task["required_reviewers"] == ["architecture_reviewer"]
+    assert task["required_reviewers"] == [
+        "architecture_reviewer",
+        "complexity_reviewer",
+        "determinism_auditor",
+        "financial_logic_auditor",
+        "test_failure_reviewer",
+    ]
 
 
 def test_list_preserves_explicit_contract_fields(tmp_path, monkeypatch, capsys) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -27,6 +28,12 @@ class _FakeStreamlit:
 
     def info(self, *_args, **_kwargs) -> None:
         return None
+
+    def subheader(self, *_args, **_kwargs) -> None:
+        return None
+
+    def container(self, *_args, **_kwargs):
+        return contextlib.nullcontext()
 
 
 def _render_canonical_dossier(
@@ -66,6 +73,12 @@ def test_live_pages_render_canonical_dossier(monkeypatch) -> None:
         projects=(),
         runs=(),
         candidates=(),
+        launch=SimpleNamespace(
+            assets=(),
+            snapshots=(),
+            hypotheses=(),
+            workflow_note="",
+        ),
         strategy_dossier={"hypothesis_id": "hypothesis:rsi_mean_reversion"},
         debug_payload=None,
     )

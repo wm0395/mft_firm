@@ -3,8 +3,11 @@ from __future__ import annotations
 from project.ui._streamlit import get_streamlit
 from project.ui.components.evidence_table import render_evidence_table
 from project.ui.components.json_debug import render_json_debug
+from project.ui.components.page_hero import render_page_hero
+from project.ui.components.status_card import render_status_cards
 from project.ui.components.workflow_stepper import render_workflow_stepper
 from project.ui.state import set_selected_evaluation
+from project.ui.views.common import StatusCardView
 from project.ui.views.explainability import get_explainability_page_view
 
 
@@ -12,8 +15,28 @@ def render(repository) -> None:
     st = get_streamlit()
     current = st.session_state.get("selected_evaluation_id") or None
     view = get_explainability_page_view(repository, current)
+    detail = view.selected_detail
     st.title("Explainability")
-    st.caption("Trace signal lineage, validation, and downstream human decisions.")
+    render_page_hero(
+        f"{len(view.evaluations)} evaluations with traceable signal lineage.",
+        (
+            "Open an evaluation to inspect the path from signals to decisions."
+            if view.evaluations
+            else "No evaluations recorded yet."
+        ),
+        context=(
+            ("Evaluations", len(view.evaluations)),
+            (
+                "Selected",
+                detail.evaluation_id if detail is not None else "none",
+            ),
+            ("Trace", len(detail.trace_steps) if detail is not None else 0),
+            (
+                "Validation",
+                _validation_value(detail) if detail is not None else "n/a",
+            ),
+        ),
+    )
     if not view.evaluations:
         st.info("No hypothesis evaluations available.")
         render_json_debug("Raw JSON / Debug", view.debug_payload)
@@ -21,18 +44,130 @@ def render(repository) -> None:
     evaluation_id = _evaluation_selector(st, view)
     if evaluation_id:
         set_selected_evaluation(st.session_state, evaluation_id)
-    detail = view.selected_detail
+        detail = get_explainability_page_view(repository, evaluation_id).selected_detail
     if detail is not None:
-        st.subheader(detail.evaluation_id)
+        render_status_cards(_cards(view, detail))
+        render_status_cards(_detail_cards(detail))
+        _render_summary(st, detail)
+        st.caption(
+            "Use the trace to confirm how evidence becomes a trade idea and decision."
+        )
+        st.subheader("Trace")
         render_workflow_stepper(detail.trace_steps)
-        render_evidence_table("Signals", _signal_rows(detail.signals))
-        st.caption("Validation")
-        st.json(detail.validation or {})
-        st.caption("Explanation")
-        st.json(detail.explanation)
-        st.write("Trade ideas: " + ", ".join(detail.trade_ideas) if detail.trade_ideas else "Trade ideas: none")
-        st.write("Decisions: " + ", ".join(detail.decisions) if detail.decisions else "Decisions: none")
+        _render_signal_section(st, detail)
+        _render_payload_section(
+            st,
+            "Validation",
+            detail.validation,
+            "No validation payload available.",
+        )
+        _render_payload_section(st, "Explanation", detail.explanation, None)
+        _render_related_section(st, detail)
     render_json_debug("Raw JSON / Debug", view.debug_payload)
+
+
+def _cards(view, detail) -> tuple[StatusCardView, ...]:
+    return (
+        StatusCardView(
+            "Evaluations",
+            str(len(view.evaluations)),
+            "ok",
+            "Available evaluations",
+        ),
+        StatusCardView(
+            "Trace Steps",
+            str(len(detail.trace_steps)),
+            "ok",
+            "Evidence path",
+        ),
+        StatusCardView(
+            "Validation",
+            _validation_value(detail),
+            _validation_state(detail),
+            "Validation payload",
+        ),
+        StatusCardView(
+            "Linked Objects",
+            str(len(detail.trade_ideas) + len(detail.decisions)),
+            "ok" if (detail.trade_ideas or detail.decisions) else "warning",
+            "Trade ideas and decisions",
+        ),
+    )
+
+
+def _detail_cards(detail) -> tuple[StatusCardView, ...]:
+    return (
+        StatusCardView(
+            "Asset",
+            detail.asset_symbol,
+            "ok",
+            f"{detail.direction} evaluation",
+        ),
+        StatusCardView(
+            "Hypothesis",
+            detail.hypothesis_id,
+            "ok",
+            "Selected evaluation",
+        ),
+        StatusCardView(
+            "Confidence",
+            f"{detail.confidence:.2f}",
+            "ok" if detail.confidence >= 0.5 else "warning",
+            f"{len(detail.trade_ideas)} linked trade ideas",
+        ),
+        StatusCardView(
+            "Validation",
+            _validation_value(detail),
+            _validation_state(detail),
+            "Selected evaluation",
+        ),
+    )
+
+
+def _render_summary(st, detail) -> None:
+    with st.container(border=True):
+        st.subheader("Selected evaluation")
+        st.write(f"Evaluation ID: {detail.evaluation_id}")
+        st.write(
+            f"Asset: {detail.asset_symbol} • Hypothesis: {detail.hypothesis_id}"
+        )
+        st.write(
+            f"Direction: {detail.direction} • Confidence: {detail.confidence:.2f}"
+        )
+        st.write(f"Trade ideas: {', '.join(detail.trade_ideas) or 'none'}")
+        st.write(f"Decisions: {', '.join(detail.decisions) or 'none'}")
+        if detail.validation is None:
+            st.info("No validation payload available.")
+        else:
+            validation_state = "passed" if detail.validation.get("is_valid", False) else "failed"
+            st.info(f"Validation {validation_state}.")
+
+
+def _render_signal_section(st, detail) -> None:
+    with st.container(border=True):
+        render_evidence_table("Signals", _signal_rows(detail.signals))
+
+
+def _render_payload_section(
+    st,
+    title: str,
+    payload: dict[str, object] | None,
+    empty_message: str | None,
+) -> None:
+    with st.container(border=True):
+        st.subheader(title)
+        if payload is None:
+            if empty_message is not None:
+                st.info(empty_message)
+            return
+        st.json(payload)
+
+
+def _render_related_section(st, detail) -> None:
+    with st.container(border=True):
+        st.subheader("Related objects")
+        st.write(f"Trade ideas: {', '.join(detail.trade_ideas) or 'none'}")
+        st.write(f"Decisions: {', '.join(detail.decisions) or 'none'}")
 
 
 def _evaluation_selector(st, view) -> str | None:
@@ -49,3 +184,15 @@ def _signal_rows(signals: dict[str, object]):
         {"signal_type": key, "value": value}
         for key, value in sorted(signals.items())
     ]
+
+
+def _validation_value(detail) -> str:
+    if detail.validation is None:
+        return "Missing"
+    return "Passed" if detail.validation.get("is_valid", False) else "Failed"
+
+
+def _validation_state(detail) -> str:
+    if detail.validation is None:
+        return "warning"
+    return "ok" if detail.validation.get("is_valid", False) else "warning"

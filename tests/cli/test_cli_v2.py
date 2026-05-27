@@ -7,6 +7,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from project.cli import app
+from project.cli import context as cli_context
 from project.common.models import Asset
 from project.data.db import DuckDBAccess
 from project.data.ingestion import build_raw_price_point
@@ -20,6 +21,27 @@ def test_root_command_prints_guidance(tmp_path: Path) -> None:
     assert "MFT Investment System" in result.output
     assert "mft status" in result.output
     assert "mft next" in result.output
+
+
+def test_open_repository_uses_data_layer_factory(tmp_path: Path, monkeypatch) -> None:
+    seen: list[tuple[str, Path, bool]] = []
+    db_path = tmp_path / "mft.duckdb"
+    db_path.touch()
+
+    class FakeRepository:
+        def close(self) -> None:
+            seen.append(("close", db_path, True))
+
+    def fake_build_repository(database: Path, read_only: bool):
+        seen.append(("build", database, read_only))
+        return FakeRepository()
+
+    monkeypatch.setattr(cli_context, "build_repository", fake_build_repository)
+
+    with cli_context.open_repository(db_path, read_only=True) as repository:
+        assert repository is not None
+
+    assert seen == [("build", db_path, True), ("close", db_path, True)]
 
 
 def test_status_next_and_json_mode(tmp_path: Path) -> None:
