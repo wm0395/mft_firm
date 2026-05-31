@@ -26,14 +26,23 @@ class _FakeStreamlit:
     def caption(self, *_args, **_kwargs) -> None:
         return None
 
+    def write(self, *_args, **_kwargs) -> None:
+        return None
+
     def info(self, *_args, **_kwargs) -> None:
         return None
 
     def subheader(self, *_args, **_kwargs) -> None:
         return None
 
+    def warning(self, *_args, **_kwargs) -> None:
+        return None
+
     def container(self, *_args, **_kwargs):
         return contextlib.nullcontext()
+
+    def columns(self, count: int):
+        return tuple(contextlib.nullcontext() for _ in range(count))
 
 
 def _render_canonical_dossier(

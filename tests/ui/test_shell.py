@@ -69,6 +69,7 @@ def test_app_main_seeds_state_and_dispatches_selected_page(monkeypatch) -> None:
 
     monkeypatch.setattr(app, "get_streamlit", lambda: fake_st)
     monkeypatch.setattr(app, "build_repository", _build_repository)
+    monkeypatch.setattr(app, "render_sidebar_focus", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         app,
         "PAGES",
@@ -79,7 +80,10 @@ def test_app_main_seeds_state_and_dispatches_selected_page(monkeypatch) -> None:
     app.main()
 
     assert "DuckDBAccess" not in app.__dict__
-    assert fake_st.page_config == {"page_title": "MFT Operator Cockpit", "layout": "wide"}
+    assert fake_st.page_config == {
+        "page_title": "MFT Operator Cockpit",
+        "layout": "wide",
+    }
     assert fake_st.session_state["ui_page"] == "Research"
     assert fake_st.session_state["selected_hypothesis_id"] == ""
     assert fake_st.session_state["selected_trade_id"] == ""
@@ -95,6 +99,8 @@ def test_app_main_seeds_state_and_dispatches_selected_page(monkeypatch) -> None:
             "Hypotheses",
             "Trade Ideas",
             "Positions",
+            "Charts",
+            "Trading",
             "Explainability",
             "Reports",
         ),

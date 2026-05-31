@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any, cast
-
 from project.ui._streamlit import get_streamlit
 from project.ui.components.evidence_table import render_evidence_table
 from project.ui.components.dossier_summary import render_dossier_summary
@@ -89,10 +87,7 @@ def _render_dossier(st, dossier: dict[str, object] | None) -> None:
             st.info("No strategy dossier is available yet.")
             return
         render_dossier_summary(st, dossier)
-        backtest = _backtest_summary_line(dossier)
-        if backtest:
-            st.info(backtest)
-        st.caption("Use the tables below to compare the supporting evidence.")
+        st.caption("Use the summary and tables below to compare the supporting evidence.")
         render_json_debug("Canonical Strategy Dossier", dossier)
 
 
@@ -109,39 +104,9 @@ def _hero_note(dossier: dict[str, object] | None) -> str:
     tradeability = str(dossier.get("tradeability_status") or "unknown")
     blockers = _dossier_strings(dossier.get("tradeability_blockers"))
     if blockers:
-        return f"{strategy_name} • {tradeability} • {len(blockers)} blockers"
+        blocker_text = f"{len(blockers)} blocker{'s' if len(blockers) != 1 else ''}"
+        return f"{strategy_name} • {tradeability} • {blocker_text}"
     return f"{strategy_name} • {tradeability}"
-
-
-def _backtest_summary_line(dossier: dict[str, object]) -> str:
-    backtest = dossier.get("best_backtest")
-    if not isinstance(backtest, dict):
-        return ""
-    return (
-        "Best backtest: "
-        f"{backtest.get('hypothesis_id', 'n/a')} • "
-        f"return {_float_value(backtest.get('total_return_pct')):.2f}% • "
-        f"Sharpe {_float_value(backtest.get('sharpe_ratio')):.2f} • "
-        f"{_int_value(backtest.get('total_trades'))} trades"
-    )
-
-
-def _best_backtest_value(backtest: object) -> str:
-    if not isinstance(backtest, dict):
-        return "no backtest"
-    return (
-        f"{_float_value(backtest.get('total_return_pct')):.2f}% / "
-        f"Sharpe {_float_value(backtest.get('sharpe_ratio')):.2f}"
-    )
-
-
-def _dossier_state(value: str) -> str:
-    if value == "eligible":
-        return "ok"
-    if value == "blocked":
-        return "warning"
-    return "action"
-
 
 def _dossier_strings(value: object) -> tuple[str, ...]:
     if isinstance(value, (list, tuple)):
@@ -149,17 +114,3 @@ def _dossier_strings(value: object) -> tuple[str, ...]:
     if value:
         return (str(value),)
     return ()
-
-
-def _float_value(value: object) -> float:
-    try:
-        return float(cast(Any, value))
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _int_value(value: object) -> int:
-    try:
-        return int(cast(Any, value))
-    except (TypeError, ValueError):
-        return 0

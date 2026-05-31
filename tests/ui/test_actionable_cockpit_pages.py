@@ -158,6 +158,62 @@ def test_mission_control_render_wires_action_context(monkeypatch) -> None:
     assert captured["debug"] == ("Raw JSON / Debug", view.debug_payload)
 
 
+def test_mission_control_render_uses_html_summary_when_available(
+    monkeypatch,
+) -> None:
+    class _MarkdownStreamlit(_FakeStreamlit):
+        def __init__(self) -> None:
+            super().__init__()
+            self.markdowns: list[tuple[str, bool]] = []
+
+        def markdown(self, text: str, unsafe_allow_html: bool = False) -> None:
+            self.markdowns.append((text, unsafe_allow_html))
+
+    fake_st = _MarkdownStreamlit()
+    captured: dict[str, object] = {}
+    view = _mission_control_view()
+
+    monkeypatch.setattr(mission_control_page, "get_streamlit", lambda: fake_st)
+    monkeypatch.setattr(
+        mission_control_page,
+        "get_mission_control_view",
+        lambda _repository: view,
+    )
+    monkeypatch.setattr(
+        mission_control_page,
+        "render_status_cards",
+        lambda cards: captured.setdefault("cards", cards),
+    )
+    monkeypatch.setattr(
+        mission_control_page,
+        "render_workflow_stepper",
+        lambda steps: captured.setdefault("steps", steps),
+    )
+    monkeypatch.setattr(
+        mission_control_page,
+        "render_json_debug",
+        lambda title, payload: captured.setdefault("debug", (title, payload)),
+    )
+    monkeypatch.setattr(
+        mission_control_page,
+        "render_action_panel",
+        lambda title, explanation, button_label, *, key, on_click: captured.update(
+            action_panel=(title, explanation, button_label, key, on_click)
+        ),
+    )
+
+    mission_control_page.render(object())
+
+    summary_html = next(
+        html for html, unsafe in fake_st.markdowns if "Current posture" in html
+    )
+    assert "Health" in summary_html
+    assert "Run Research" in summary_html
+    assert "No research run exists yet." in summary_html
+    assert "Warnings" in summary_html
+    assert "Activity" in summary_html
+
+
 def test_data_render_submits_structured_snapshot_payload(monkeypatch) -> None:
     repository = object()
     fake_st = _FakeStreamlit(
@@ -247,6 +303,76 @@ def test_data_render_submits_structured_snapshot_payload(monkeypatch) -> None:
     assert captured["debug"] == ("Raw JSON / Debug", view.debug_payload)
 
 
+def test_data_render_uses_html_snapshot_preview_when_available(
+    monkeypatch,
+) -> None:
+    class _MarkdownStreamlit(_FakeStreamlit):
+        def __init__(self, **kwargs) -> None:
+            super().__init__(**kwargs)
+            self.markdowns: list[tuple[str, bool]] = []
+
+        def markdown(self, text: str, unsafe_allow_html: bool = False) -> None:
+            self.markdowns.append((text, unsafe_allow_html))
+
+    repository = object()
+    fake_st = _MarkdownStreamlit(
+        multiselect_values={"Assets": ["NIFTY", "BANKNIFTY"]},
+        date_values={
+            "Data start": date(2026, 5, 1),
+            "Data end": date(2026, 5, 25),
+        },
+        text_inputs={
+            "Snapshot name": "Operator Snapshot",
+            "Market": "NSE",
+            "Resolution": "1d",
+        },
+        text_areas={
+            "Description": "",
+        },
+    )
+    captured: dict[str, object] = {}
+    view = _data_view()
+
+    monkeypatch.setattr(data_page, "get_streamlit", lambda: fake_st)
+    monkeypatch.setattr(data_page, "get_data_page_view", lambda _repository: view)
+    monkeypatch.setattr(
+        data_page,
+        "render_status_cards",
+        lambda cards: captured.setdefault("cards", cards),
+    )
+    monkeypatch.setattr(
+        data_page,
+        "render_workflow_stepper",
+        lambda steps: captured.setdefault("steps", steps),
+    )
+    monkeypatch.setattr(
+        data_page,
+        "render_evidence_table",
+        lambda title, rows: captured.setdefault(f"table:{title}", rows),
+    )
+    monkeypatch.setattr(
+        data_page,
+        "render_json_debug",
+        lambda title, payload: captured.setdefault("debug", (title, payload)),
+    )
+    monkeypatch.setattr(
+        data_page,
+        "create_snapshot",
+        lambda *args: _capture_snapshot_args(captured, args),
+    )
+
+    data_page.render(repository)
+
+    assert fake_st.info_messages == [
+        "Mission Control recommends creating a dataset snapshot."
+    ]
+    html = fake_st.markdowns[0][0]
+    assert "Snapshot draft" in html
+    assert "Operator Snapshot" in html
+    assert "BANKNIFTY" in html
+    assert "Readiness" in html
+
+
 def test_data_render_blocks_invalid_snapshot_submission(monkeypatch) -> None:
     repository = object()
     fake_st = _FakeStreamlit(
@@ -319,7 +445,8 @@ def test_research_render_keeps_guided_surface_readable(monkeypatch) -> None:
 
     assert fake_st.titles == ["Research"]
     assert fake_st.captions == [
-        "Launch flags: include_testing=False, include_draft=False"
+        "Launch flags: include_testing=False, include_draft=False",
+        "Read the summary above, then inspect the raw dossier JSON below.",
     ]
     assert fake_st.codes == [
         (

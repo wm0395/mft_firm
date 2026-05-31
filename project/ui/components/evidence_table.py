@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import pandas as pd  # type: ignore[import-untyped]
-
 from project.ui._streamlit import get_streamlit
+from project.ui.components.table_rows import build_table_rows
 
 
 def render_evidence_table(title: str, rows) -> None:
@@ -13,12 +12,6 @@ def render_evidence_table(title: str, rows) -> None:
         if not rows:
             st.caption("No records captured yet.")
             return
-        frame = pd.DataFrame([_row_data(row) for row in rows])
+        frame = build_table_rows(rows)
         st.caption(f"{len(rows)} records")
         st.dataframe(frame, use_container_width=True)
-
-
-def _row_data(row) -> dict[str, object]:
-    if isinstance(row, dict):
-        return row
-    return row.__dict__

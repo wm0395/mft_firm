@@ -10,14 +10,16 @@ class PageDefinition:
 
 
 PAGES = (
-    PageDefinition("Mission Control", "See system health and pick the next action."),
-    PageDefinition("Data", "Check freshness and create reproducible snapshots."),
-    PageDefinition("Research", "Launch and inspect research runs."),
-    PageDefinition("Hypotheses", "Review lifecycle state and readiness blockers."),
-    PageDefinition("Trade Ideas", "Decide on the open trade queue."),
-    PageDefinition("Positions", "Inspect open and closed positions."),
-    PageDefinition("Explainability", "Trace signals from evaluation to decision."),
-    PageDefinition("Reports", "Review backtests, performance, and rejections."),
+    PageDefinition("Mission Control", "System health, warnings, and workflow handoff."),
+    PageDefinition("Data", "Dataset snapshots, data quality, and asset coverage."),
+    PageDefinition("Research", "Launch research runs and review strategy dossiers."),
+    PageDefinition("Hypotheses", "Browse lifecycle states and hypothesis readiness."),
+    PageDefinition("Trade Ideas", "Review, approve, and track trade ideas."),
+    PageDefinition("Positions", "Monitor open positions and realized performance."),
+    PageDefinition("Charts", "Inspect locally rendered market charts."),
+    PageDefinition("Trading", "Review trade ideas, positions, and reports."),
+    PageDefinition("Explainability", "Trace signals into decisions and validations."),
+    PageDefinition("Reports", "Backtests, performance, and canonical dossiers."),
 )
 
 

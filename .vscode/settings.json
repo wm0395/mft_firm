@@ -1,0 +1,10 @@
+{
+    "git.enabled": true,
+    "git.enableSmartCommit": true,
+    "git.confirmSync": false,
+    "git.autofetch": true,
+    "git.autorefresh": true,
+    "git.path": "/home/linuxbrew/.linuxbrew/bin/git",
+    "source.control.includeDependencies": true,
+    "scm.inputFontSize": 12
+}

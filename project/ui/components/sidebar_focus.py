@@ -151,16 +151,67 @@ def _trade_state(repository: object, trade_id: str) -> str:
 
 
 def _focus_html(items: tuple[tuple[str, str], ...]) -> str:
+    page = _focus_value(items, "Current page")
+    description = _focus_value(items, "Description")
+    chips = [_chip_html("Workflow", _focus_value(items, "Workflow"), "workflow")]
+    selection_items = items[3:]
+    if len(selection_items) == 1 and selection_items[0][0] == "Selection":
+        chips.append(_chip_html("Selection", selection_items[0][1], "idle"))
+    else:
+        for label, value in selection_items:
+            chips.append(_chip_html(label, value, "selection"))
     rows = [
+        "<style>",
+        ".ui-sidebar-focus{margin:0 1rem 0.75rem;padding:0.9rem 0.95rem;",
+        "border:1px solid rgba(226,232,240,0.95);border-radius:14px;",
+        "background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);",
+        "box-shadow:0 8px 18px rgba(15,23,42,0.06);}",
+        ".ui-sidebar-focus__eyebrow{color:#64748b;font-size:0.67rem;font-weight:700;",
+        "letter-spacing:0.16em;text-transform:uppercase;margin-bottom:0.25rem;}",
+        ".ui-sidebar-focus__title{color:#0f172a;font-size:1rem;font-weight:700;",
+        "letter-spacing:-0.02em;line-height:1.25;}",
+        ".ui-sidebar-focus__description{color:#475569;font-size:0.82rem;",
+        "line-height:1.5;margin-top:0.35rem;}",
+        ".ui-sidebar-focus__chips{display:flex;flex-direction:column;gap:0.45rem;",
+        "margin-top:0.75rem;}",
+        ".ui-sidebar-focus__chip{display:flex;flex-direction:column;gap:0.15rem;",
+        "padding:0.55rem 0.65rem;border-radius:12px;border:1px solid #e2e8f0;",
+        "background:#ffffff;}",
+        ".ui-sidebar-focus__chip--workflow{background:#eef2ff;border-color:rgba(99,102,241,0.18);}",
+        ".ui-sidebar-focus__chip--selection{background:#f0fdf4;border-color:rgba(34,197,94,0.18);}",
+        ".ui-sidebar-focus__chip--idle{background:#f8fafc;border-color:#e2e8f0;}",
+        ".ui-sidebar-focus__chip-label{color:#64748b;font-size:0.62rem;font-weight:700;",
+        "letter-spacing:0.12em;text-transform:uppercase;}",
+        ".ui-sidebar-focus__chip-value{color:#0f172a;font-size:0.8rem;font-weight:600;",
+        "line-height:1.4;word-break:break-word;}",
+        "</style>",
         "<section class='ui-sidebar-focus'>",
         "<div class='ui-sidebar-focus__eyebrow'>Current focus</div>",
+        f"<div class='ui-sidebar-focus__title'>{html.escape(page)}</div>",
+        (
+            f"<div class='ui-sidebar-focus__description'>"
+            f"{html.escape(description)}</div>"
+        ),
+        "<div class='ui-sidebar-focus__chips'>",
+        *chips,
+        "</div></section>",
     ]
-    for label, value in items:
-        rows.append(
-            "<div class='ui-sidebar-focus__row'>"
-            f"<span class='ui-sidebar-focus__label'>{html.escape(label)}</span>"
-            f"<span class='ui-sidebar-focus__value'>{html.escape(value)}</span>"
-            "</div>"
-        )
-    rows.append("</section>")
     return "".join(rows)
+
+
+def _focus_value(items: tuple[tuple[str, str], ...], label: str) -> str:
+    for item_label, value in items:
+        if item_label == label:
+            return value
+    return ""
+
+
+def _chip_html(label: str, value: str, variant: str) -> str:
+    return "".join(
+        [
+            f"<div class='ui-sidebar-focus__chip ui-sidebar-focus__chip--{variant}'>",
+            f"<span class='ui-sidebar-focus__chip-label'>{html.escape(label)}</span>",
+            f"<span class='ui-sidebar-focus__chip-value'>{html.escape(value)}</span>",
+            "</div>",
+        ]
+    )

@@ -5,6 +5,7 @@ from project.ui.components.evidence_table import render_evidence_table
 from project.ui.components.json_debug import render_json_debug
 from project.ui.components.page_hero import render_page_hero
 from project.ui.components.status_card import render_status_cards
+from project.ui.components.trade_summary import render_trade_summary
 from project.ui.views.common import StatusCardView
 from project.ui.views.trade_ideas import (
     approval_position_warning,
@@ -198,14 +199,7 @@ def _render_detail(st, detail, repository, allow_submit: bool = True) -> None:
 
 def _render_detail_summary(st, detail) -> None:
     with st.container(border=True):
-        st.subheader(f"Trade idea: {detail.asset_symbol} {detail.direction}")
-        st.caption(
-            f"Confidence {detail.confidence:.2f} • "
-            f"{detail.hypothesis_status} hypothesis"
-        )
-        st.write(f"Hypothesis: {detail.hypothesis_name}")
-        st.write(f"System recommendation: {detail.recommended_action}")
-        st.caption(f"Reason: {detail.recommended_reason}")
+        render_trade_summary(st, detail)
 
 
 def _render_detail_evidence(st, detail) -> None:

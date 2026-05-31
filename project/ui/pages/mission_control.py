@@ -66,9 +66,32 @@ def _render_overview(st, view) -> None:
     with st.container(border=True):
         st.subheader("At a glance")
         render_status_cards(_overview_cards(view))
-        _surface_caption(st, f"Health: {health}")
-        _surface_caption(st, f"Next step: {action_title}")
-        _surface_caption(st, action_explanation)
+        _render_overview_summary(st, view, health, action_title, action_explanation)
+
+
+def _render_overview_summary(
+    st,
+    view,
+    health: str,
+    action_title: str,
+    action_explanation: str,
+) -> None:
+    markdown_fn = getattr(st, "markdown", None)
+    if callable(markdown_fn):
+        markdown_fn(
+            _overview_summary_html(
+                health,
+                action_title,
+                action_explanation,
+                tuple(getattr(view, "warnings", ())),
+                tuple(getattr(view, "recent_activity", ())),
+            ),
+            unsafe_allow_html=True,
+        )
+        return
+    _surface_caption(st, f"Health: {health}")
+    _surface_caption(st, f"Next step: {action_title}")
+    _surface_caption(st, action_explanation)
 
 
 def _overview_cards(view) -> tuple[StatusCardView, ...]:
@@ -217,6 +240,88 @@ def _surface_caption(st, text: str) -> None:
     write_fn = getattr(st, "write", None)
     if callable(write_fn):
         write_fn(text)
+
+
+def _overview_summary_html(
+    health: str,
+    action_title: str,
+    action_explanation: str,
+    warnings,
+    activity,
+) -> str:
+    warning_count = len(warnings)
+    activity_count = len(activity)
+    warnings_text = (
+        f"{warning_count} warning{'s' if warning_count != 1 else ''}"
+    )
+    activity_text = (
+        f"{activity_count} event{'s' if activity_count != 1 else ''}"
+    )
+    items = (
+        ("Health", health, _health_tone(health)),
+        ("Next step", action_title, "primary"),
+        ("Warnings", warnings_text, _count_tone(warning_count)),
+        ("Activity", activity_text, _count_tone(activity_count)),
+    )
+    rows = [
+        "<div style='margin-top:0.85rem;padding:1rem 1.1rem;border-radius:14px;"
+        "border:1px solid #e2e8f0;background:linear-gradient(180deg,#ffffff 0%,"
+        "#f8fafc 100%);box-shadow:0 6px 18px rgba(15,23,42,0.05);'>",
+        "<div style='color:#64748b;font-size:0.68rem;font-weight:700;"
+        "letter-spacing:0.14em;text-transform:uppercase;margin-bottom:0.75rem;'>"
+        "Current posture</div>",
+        "<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));"
+        "gap:0.65rem;'>",
+    ]
+    for label, value, tone in items:
+        rows.append(_summary_item_html(label, value, tone))
+    rows.append(
+        "</div>"
+        "<div style='margin-top:0.85rem;color:#475569;font-size:0.88rem;"
+        "line-height:1.6;'>"
+        f"{html.escape(action_explanation or 'No guidance available yet.')}"
+        "</div></div>"
+    )
+    return "".join(rows)
+
+
+def _summary_item_html(label: str, value: str, tone: str) -> str:
+    return "".join(
+        [
+            "<div style='padding:0.7rem 0.8rem;border-radius:12px;background:#ffffff;"
+            "border:1px solid #f1f5f9;'>",
+            f"<div style='color:#64748b;font-size:0.62rem;font-weight:700;"
+            f"letter-spacing:0.12em;text-transform:uppercase;margin-bottom:0.2rem;'>"
+            f"{html.escape(label)}</div>",
+            f"<div style='color:{_tone_color(tone)};font-size:0.92rem;"
+            f"font-weight:700;line-height:1.35;'>"
+            f"{html.escape(value)}</div>",
+            "</div>",
+        ]
+    )
+
+
+def _health_tone(health: str) -> str:
+    normalized = health.strip().lower()
+    if normalized == "ok":
+        return "ok"
+    if normalized == "critical":
+        return "warning"
+    if normalized == "warning":
+        return "warning"
+    return "primary"
+
+
+def _count_tone(count: int) -> str:
+    return "ok" if count == 0 else "warning"
+
+
+def _tone_color(tone: str) -> str:
+    if tone == "ok":
+        return "#15803d"
+    if tone == "warning":
+        return "#b45309"
+    return "#4f46e5"
 
 
 def _warning_cards_html(warnings) -> str:

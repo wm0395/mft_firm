@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from project.ui._streamlit import get_streamlit
 from project.ui.components.evidence_table import render_evidence_table
+from project.ui.components.evaluation_summary import render_evaluation_summary
 from project.ui.components.json_debug import render_json_debug
 from project.ui.components.page_hero import render_page_hero
 from project.ui.components.status_card import render_status_cards
@@ -127,20 +128,7 @@ def _detail_cards(detail) -> tuple[StatusCardView, ...]:
 def _render_summary(st, detail) -> None:
     with st.container(border=True):
         st.subheader("Selected evaluation")
-        st.write(f"Evaluation ID: {detail.evaluation_id}")
-        st.write(
-            f"Asset: {detail.asset_symbol} • Hypothesis: {detail.hypothesis_id}"
-        )
-        st.write(
-            f"Direction: {detail.direction} • Confidence: {detail.confidence:.2f}"
-        )
-        st.write(f"Trade ideas: {', '.join(detail.trade_ideas) or 'none'}")
-        st.write(f"Decisions: {', '.join(detail.decisions) or 'none'}")
-        if detail.validation is None:
-            st.info("No validation payload available.")
-        else:
-            validation_state = "passed" if detail.validation.get("is_valid", False) else "failed"
-            st.info(f"Validation {validation_state}.")
+        render_evaluation_summary(st, detail)
 
 
 def _render_signal_section(st, detail) -> None:

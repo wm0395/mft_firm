@@ -7,6 +7,7 @@ from project.ui.components.evidence_table import render_evidence_table
 from project.ui.components.json_debug import render_json_debug
 from project.ui.components.page_hero import render_page_hero
 from project.ui.components.status_card import render_status_cards
+from project.ui.components.table_rows import build_table_rows
 from project.ui.views.common import StatusCardView
 from project.ui.views.positions import (
     PositionsPageView,
@@ -169,13 +170,29 @@ def _render_detail(st, detail: PositionDetailView) -> None:
 
 def _render_detail_summary(st, detail: PositionDetailView) -> None:
     markdown_fn = getattr(st, "markdown", None)
-    if not callable(markdown_fn):
+    if callable(markdown_fn):
+        html_text = _detail_summary_html(detail)
+        try:
+            markdown_fn(html_text, unsafe_allow_html=True)
+        except TypeError:
+            markdown_fn(html_text)
         return
-    html_text = _detail_summary_html(detail)
-    try:
-        markdown_fn(html_text, unsafe_allow_html=True)
-    except TypeError:
-        markdown_fn(html_text)
+    caption_fn = getattr(st, "caption", None)
+    if callable(caption_fn):
+        caption_fn("Selected position")
+    write_fn = getattr(st, "write", None)
+    if not callable(write_fn):
+        return
+    write_fn(f"Position: {detail.position_id} • Trade {detail.trade_id}")
+    write_fn(f"Asset: {detail.asset_symbol} • {detail.asset_name or 'n/a'}")
+    write_fn(
+        f"Hypothesis: {detail.hypothesis_name} • {detail.hypothesis_id or 'n/a'}"
+    )
+    write_fn(
+        "Outcome: "
+        f"{_position_outcome_value(detail)} • {detail.direction.title()} • "
+        f"{detail.status.title()}"
+    )
 
 
 def _detail_summary_html(detail: PositionDetailView) -> str:
@@ -185,7 +202,7 @@ def _detail_summary_html(detail: PositionDetailView) -> str:
         ("Hypothesis", detail.hypothesis_name, detail.hypothesis_id or "n/a", ""),
         (
             "Outcome",
-            _money(detail.pnl),
+            _position_outcome_value(detail),
             f"{detail.direction.title()} • {detail.status.title()}",
             _outcome_variant(detail),
         ),
@@ -225,6 +242,12 @@ def _outcome_variant(detail: PositionDetailView) -> str:
     if detail.pnl < 0:
         return "ui-record-card--warning"
     return ""
+
+
+def _position_outcome_value(detail: PositionDetailView) -> str:
+    if detail.pnl is None or detail.status == "open":
+        return "Open position"
+    return _money(detail.pnl)
 
 
 def _render_detail_fields(st, detail: PositionDetailView) -> None:
@@ -283,9 +306,7 @@ def _asset_label(primary: str, secondary: str) -> str:
 
 
 def _positions_dataframe(positions: tuple[PositionDetailView, ...]):
-    from pandas import DataFrame  # type: ignore[import-untyped]
-
-    return DataFrame([row.__dict__ for row in _table_rows(positions)])
+    return build_table_rows(_table_rows(positions))
 
 
 def _current_position_id(

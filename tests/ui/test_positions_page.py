@@ -10,6 +10,8 @@ from project.tracking.positions import open_position
 from project.ui import app
 from project.ui.navigation import page_titles
 from project.ui.pages import positions as positions_page
+from project.ui.pages import charts as charts_page
+from project.ui.pages import trading as trading_page
 from project.ui.views.common import StatusCardView
 from project.ui.views.positions import PositionDetailView, PositionsPageView
 from project.ui_services.positions_views import get_positions_page_view
@@ -73,7 +75,9 @@ def test_positions_page_view_is_empty_for_empty_repository(tmp_path: Path) -> No
         repository.close()
 
 
-def test_positions_page_view_exposes_open_and_closed_position_values(tmp_path: Path) -> None:
+def test_positions_page_view_exposes_open_and_closed_position_values(
+    tmp_path: Path,
+) -> None:
     repository, open_trade = _seed_positions_repository(tmp_path)
     try:
         view = get_positions_page_view(repository)
@@ -150,8 +154,9 @@ def test_positions_page_render_shows_detail_and_rows_for_closed_position(
             ("Closed", "1"),
             ("Realized PnL", "10.00"),
         )
+        assert "Selected position" in fake_st.captions
+        assert fake_st.writes == _summary_writes(detail) + _detail_writes(detail)
         assert rows == [_table_row(detail)]
-        assert fake_st.writes == _detail_writes(detail)
         assert fake_st.json_payloads == [{"rsi_14": 22.5}]
     finally:
         repository.close()
@@ -161,6 +166,10 @@ def test_navigation_includes_positions_page() -> None:
     assert "Positions" in page_titles()
     assert "Positions" in app.PAGES
     assert app.PAGES["Positions"] is positions_page.render
+    assert "Charts" in page_titles()
+    assert "Trading" in page_titles()
+    assert app.PAGES["Charts"] is charts_page.render
+    assert app.PAGES["Trading"] is trading_page.render
 
 
 def _render_positions_page(
@@ -216,7 +225,9 @@ def _table_row(detail: PositionDetailView) -> dict[str, str]:
         "direction": detail.direction,
         "status": detail.status,
         "entry_price": f"{detail.entry_price:.2f}",
-        "exit_price": "n/a" if detail.exit_price is None else f"{detail.exit_price:.2f}",
+        "exit_price": (
+            "n/a" if detail.exit_price is None else f"{detail.exit_price:.2f}"
+        ),
         "pnl": "n/a" if detail.pnl is None else f"{detail.pnl:.2f}",
         "trade_timestamp": detail.trade_timestamp,
     }
@@ -232,8 +243,26 @@ def _detail_writes(detail: PositionDetailView) -> list[str]:
         f"Status: {detail.status}",
         f"Trade timestamp: {detail.trade_timestamp}",
         f"Entry price: {detail.entry_price:.2f}",
-        f"Exit price: {('n/a' if detail.exit_price is None else f'{detail.exit_price:.2f}')}",
+        (
+            f"Exit price: "
+            f"{('n/a' if detail.exit_price is None else f'{detail.exit_price:.2f}')}"
+        ),
         f"PnL: {('n/a' if detail.pnl is None else f'{detail.pnl:.2f}')}",
+    ]
+
+
+def _summary_writes(detail: PositionDetailView) -> list[str]:
+    outcome = "Open position"
+    if detail.pnl is not None and detail.status != "open":
+        outcome = f"{detail.pnl:.2f}"
+    return [
+        f"Position: {detail.position_id} • Trade {detail.trade_id}",
+        f"Asset: {detail.asset_symbol} • {detail.asset_name or 'n/a'}",
+        f"Hypothesis: {detail.hypothesis_name} • {detail.hypothesis_id or 'n/a'}",
+        (
+            f"Outcome: {outcome} • {detail.direction.title()} • "
+            f"{detail.status.title()}"
+        ),
     ]
 
 
