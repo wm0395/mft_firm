@@ -44,12 +44,17 @@ def render(repository) -> None:
     render_status_cards(view.cards)
     st.subheader("Workflow progress")
     render_workflow_stepper(view.workflow_steps)
+    action = view.recommended_action
+    is_executable = bool(getattr(action, "is_executable", True))
     render_action_panel(
         "Recommended next action",
-        view.recommended_action.explanation,
-        view.recommended_action.button_label,
+        action.explanation,
+        action.button_label,
         key="mission-control-action",
-        on_click=lambda: _navigate_to_action(st, view.recommended_action),
+        on_click=None if not is_executable else lambda: _navigate_to_action(st, action),
+        target_page=getattr(action, "target_page", None) or None,
+        disabled=not is_executable,
+        disabled_reason=getattr(action, "disabled_reason", None) or None,
     )
     st.subheader("Recent warnings")
     _render_warnings(st, view.warnings)

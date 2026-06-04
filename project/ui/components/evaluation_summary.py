@@ -15,11 +15,7 @@ def render_evaluation_summary(st, detail) -> None:
     )
     st.write(f"Trade ideas: {', '.join(detail.trade_ideas) or 'none'}")
     st.write(f"Decisions: {', '.join(detail.decisions) or 'none'}")
-    if detail.validation is None:
-        st.info("No validation payload available.")
-    else:
-        validation_state = "passed" if detail.validation.get("is_valid", False) else "failed"
-        st.info(f"Validation {validation_state}.")
+    st.write(f"Validation: {_validation_value(detail)}.")
 
 
 def _summary_html(detail) -> str:

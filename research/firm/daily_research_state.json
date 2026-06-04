@@ -1,6 +1,6 @@
 {
   "state_name": "daily_research_state",
-  "state_as_of_utc": "2026-05-22T00:00:00Z",
+  "state_as_of_utc": "2026-06-03T00:00:00Z",
   "canonical_alpha101_state": "research/projects/alpha101_formulaic_alphas/research_state.json",
   "legacy_alpha101_state": "research/projects/alpha101_formulaic_alphas/alpha101_research_state.json",
   "legacy_alpha101_state_status": "superseded",
@@ -11,6 +11,12 @@
       "name": "alpha101-formulaic-alphas",
       "status": "draft",
       "phase": "late-stage discovery and robustness triage"
+    },
+    {
+      "project_id": "research_project:ipo_liquidity_pressure",
+      "name": "ipo-liquidity-pressure",
+      "status": "draft",
+      "phase": "pilot evidence collection and seed event study"
     }
   ],
   "current_alpha_lanes": [

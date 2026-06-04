@@ -1,0 +1,104 @@
+{
+  "canonical_state_file": "research/projects/price_action_strategy_meta/research_state.json",
+  "project_id": "research_project:price_action_strategy_meta",
+  "project_status": "draft",
+  "phase": "cataloging price-action families, stock regime map, selector gate v0, and walk-forward validation",
+  "state_as_of_utc": "2026-06-04T10:09:08Z",
+  "source_of_truth": "research/projects/price_action_strategy_meta/README.md",
+  "objective": "Catalog the repo-native price-action families, measure conditional edge, and design a regime-gated selector that only deploys when conditions are favorable.",
+  "summary_artifacts": [
+    "research/projects/price_action_strategy_meta/reports/strategy_catalog.md",
+    "research/projects/price_action_strategy_meta/reports/strategy_inventory.md",
+    "research/projects/price_action_strategy_meta/reports/metrics_framework.md",
+    "research/projects/price_action_strategy_meta/reports/meta_selector_design.md",
+    "research/projects/price_action_strategy_meta/reports/screening_results.md",
+    "research/projects/price_action_strategy_meta/reports/extra_strategy_screening.md",
+    "research/projects/price_action_strategy_meta/reports/regime_analysis.md",
+    "research/projects/price_action_strategy_meta/reports/stock_regime.md",
+    "research/projects/price_action_strategy_meta/reports/selector_gate.md",
+    "research/projects/price_action_strategy_meta/reports/selector_walk_forward.md",
+    "research/projects/price_action_strategy_meta/review_packs/price_action_meta_pack.md"
+  ],
+  "active_refinements": [
+    "strategy_catalog",
+    "strategy_inventory",
+    "daily_screening_readout",
+    "regime_state_panel",
+    "high_confidence_gate_candidates",
+    "stock_regime_mapping",
+    "walk_forward_backtests",
+    "regime_holdout_panel",
+    "cost_stress_panel",
+    "meta_selector_precision",
+    "selector_gate_v0",
+    "selector_abstention_rules"
+  ],
+  "current_baseline": {
+    "universe": "indian_daily_liquid_equities",
+    "timeframe": "1d",
+    "cost_stress_bps": [
+      0,
+      5,
+      10,
+      25
+    ],
+    "evaluation_split": "walk_forward_purged_embargo"
+  },
+  "initial_tasks": [
+    {
+      "task_id": "catalog_price_action_families",
+      "status": "planned",
+      "objective": "Map repo-native price-action primitives to strategy families and failure modes.",
+      "deliverable": "reports/strategy_catalog.md"
+    },
+    {
+      "task_id": "define_metrics_panel",
+      "status": "planned",
+      "objective": "Specify the primary, conditional, and selector metrics for the research loop.",
+      "deliverable": "reports/metrics_framework.md"
+    },
+    {
+      "task_id": "run_walk_forward_backtests",
+      "status": "completed",
+      "objective": "Measure each family out of sample across time and regime splits.",
+      "deliverables": [
+        "price_action_walk_forward_results.csv",
+        "price_action_regime_results.csv"
+      ]
+    },
+    {
+      "task_id": "build_meta_selector",
+      "status": "planned",
+      "objective": "Prototype a high-precision selector that can abstain when conditions are weak.",
+      "deliverable": "price_action_meta_selector_v0.md"
+    },
+    {
+      "task_id": "write_deployment_rules",
+      "status": "blocked",
+      "objective": "Write deployment rules only after the selector clears the out-of-sample and cost gates.",
+      "deliverable": "price_action_meta_deployment_v0.md"
+    }
+  ],
+  "validation_gates": [
+    "Coverage gate",
+    "Edge gate",
+    "Cost gate",
+    "Regime robustness gate",
+    "Calibration gate",
+    "Selector precision gate"
+  ],
+  "notes": [
+    "Strategy families are research-only until they clear out-of-sample and cost-stressed tests.",
+    "Gap, breakout, and trend families fail in different regimes and must be evaluated separately.",
+    "The regime scan uses the top 100 high-vol names from each universe and a curated representative strategy panel.",
+    "Reversal exhaustion is the strongest broad pocket, especially in high-vol, bear, risk_off, and up-gap-shock states.",
+    "The supplemental extra-strategy screen identifies fisher_transform_reversal_10 as the cleanest extra candidate, especially in bear, high-vol, up-gap-shock, and low-liquidity states.",
+    "The expanded extra pool now also includes supertrend, parabolic SAR, Aroon, Ichimoku, KST, inverse Fisher RSI, mass index, support trendline, volume profile, and choppiness helpers so the gate can probe more first-principles combinations.",
+    "Metals & Mining and Capital Goods are the strongest 5-day sector pockets; risk_off low-liquidity slices are weak.",
+    "The stock-level map shows names like ADANIENT, VOLTAS, CHENNPETRO, and SUZLON tilting into risk_on/high_vol regimes, while HINDZINC, TATASTEEL, BALRAMCHIN, and GLENMARK tilt the other way.",
+    "The strict selector gate clears the combined always-on baseline on the 5-day test slice with 54.3% precision, 13.5% coverage, and 6.735 bps mean portfolio return.",
+    "The leakage-controlled walk-forward layer now refits the same candidate scan on each fold, records abstain when no policy survives, and still does not beat the combined always-on baseline; average lift remains negative across walk-forward, purged, and embargoed splits.",
+    "A selector may abstain; abstention is a valid outcome.",
+    "Every result must be compared with always-on and always-flat baselines."
+  ]
+}

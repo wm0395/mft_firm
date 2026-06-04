@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from project.ui._streamlit import get_streamlit
+from project.ui.components.approval_outcome import render_approval_outcome
+from project.ui.components.decision_guidance import render_decision_guidance
+from project.ui.components.empty_state import render_empty_state
+from project.ui.components.decision_preview import render_decision_preview
 from project.ui.components.evidence_table import render_evidence_table
 from project.ui.components.json_debug import render_json_debug
 from project.ui.components.page_hero import render_page_hero
@@ -97,12 +101,17 @@ def _selected_trade_context(
 
 
 def _show_no_open_trade_ideas(st) -> None:
-    info_fn = getattr(st, "info", None)
-    if callable(info_fn):
-        info_fn("No open trade ideas.")
-    else:
-        st.write("No open trade ideas.")
-    st.caption("Closed reviews stay accessible when selected from session state.")
+    render_empty_state(
+        st,
+        "No open trade ideas.",
+        "The review queue is currently clear.",
+        "Closed reviews stay accessible when selected from session state.",
+        (
+            ("Queue", "0 open", "warning"),
+            ("Reviewed", "Closed reviews remain accessible", "ok"),
+            ("Next step", "Keep reviewing history", "action"),
+        ),
+    )
 
 
 def _selected_trade_note(
@@ -194,7 +203,17 @@ def _render_detail(st, detail, repository, allow_submit: bool = True) -> None:
     if allow_submit:
         _render_detail_decision(st, detail, repository)
     else:
-        st.caption("Read-only review record")
+        render_empty_state(
+            st,
+            "Read-only review record",
+            "This trade has already been recorded and is now read-only.",
+            "Use the summary, signals, and history above to audit the decision.",
+            (
+                ("Mode", "Read only", "warning"),
+                ("Action", "No new submission", "ok"),
+                ("Next step", "Review the evidence", "action"),
+            ),
+        )
 
 
 def _render_detail_summary(st, detail) -> None:
@@ -205,11 +224,9 @@ def _render_detail_summary(st, detail) -> None:
 def _render_detail_evidence(st, detail) -> None:
     render_evidence_table("Signal snapshot", detail.signals)
     if detail.evaluation_validation is not None:
-        st.caption("Validation status")
-        st.json(detail.evaluation_validation)
+        render_json_debug("Validation status", detail.evaluation_validation)
     if detail.evaluation_explanation is not None:
-        st.caption("Explanation")
-        st.json(detail.evaluation_explanation)
+        render_json_debug("Explanation", detail.evaluation_explanation)
 
 
 def _render_detail_history(st, detail) -> None:
@@ -217,38 +234,12 @@ def _render_detail_history(st, detail) -> None:
 
 
 def _render_approval_outcome(st, detail) -> None:
-    outcome = detail.approval_outcome
-    st.caption("Approval outcome")
-    if outcome.state == "warning":
-        warning_fn = getattr(st, "warning", None)
-        if callable(warning_fn):
-            warning_fn(outcome.message)
-        else:
-            st.write(outcome.message)
-    elif outcome.state == "ok":
-        success_fn = getattr(st, "success", None)
-        if callable(success_fn):
-            success_fn(outcome.message)
-        else:
-            st.write(outcome.message)
-    elif outcome.state == "info":
-        info_fn = getattr(st, "info", None)
-        if callable(info_fn):
-            info_fn(outcome.message)
-        else:
-            st.write(outcome.message)
-    else:
-        st.write(outcome.message)
-    if outcome.open_position_status is not None:
-        st.write(f"Open position status: {outcome.open_position_status}")
-    if outcome.open_position_entry_price is not None:
-        st.write(f"Entry price: {outcome.open_position_entry_price:.2f}")
+    render_approval_outcome(st, detail.approval_outcome)
 
 
 def _render_detail_decision(st, detail, repository) -> None:
     with st.container(border=True):
         st.subheader("Decision")
-        st.caption("Disable automatic review to override the recommendation.")
         with st.form("trade-decision-form"):
             auto_review = st.checkbox(
                 "Use system recommendation",
@@ -258,8 +249,8 @@ def _render_detail_decision(st, detail, repository) -> None:
                     "override."
                 ),
             )
-            _render_decision_guidance(st, detail, auto_review)
-            action, reason = None, None
+            render_decision_guidance(st, detail, auto_review)
+            action, reason, reason_label = None, None, None
             if not auto_review:
                 action = st.radio(
                     "Action",
@@ -275,7 +266,15 @@ def _render_detail_decision(st, detail, repository) -> None:
                 "Notes",
                 placeholder="Optional context, rationale, or risk notes.",
             )
-            st.caption("Notes are saved with the decision and shown in history.")
+            render_decision_preview(
+                st,
+                detail,
+                auto_review,
+                action,
+                reason,
+                reason_label,
+                notes,
+            )
             submitted = st.form_submit_button("Submit decision")
         if submitted:
             _submit_trade_decision(
@@ -286,18 +285,6 @@ def _render_detail_decision(st, detail, repository) -> None:
                 reason,
                 notes,
             )
-
-
-def _render_decision_guidance(st, detail, auto_review: bool) -> None:
-    if auto_review:
-        st.write(
-            f"Automatic review will submit {detail.recommended_action} "
-            f"with reason {detail.recommended_reason}."
-        )
-        st.caption("Switch off automatic review to choose a different action.")
-        return
-    st.write("Manual override is active.")
-    st.caption("Choose an explicit action and reason below.")
 
 
 def _submit_trade_decision(

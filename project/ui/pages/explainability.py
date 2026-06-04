@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from project.ui._streamlit import get_streamlit
+from project.ui.components.empty_state import render_empty_state
 from project.ui.components.evidence_table import render_evidence_table
 from project.ui.components.evaluation_summary import render_evaluation_summary
 from project.ui.components.json_debug import render_json_debug
@@ -39,7 +40,17 @@ def render(repository) -> None:
         ),
     )
     if not view.evaluations:
-        st.info("No hypothesis evaluations available.")
+        render_empty_state(
+            st,
+            "No hypothesis evaluations available.",
+            "Generate an evaluation to inspect signal lineage and decision traceability.",
+            "Run research or load a seeded repository to populate this page.",
+            (
+                ("Evaluations", "0 recorded", "warning"),
+                ("Trace", "No trace yet", "action"),
+                ("Next step", "Run research", "ok"),
+            ),
+        )
         render_json_debug("Raw JSON / Debug", view.debug_payload)
         return
     evaluation_id = _evaluation_selector(st, view)
@@ -146,7 +157,17 @@ def _render_payload_section(
         st.subheader(title)
         if payload is None:
             if empty_message is not None:
-                st.info(empty_message)
+                render_empty_state(
+                    st,
+                    empty_message,
+                    "This evaluation does not include a validation payload yet.",
+                    "Run research with validation enabled to populate this section.",
+                    (
+                        ("Validation", "Missing", "warning"),
+                        ("Trace", "Still available", "ok"),
+                        ("Next step", "Run research", "action"),
+                    ),
+                )
             return
         st.json(payload)
 

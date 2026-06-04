@@ -18,7 +18,7 @@ def test_simple_notebook():
     print("2. Configuring Python path...")
     if os.getcwd() not in sys.path:
         sys.path.insert(0, os.getcwd())
-    print(f"   🔗 Project root added to Python path")
+    print("   🔗 Project root added to Python path")
     
     # STEP 3: Import the research framework
     print("3. Importing research framework...")
@@ -88,7 +88,6 @@ def test_simple_notebook():
     print("\n📊 Performing basic analysis...")
     
     try:
-        import pandas as pd
         import numpy as np
         
         # Calculate forward returns (next day)
@@ -127,7 +126,7 @@ def test_simple_notebook():
         
         # Show volatility (annualized)
         annual_factor = np.sqrt(252)
-        print(f"   📊 Annualized volatilities:")
+        print("   📊 Annualized volatilities:")
         print(f"      Alpha #1: {alpha001.std().mean() * annual_factor:.4f}")
         print(f"      Alpha #2: {alpha002.std().mean() * annual_factor:.4f}")
         print(f"      Alpha #101: {alpha101.std().mean() * annual_factor:.4f}")

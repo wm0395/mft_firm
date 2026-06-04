@@ -3,7 +3,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd  # type: ignore[import-untyped]
 
-from research.alpha101_engine import backtest_weights, performance_metrics
+if __package__:
+    from .alpha101_engine import backtest_weights, performance_metrics  # noqa: E402
+else:  # pragma: no cover
+    from alpha101_engine import backtest_weights, performance_metrics  # noqa: E402
 
 
 def backtests_by_cost(weights: pd.DataFrame, next_returns: pd.DataFrame, costs: tuple[float, ...]) -> dict[float, dict]:

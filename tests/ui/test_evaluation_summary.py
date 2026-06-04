@@ -9,16 +9,12 @@ class _FakeStreamlit:
     def __init__(self) -> None:
         self.markdowns: list[tuple[str, bool]] = []
         self.writes: list[str] = []
-        self.infos: list[str] = []
 
     def markdown(self, text: str, unsafe_allow_html: bool = False) -> None:
         self.markdowns.append((text, unsafe_allow_html))
 
     def write(self, text: object) -> None:
         self.writes.append(str(text))
-
-    def info(self, text: str) -> None:
-        self.infos.append(text)
 
 
 def test_render_evaluation_summary_renders_summary_card() -> None:
@@ -81,5 +77,5 @@ def test_render_evaluation_summary_falls_back_without_markdown() -> None:
         "Direction: long • Confidence: 0.82",
         "Trade ideas: trade:1",
         "Decisions: none",
+        "Validation: Missing.",
     ]
-    assert fake_st.infos == ["No validation payload available."]

@@ -5,12 +5,14 @@ import sys
 
 import pandas as pd  # type: ignore[import-untyped]
 
-
 NOTEBOOK_ROOT = Path(__file__).resolve().parents[1]
 if str(NOTEBOOK_ROOT) not in sys.path:
     sys.path.insert(0, str(NOTEBOOK_ROOT))
 
-from research.alpha101_robustness import strict_liquidity_primary_report  # type: ignore[import-untyped]  # noqa: E402
+if __package__:
+    from .alpha101_robustness import strict_liquidity_primary_report  # type: ignore[import-untyped]  # noqa: E402
+else:  # pragma: no cover
+    from alpha101_robustness import strict_liquidity_primary_report  # type: ignore[import-untyped]  # noqa: E402
 
 
 SHORTLIST_PATH = Path("research/artifacts/alpha101_research_factory/promoted_exact_shortlist_filled.csv")

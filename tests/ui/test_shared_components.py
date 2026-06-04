@@ -102,9 +102,9 @@ def test_render_json_debug_summarizes_dict_payload(
     )
 
     assert fake_st.expander_calls == [("Debug payload", False)]
-    assert fake_st.writes == [
-        "Object payload with 5 top-level fields: alpha, beta, gamma, delta, ..."
-    ]
+    assert fake_st.markdowns and fake_st.markdowns[0][1] is True
+    assert "Debug summary" in fake_st.markdowns[0][0]
+    assert "Object payload with 5 top-level fields: alpha, beta, gamma, delta, ..." in fake_st.markdowns[0][0]
     assert fake_st.captions == ["Raw payload for inspection."]
     assert fake_st.codes[0][1] == "json"
     assert '"epsilon": 5' in fake_st.codes[0][0]
@@ -155,12 +155,14 @@ def test_render_dossier_summary_renders_compact_fact_rows(monkeypatch) -> None:
     )
 
     assert fake_st.columns_calls == [2]
-    assert fake_st.markdowns and fake_st.markdowns[0][1] is True
+    assert len(fake_st.markdowns) == 2
+    assert fake_st.markdowns[0][1] is True
     html = fake_st.markdowns[0][0]
     assert "Dossier at a glance" in html
     assert "RSI Mean Reversion" in html
     assert "1 blocker" in html
     assert "Validation" in html
+    assert "Review note" in fake_st.markdowns[1][0]
     assert fake_st.writes == [
         "**Strategy**: RSI Mean Reversion",
         "**Tradeability**: eligible • active",
@@ -173,9 +175,7 @@ def test_render_dossier_summary_renders_compact_fact_rows(monkeypatch) -> None:
         "Blockers: Missing validation",
         "Validation errors: Beta mismatch",
     ]
-    assert fake_st.captions == [
-        "Read the summary above, then inspect the raw dossier JSON below."
-    ]
+    assert fake_st.captions == []
 
 
 def test_render_dossier_summary_falls_back_without_markdown(monkeypatch) -> None:
@@ -215,9 +215,10 @@ def test_render_dossier_summary_falls_back_without_markdown(monkeypatch) -> None
     )
 
     assert fake_st.writes[0] == "RSI Mean Reversion • blocked • 1 blocker"
-    assert fake_st.captions == [
+    assert fake_st.writes[-1] == (
         "Read the summary above, then inspect the raw dossier JSON below."
-    ]
+    )
+    assert fake_st.captions == []
     assert fake_st.warning_messages == [
         "Blockers: Missing validation",
         "Validation errors: Beta mismatch",
@@ -324,7 +325,11 @@ def test_render_evidence_table_renders_inside_a_bordered_container(
 
     assert fake_st.container_calls == [True]
     assert fake_st.subheaders == ["Signal snapshot"]
-    assert fake_st.captions == ["2 records"]
+    assert fake_st.markdowns and fake_st.markdowns[0][1] is True
+    assert "Evidence table" in fake_st.markdowns[0][0]
+    assert "2 records ready for review." in fake_st.markdowns[0][0]
+    assert "Columns: signal, value" in fake_st.markdowns[0][0]
+    assert fake_st.captions == []
     assert fake_st.dataframes[0].to_dict(orient="records") == [
         {"signal": "rsi", "value": 22.5},
         {"signal": "close", "value": 110.0},
@@ -343,5 +348,7 @@ def test_render_evidence_table_shows_empty_state_in_a_bordered_container(
 
     assert fake_st.container_calls == [True]
     assert fake_st.subheaders == ["Signal snapshot"]
-    assert fake_st.captions == ["No records captured yet."]
+    assert fake_st.markdowns and fake_st.markdowns[0][1] is True
+    assert "No records captured yet." in fake_st.markdowns[0][0]
+    assert fake_st.captions == []
     assert fake_st.dataframes == []

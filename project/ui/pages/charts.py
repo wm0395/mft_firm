@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta, timezone
 
 from project.ui._streamlit import get_streamlit
+from project.ui.components.empty_state import render_empty_state
+from project.ui.components.page_hero import render_page_hero
 from project.ui.components.trading_view_chart import trading_view_chart
 from project.ui.state import set_selected_asset
 
@@ -17,7 +19,17 @@ def render(repository) -> None:
 
     assets = _load_assets(repository)
     if not assets:
-        st.info("No assets available.")
+        render_empty_state(
+            st,
+            "No assets available.",
+            "Add assets before opening the chart view.",
+            "The chart cannot render until the asset universe is populated.",
+            (
+                ("Assets", "0 registered", "warning"),
+                ("Chart", "Unavailable", "warning"),
+                ("Next step", "Load universe", "action"),
+            ),
+        )
         return
 
     symbols = [a.symbol for a in assets]
@@ -28,6 +40,16 @@ def render(repository) -> None:
         set_selected_asset(st.session_state, selected)
 
     start_date, end_date, window_label = _get_date_range(range_label)
+    render_page_hero(
+        f"Inspect {_format_asset(selected, asset_map)} at a glance.",
+        "Chart, metrics, and raw data stay synchronized to the same filters.",
+        context=(
+            ("Asset", selected),
+            ("Range", range_label),
+            ("Window", window_label),
+            ("Universe", len(assets)),
+        ),
+    )
 
     st.markdown("<hr class='ui-divider'>", unsafe_allow_html=True)
 
@@ -232,8 +254,16 @@ def _render_raw_data(st, data) -> None:
 
 
 def _render_empty(st, selected, window_label) -> None:
-    st.info(
-        f"No market data for **{selected}** in the selected range ({window_label})."
+    render_empty_state(
+        st,
+        f"No market data for {selected}.",
+        f"The selected range ({window_label}) returned no rows.",
+        "Widen the date window or verify that market data has been loaded.",
+        (
+            ("Asset", selected, "warning"),
+            ("Range", window_label, "ok"),
+            ("Next step", "Load data", "action"),
+        ),
     )
     with st.expander("Troubleshooting", expanded=False):
         st.markdown(

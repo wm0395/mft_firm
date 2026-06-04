@@ -27,20 +27,30 @@ def test_render_snapshot_form_prefills_guided_controls_and_creates_snapshot(
     )
     captured: dict[str, object] = {}
     original_create_snapshot = data_page.create_snapshot
+    original_render_snapshot_result = data_page.render_snapshot_result
 
     try:
         data_page.create_snapshot = _fake_create_snapshot(captured)  # type: ignore[assignment]
+        data_page.render_snapshot_result = lambda _st, result: captured.setdefault(
+            "snapshot_result", result
+        )  # type: ignore[assignment]
         data_page._render_snapshot_form(fake_st, repository, view)
     finally:
         data_page.create_snapshot = original_create_snapshot  # type: ignore[assignment]
+        data_page.render_snapshot_result = original_render_snapshot_result  # type: ignore[assignment]
         repository.close()
 
     assert view.default_snapshot.data_start == "2026-05-01"
     assert view.default_snapshot.data_end == "2026-05-03"
     assert view.workflow_next_command == "create-dataset-snapshot"
-    assert fake_st.info_messages == [
-        "Mission Control recommends creating a dataset snapshot."
-    ]
+    guidance_html = next(
+        html
+        for html, unsafe in fake_st.markdowns
+        if "Mission Control recommends creating a dataset snapshot." in html
+    )
+    assert "Confirm inputs" in guidance_html
+    assert "Prepare a reproducible cut" in guidance_html
+    assert fake_st.info_messages == []
     assert captured["args"] == (
         repository,
         "Operator Snapshot",
@@ -51,6 +61,7 @@ def test_render_snapshot_form_prefills_guided_controls_and_creates_snapshot(
         "1d",
         "Created from the MFT Operator Cockpit",
     )
+    assert captured["snapshot_result"].dataset_snapshot_id == "dataset_snapshot:test"
     assert fake_st.error_messages == []
     assert fake_st.success_messages == ["Created snapshot dataset_snapshot:test"]
 
@@ -160,6 +171,7 @@ class _FakeDataStreamlit:
         self.data_end = data_end
         self.submit = submit
         self.info_messages: list[str] = []
+        self.markdowns: list[tuple[str, bool]] = []
         self.error_messages: list[str] = []
         self.success_messages: list[str] = []
         self.button_disabled = False
@@ -172,6 +184,9 @@ class _FakeDataStreamlit:
 
     def info(self, message: str) -> None:
         self.info_messages.append(message)
+
+    def markdown(self, text: str, unsafe_allow_html: bool = False) -> None:
+        self.markdowns.append((text, unsafe_allow_html))
 
     def multiselect(self, *_args, **_kwargs) -> tuple[str, ...]:
         return self.selected_symbols

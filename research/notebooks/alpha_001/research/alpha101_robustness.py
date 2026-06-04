@@ -8,29 +8,54 @@ from typing import cast
 import numpy as np
 import pandas as pd  # type: ignore[import-untyped]
 
-import research.alpha101_formulas as formula_module
-from research.alpha101_engine import (
-    ALPHA101_ARTIFACT_DIR,
-    Alpha101Panel,
-    backtest_weights,
-    causal_orient,
-    clean,
-    fast_rank_ic_by_date,
-    forward_return,
-    load_panel,
-    next_session_return,
-    performance_metrics,
-)
-from research.alpha101_factory import (
-    COST_GRID,
-    PRIMARY_HORIZON,
-    advanced_transform_signal,
-    build_portfolio_weights,
-    compatible_portfolios,
-    panel_masks,
-    portfolio_signal_transforms,
-)
-from research.alpha101_formulas import FORMULA_REGISTRY, compute_alpha, registry_frame
+if __package__:
+    from . import alpha101_formulas as formula_module  # noqa: E402
+    from .alpha101_engine import (  # noqa: E402
+        ALPHA101_ARTIFACT_DIR,
+        Alpha101Panel,
+        backtest_weights,
+        causal_orient,
+        clean,
+        fast_rank_ic_by_date,
+        forward_return,
+        load_panel,
+        next_session_return,
+        performance_metrics,
+    )
+    from .alpha101_factory import (  # noqa: E402
+        COST_GRID,
+        PRIMARY_HORIZON,
+        advanced_transform_signal,
+        build_portfolio_weights,
+        compatible_portfolios,
+        panel_masks,
+        portfolio_signal_transforms,
+    )
+    from .alpha101_formulas import FORMULA_REGISTRY, compute_alpha, registry_frame  # noqa: E402
+else:  # pragma: no cover
+    import alpha101_formulas as formula_module  # noqa: E402
+    from alpha101_engine import (  # noqa: E402
+        ALPHA101_ARTIFACT_DIR,
+        Alpha101Panel,
+        backtest_weights,
+        causal_orient,
+        clean,
+        fast_rank_ic_by_date,
+        forward_return,
+        load_panel,
+        next_session_return,
+        performance_metrics,
+    )
+    from alpha101_factory import (  # noqa: E402
+        COST_GRID,
+        PRIMARY_HORIZON,
+        advanced_transform_signal,
+        build_portfolio_weights,
+        compatible_portfolios,
+        panel_masks,
+        portfolio_signal_transforms,
+    )
+    from alpha101_formulas import FORMULA_REGISTRY, compute_alpha, registry_frame  # noqa: E402
 
 
 ROBUSTNESS_DIR = ALPHA101_ARTIFACT_DIR

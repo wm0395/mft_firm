@@ -121,7 +121,24 @@ def _quality_report(
 ):
     if not assets:
         return None
-    return build_data_quality_report(repository, tuple(asset.symbol for asset in assets))
+    symbols = tuple(asset.symbol for asset in assets)
+    return build_data_quality_report(
+        repository,
+        symbols,
+        as_of=_quality_as_of(repository, symbols),
+    )
+
+
+def _quality_as_of(repository: DataRepository, symbols: tuple[str, ...]) -> datetime:
+    latest_timestamp: datetime | None = None
+    for symbol in symbols:
+        rows = repository.get_market_data(symbol, None, None)
+        if not rows:
+            continue
+        row_timestamp = rows[-1][0]
+        if latest_timestamp is None or row_timestamp > latest_timestamp:
+            latest_timestamp = row_timestamp
+    return latest_timestamp or datetime.now(UTC)
 
 
 def _quality_rows(report) -> tuple[QualityRowView, ...]:

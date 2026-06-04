@@ -4,6 +4,7 @@ from project.ui._streamlit import get_streamlit
 from project.ui.components.dossier_summary import render_dossier_summary
 from project.ui.components.evidence_table import render_evidence_table
 from project.ui.components.launch_preview import launch_hero_context
+from project.ui.components.launch_requirements import render_launch_requirements
 from project.ui.components.launch_preview import render_launch_preview
 from project.ui.components.json_debug import render_json_debug
 from project.ui.components.page_hero import render_page_hero
@@ -104,10 +105,7 @@ def _render_launch_panel(st, repository, view) -> None:
         st.subheader("Guided research run")
         render_status_cards(_launch_cards(launch))
         if not (launch.assets and launch.snapshots and launch.hypotheses):
-            st.info(
-                "Add an asset, dataset snapshot, and actionable hypothesis to "
-                "launch research."
-            )
+            render_launch_requirements(st, launch)
             return
         (
             asset_symbol,
@@ -221,20 +219,22 @@ def _launch_preview_block(
     include_testing: bool,
     include_draft: bool,
 ) -> None:
-    st.code(
-        _launch_preview(
-            hypothesis_id,
-            asset_symbol,
-            snapshot_id,
-            start_date,
-            end_date,
-        ),
-        language="bash",
-    )
-    st.caption(
-        f"Launch flags: include_testing={include_testing}, "
-        f"include_draft={include_draft}"
-    )
+    with st.container(border=True):
+        st.subheader("Launch command")
+        st.code(
+            _launch_preview(
+                hypothesis_id,
+                asset_symbol,
+                snapshot_id,
+                start_date,
+                end_date,
+            ),
+            language="bash",
+        )
+        st.caption(
+            f"Launch flags: include_testing={include_testing}, "
+            f"include_draft={include_draft}"
+        )
 
 
 def _render_launch_preview(
@@ -331,7 +331,7 @@ def _render_dossier(st, dossier) -> None:
     with st.container(border=True):
         st.subheader("Canonical Strategy Dossier")
         if dossier is None:
-            _surface_notice(st, "No strategy dossier is available yet.")
+            st.caption("No strategy dossier is available yet.")
             return
         render_dossier_summary(st, dossier)
         render_json_debug("Canonical Strategy Dossier", dossier)
@@ -339,22 +339,8 @@ def _render_dossier(st, dossier) -> None:
 
 def _render_table_section(st, title: str, note: str, rows) -> None:
     with st.container(border=True):
-        _surface_notice(st, note)
+        st.caption(note)
         render_evidence_table(title, rows)
-
-
-def _surface_notice(st, text: str) -> None:
-    info_fn = getattr(st, "info", None)
-    if callable(info_fn):
-        info_fn(text)
-        return
-    write_fn = getattr(st, "write", None)
-    if callable(write_fn):
-        write_fn(text)
-        return
-    caption_fn = getattr(st, "caption", None)
-    if callable(caption_fn):
-        caption_fn(text)
 
 
 def _launch_cards(launch) -> tuple[StatusCardView, ...]:

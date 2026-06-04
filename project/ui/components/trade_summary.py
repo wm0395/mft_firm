@@ -8,13 +8,20 @@ def render_trade_summary(st, detail) -> None:
     if callable(markdown_fn):
         markdown_fn(_summary_html(detail), unsafe_allow_html=True)
         return
-    st.subheader(f"Trade idea: {detail.asset_symbol} {detail.direction}")
-    st.caption(
-        f"Confidence {detail.confidence:.2f} • {detail.hypothesis_status} hypothesis"
+    st.subheader("Trade summary")
+    _surface_text(
+        st,
+        f"Trade idea: {detail.asset_symbol} {detail.direction}",
     )
-    st.write(f"Hypothesis: {detail.hypothesis_name}")
-    st.write(f"System recommendation: {detail.recommended_action}")
-    st.caption(f"Reason: {detail.recommended_reason}")
+    _surface_text(
+        st,
+        f"Confidence: {detail.confidence:.2f} • {detail.hypothesis_status} hypothesis",
+    )
+    _surface_text(st, f"Hypothesis: {detail.hypothesis_name}")
+    _surface_text(st, f"System recommendation: {detail.recommended_action}")
+    _surface_text(st, f"Reason: {detail.recommended_reason}")
+    _surface_text(st, f"Decisions: {_decision_history_text(detail)}")
+    _surface_text(st, f"Outcome: {detail.approval_outcome.state.title()}")
 
 
 def _summary_html(detail) -> str:
@@ -98,3 +105,13 @@ def _tone_color(tone: str) -> str:
     if tone == "warning":
         return "#b45309"
     return "#4f46e5"
+
+
+def _surface_text(st, text: str) -> None:
+    write_fn = getattr(st, "write", None)
+    if callable(write_fn):
+        write_fn(text)
+        return
+    caption_fn = getattr(st, "caption", None)
+    if callable(caption_fn):
+        caption_fn(text)

@@ -13,23 +13,42 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research.alpha101_engine import (  # type: ignore[import-not-found]  # noqa: E402
-    ANNUALIZATION,
-    Alpha101Panel,
-    backtest_weights,
-    causal_orient,
-    forward_return,
-    load_panel,
-    next_session_return,
-    performance_metrics,
-)
-from research.alpha101_factory import (  # type: ignore[import-not-found]  # noqa: E402
-    PRIMARY_HORIZON,
-    advanced_transform_signal,
-    build_portfolio_weights,
-    panel_masks,
-)
-import research.alpha101_formulas as formula_module  # type: ignore[import-not-found]  # noqa: E402
+if __package__:
+    from .alpha101_engine import (  # type: ignore[import-not-found]  # noqa: E402
+        ANNUALIZATION,
+        Alpha101Panel,
+        backtest_weights,
+        causal_orient,
+        forward_return,
+        load_panel,
+        next_session_return,
+        performance_metrics,
+    )
+    from .alpha101_factory import (  # type: ignore[import-not-found]  # noqa: E402
+        PRIMARY_HORIZON,
+        advanced_transform_signal,
+        build_portfolio_weights,
+        panel_masks,
+    )
+    from . import alpha101_formulas as formula_module  # type: ignore[import-not-found]  # noqa: E402
+else:  # pragma: no cover
+    from alpha101_engine import (  # type: ignore[import-not-found]  # noqa: E402
+        ANNUALIZATION,
+        Alpha101Panel,
+        backtest_weights,
+        causal_orient,
+        forward_return,
+        load_panel,
+        next_session_return,
+        performance_metrics,
+    )
+    from alpha101_factory import (  # type: ignore[import-not-found]  # noqa: E402
+        PRIMARY_HORIZON,
+        advanced_transform_signal,
+        build_portfolio_weights,
+        panel_masks,
+    )
+    import alpha101_formulas as formula_module  # type: ignore[import-not-found]  # noqa: E402
 from project.data.db import DuckDBAccess  # noqa: E402
 from project.data.repository import DataRepository  # noqa: E402
 

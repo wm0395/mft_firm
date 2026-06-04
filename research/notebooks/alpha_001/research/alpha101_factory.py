@@ -8,31 +8,58 @@ from pathlib import Path
 import numpy as np
 import pandas as pd  # type: ignore[import-untyped]
 
-from research.alpha101_engine import (
-    ALPHA101_ARTIFACT_DIR,
-    backtest_weights,
-    causal_orient,
-    centered_rank,
-    clean,
-    equal_weight_targets,
-    fast_rank_ic_by_date,
-    forward_return,
-    indneutralize,
-    load_panel,
-    next_session_return,
-    operator_validation,
-    overlay_weights,
-    performance_metrics,
-    row_zscore,
-    score_tilt_weights,
-    top_bucket_weights,
-    long_short_weights,
-    weekly_rebalance_mask,
-    carry_on_rebalance,
-    winsorized_zscore,
-)
-from research.alpha101_formulas import FORMULA_REGISTRY, compute_alpha, registry_frame
-from research.alpha101_portfolio_cache import average_names, backtests_by_cost, portfolio_row_from_backtests
+if __package__:
+    from .alpha101_engine import (  # noqa: E402
+        ALPHA101_ARTIFACT_DIR,
+        backtest_weights,
+        causal_orient,
+        centered_rank,
+        clean,
+        equal_weight_targets,
+        fast_rank_ic_by_date,
+        forward_return,
+        indneutralize,
+        load_panel,
+        next_session_return,
+        operator_validation,
+        overlay_weights,
+        performance_metrics,
+        row_zscore,
+        score_tilt_weights,
+        top_bucket_weights,
+        long_short_weights,
+        weekly_rebalance_mask,
+        carry_on_rebalance,
+        winsorized_zscore,
+    )
+    from .alpha101_formulas import FORMULA_REGISTRY, compute_alpha, registry_frame  # noqa: E402
+    from .alpha101_portfolio_cache import average_names, backtests_by_cost, portfolio_row_from_backtests  # noqa: E402
+else:  # pragma: no cover
+    from alpha101_engine import (  # noqa: E402
+        ALPHA101_ARTIFACT_DIR,
+        backtest_weights,
+        causal_orient,
+        centered_rank,
+        clean,
+        equal_weight_targets,
+        fast_rank_ic_by_date,
+        forward_return,
+        indneutralize,
+        load_panel,
+        next_session_return,
+        operator_validation,
+        overlay_weights,
+        performance_metrics,
+        row_zscore,
+        score_tilt_weights,
+        top_bucket_weights,
+        long_short_weights,
+        weekly_rebalance_mask,
+        carry_on_rebalance,
+        winsorized_zscore,
+    )
+    from alpha101_formulas import FORMULA_REGISTRY, compute_alpha, registry_frame  # noqa: E402
+    from alpha101_portfolio_cache import average_names, backtests_by_cost, portfolio_row_from_backtests  # noqa: E402
 
 
 PANELS = ("nifty500", "expanded")

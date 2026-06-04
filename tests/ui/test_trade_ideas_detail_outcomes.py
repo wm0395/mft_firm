@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ import pytest
 import project.ui.pages.trade_ideas as trade_ideas_page
 from project.common.models import TradeIdea, utc_now_iso
 from project.data.db import DuckDBAccess
+from project.data.models import HypothesisEvaluation
 from project.data.repository import DataRepository
 from project.tracking.positions import open_position
 from project.ui.views import trade_ideas as trade_ideas_views
@@ -44,7 +46,7 @@ def test_trade_ideas_detail_render_shows_positive_approval_outcome_after_submit(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    repository, detail, fake_st, captured_tables = (
+    repository, detail, fake_st, captured_tables, captured_debug = (
         _render_submitted_trade_detail(
             monkeypatch,
             tmp_path,
@@ -60,14 +62,38 @@ def test_trade_ideas_detail_render_shows_positive_approval_outcome_after_submit(
         assert detail.approval_outcome.open_position_status == "open"
         assert detail.approval_outcome.open_position_entry_price == 112.0
         assert captured_tables["Decision history"] == detail.decision_history
-        assert fake_st.info_messages == ["No open trade ideas."]
-        assert fake_st.warning_messages == []
-        assert fake_st.captions[-2:] == ["Approval outcome", "Read-only review record"]
-        assert fake_st.writes[-3:] == [
-            "Approved and an open position exists for this trade.",
-            "Open position status: open",
-            "Entry price: 112.00",
+        assert fake_st.info_messages == []
+        assert fake_st.writes[:6] == [
+            "No open trade ideas.",
+            "The review queue is currently clear.",
+            "Closed reviews stay accessible when selected from session state.",
+            "Queue: 0 open",
+            "Reviewed: Closed reviews remain accessible",
+            "Next step: Keep reviewing history",
         ]
+        assert fake_st.warning_messages == []
+        assert fake_st.captions == []
+        assert fake_st.writes[-11:] == [
+            "Approval outcome",
+            "Approved and an open position exists for this trade.",
+            "Outcome: Approved",
+            "Open position: open",
+            "Entry price: 112.00",
+            "Read-only review record",
+            "This trade has already been recorded and is now read-only.",
+            "Use the summary, signals, and history above to audit the decision.",
+            "Mode: Read only",
+            "Action: No new submission",
+            "Next step: Review the evidence",
+        ]
+        assert captured_debug["Validation status"] == {
+            "is_valid": False,
+            "reasons": ["missing_dataset_snapshot"],
+        }
+        assert captured_debug["Explanation"] == {
+            "hypothesis_id": "hypothesis:demo",
+            "message": "Trade detail fixture",
+        }
         assert repository.get_positions(status="open") == (
             open_position(detail.trade_id, 112.0),
         )
@@ -79,7 +105,7 @@ def test_trade_ideas_detail_render_shows_no_position_warning_after_submit(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    repository, detail, fake_st, captured_tables = (
+    repository, detail, fake_st, captured_tables, captured_debug = (
         _render_submitted_trade_detail(
             monkeypatch,
             tmp_path,
@@ -95,9 +121,36 @@ def test_trade_ideas_detail_render_shows_no_position_warning_after_submit(
         assert detail.approval_outcome.open_position_status is None
         assert detail.approval_outcome.open_position_entry_price is None
         assert captured_tables["Decision history"] == detail.decision_history
-        assert fake_st.info_messages == ["No open trade ideas."]
-        assert fake_st.warning_messages == [detail.approval_outcome.message]
-        assert fake_st.captions[-2:] == ["Approval outcome", "Read-only review record"]
+        assert fake_st.info_messages == []
+        assert fake_st.writes[:6] == [
+            "No open trade ideas.",
+            "The review queue is currently clear.",
+            "Closed reviews stay accessible when selected from session state.",
+            "Queue: 0 open",
+            "Reviewed: Closed reviews remain accessible",
+            "Next step: Keep reviewing history",
+        ]
+        assert fake_st.warning_messages == []
+        assert fake_st.captions == []
+        assert fake_st.writes[-9:] == [
+            "Approval outcome",
+            "Approved, but no open position exists for this trade.",
+            "Outcome: Warning",
+            "Read-only review record",
+            "This trade has already been recorded and is now read-only.",
+            "Use the summary, signals, and history above to audit the decision.",
+            "Mode: Read only",
+            "Action: No new submission",
+            "Next step: Review the evidence",
+        ]
+        assert captured_debug["Validation status"] == {
+            "is_valid": False,
+            "reasons": ["missing_dataset_snapshot"],
+        }
+        assert captured_debug["Explanation"] == {
+            "hypothesis_id": "hypothesis:demo",
+            "message": "Trade detail fixture",
+        }
         assert repository.get_positions(status="open") == ()
     finally:
         repository.close()
@@ -112,10 +165,12 @@ def _render_submitted_trade_detail(
     TradeIdeaDetailView,
     _FakeStreamlit,
     dict[str, tuple[object, ...]],
+    dict[str, object],
 ]:
     repository, trade = _repository_with_trade(tmp_path, signals_snapshot)
     fake_st = _FakeStreamlit()
     captured_tables: dict[str, tuple[object, ...]] = {}
+    captured_debug: dict[str, object] = {}
     submit_trade_decision(
         repository,
         trade.trade_id,
@@ -129,7 +184,9 @@ def _render_submitted_trade_detail(
         lambda title, rows: captured_tables.setdefault(title, rows),
     )
     monkeypatch.setattr(
-        trade_ideas_page, "render_json_debug", lambda *_args, **_kwargs: None
+        trade_ideas_page,
+        "render_json_debug",
+        lambda title, payload: captured_debug.setdefault(title, payload),
     )
     monkeypatch.setattr(
         trade_ideas_page, "render_status_cards", lambda *_args, **_kwargs: None
@@ -139,7 +196,7 @@ def _render_submitted_trade_detail(
     trade_ideas_page.render(repository)
     detail = trade_ideas_views.get_trade_idea_detail_view(repository, trade.trade_id)
     assert detail is not None
-    return repository, detail, fake_st, captured_tables
+    return repository, detail, fake_st, captured_tables, captured_debug
 
 
 def _repository_with_trade(
@@ -161,6 +218,31 @@ def _repository_with_trade(
         timestamp=utc_now_iso(),
     )
     repository.persist_trade_idea(trade)
+    repository.persist_hypothesis_evaluation(
+        HypothesisEvaluation(
+            evaluation_id="evaluation:trade:demo",
+            asset_id=asset.asset_id,
+            hypothesis_id=trade.hypothesis_id,
+            hypothesis_version=1,
+            timestamp=utc_now_iso(),
+            direction="long",
+            confidence=0.72,
+            signals_snapshot_json=json.dumps(signals_snapshot or {"close": 112.0}, sort_keys=True),
+            explanation_json=json.dumps(
+                {
+                    "hypothesis_id": trade.hypothesis_id,
+                    "message": "Trade detail fixture",
+                },
+                sort_keys=True,
+            ),
+            generated_trade_idea=True,
+            validation_result_json=json.dumps(
+                {"is_valid": False, "reasons": ["missing_dataset_snapshot"]},
+                sort_keys=True,
+            ),
+            created_at=utc_now_iso(),
+        )
+    )
     return repository, trade
 
 

@@ -21,7 +21,7 @@ def test_complete_notebook():
     print("2. Adding project root to Python path...")
     if os.getcwd() not in sys.path:
         sys.path.insert(0, os.getcwd())
-    print(f"   ✅ Project root added to Python path")
+    print("   ✅ Project root added to Python path")
     print(f"   ✅ Python path[0]: {sys.path[0]}")
     
     # 3. Verify Imports Work
@@ -67,7 +67,6 @@ def test_complete_notebook():
     # 6. BASIC ANALYSIS
     print("6. Performing basic analysis...")
     try:
-        import pandas as pd
         import numpy as np
         
         # Calculate forward returns for analysis (next day returns)
@@ -110,7 +109,7 @@ def test_complete_notebook():
         
         # Show volatility (annualized)
         annual_factor = np.sqrt(252)
-        print(f"   📊 Annualized volatilities:")
+        print("   📊 Annualized volatilities:")
         print(f"      Alpha #1: {alpha001.std().mean() * annual_factor:.4f}")
         print(f"      Alpha #2: {alpha002.std().mean() * annual_factor:.4f}")
         print(f"      Alpha #101: {alpha101.std().mean() * annual_factor:.4f}")

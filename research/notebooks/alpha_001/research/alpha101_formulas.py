@@ -5,11 +5,18 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd  # type: ignore[import-untyped]
 
-from research.notebooks.alpha_001.research.alpha101_engine import (  # type: ignore[import-untyped]
-    adv, clean, correlation, covariance, decay_linear, delay, delta, indneutralize,
-    product, rank, scale, sma, stddev, ts_argmax, ts_argmin,
-    ts_max, ts_min, ts_rank, ts_sum,
-)
+if __package__:
+    from .alpha101_engine import (  # type: ignore[import-untyped]  # noqa: E402
+        adv, clean, correlation, covariance, decay_linear, delay, delta, indneutralize,
+        product, rank, scale, sma, stddev, ts_argmax, ts_argmin,
+        ts_max, ts_min, ts_rank, ts_sum,
+    )
+else:  # pragma: no cover
+    from alpha101_engine import (  # type: ignore[import-untyped]  # noqa: E402
+        adv, clean, correlation, covariance, decay_linear, delay, delta, indneutralize,
+        product, rank, scale, sma, stddev, ts_argmax, ts_argmin,
+        ts_max, ts_min, ts_rank, ts_sum,
+    )
 
 abs = np.abs
 log = np.log

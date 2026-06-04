@@ -126,7 +126,7 @@ def main() -> None:
     print(f"  raw_market_data now: {new_market:,}  (added {new_market - existing_market:,})")
 
     # --- Step 4: Bulk insert raw_data (close prices) ---
-    print(f"\nIngesting raw_data close prices...")
+    print("\nIngesting raw_data close prices...")
     con.execute("begin")
     try:
         con.execute("""
@@ -158,7 +158,7 @@ def main() -> None:
     total_raw = con.execute("SELECT count(*) FROM raw_data").fetchone()[0]
     total_assets = con.execute("SELECT count(*) FROM assets").fetchone()[0]
     print(f"\n{'='*50}")
-    print(f"Final summary:")
+    print("Final summary:")
     print(f"  assets:           {total_assets}")
     print(f"  raw_market_data:  {total_market:,} rows ({symbols_in_db} symbols)")
     print(f"  raw_data:         {total_raw:,} rows")

@@ -1,0 +1,168 @@
+{
+  "catalog_version": 1,
+  "strategy_families": [
+    {
+      "family": "breakout_continuation",
+      "primitives": [
+        "breakout_above",
+        "breakout_below",
+        "donchian_channels",
+        "opening_range_breakout",
+        "bollinger_squeeze",
+        "bollinger_bandwidth",
+        "bollinger_percent_b"
+      ],
+      "market_conditions": [
+        "trend",
+        "expansion",
+        "compression_breakout"
+      ],
+      "failure_modes": [
+        "whipsaw",
+        "failed_breakout",
+        "late_entry"
+      ]
+    },
+    {
+      "family": "trend_following",
+      "primitives": [
+        "parabolic_sar",
+        "chandelier_exit",
+        "supertrend",
+        "keltner_channels",
+        "trix"
+      ],
+      "market_conditions": [
+        "persistent_direction",
+        "volatility_expansion"
+      ],
+      "failure_modes": [
+        "range_chop",
+        "volatility_shock"
+      ]
+    },
+    {
+      "family": "gap_reaction",
+      "primitives": [
+        "gap_up",
+        "gap_down",
+        "opening_gap_metrics",
+        "opening_gap_regime",
+        "gap_pressure"
+      ],
+      "market_conditions": [
+        "news_gap",
+        "open_imbalance"
+      ],
+      "failure_modes": [
+        "gap_fill",
+        "exhaustion",
+        "reversal"
+      ]
+    },
+    {
+      "family": "reversal_exhaustion",
+      "primitives": [
+        "is_bullish_engulfing",
+        "is_bearish_engulfing",
+        "is_doji",
+        "failed_breakout_signal"
+      ],
+      "market_conditions": [
+        "extreme_move",
+        "rejection",
+        "failed_breakout"
+      ],
+      "failure_modes": [
+        "trend_continuation",
+        "thin_liquidity"
+      ]
+    },
+    {
+      "family": "structure_levels",
+      "primitives": [
+        "pivot_points",
+        "support_resistance_levels",
+        "support_resistance_trendlines",
+        "multi_timeframe_confirmation"
+      ],
+      "market_conditions": [
+        "range_reaction",
+        "structure_alignment"
+      ],
+      "failure_modes": [
+        "broken_structure",
+        "regime_shift"
+      ]
+    },
+    {
+      "family": "volume_confirmation",
+      "primitives": [
+        "volume_profile_regime",
+        "relative_volume",
+        "on_balance_volume",
+        "money_flow_index",
+        "price_volume_trend",
+        "accumulation_distribution_line",
+        "chaikin_money_flow",
+        "chaikin_oscillator",
+        "ease_of_movement",
+        "force_index"
+      ],
+      "market_conditions": [
+        "participation",
+        "acceptance",
+        "follow_through"
+      ],
+      "failure_modes": [
+        "hollow_move",
+        "drift_without_sponsorship"
+      ]
+    }
+  ],
+  "regime_filters": [
+    "choppiness_index",
+    "mass_index",
+    "vortex_indicator",
+    "williams_r",
+    "relative_strength_index",
+    "commodity_channel_index",
+    "elder_ray",
+    "ichimoku_cloud"
+  ],
+  "evaluation_protocol": {
+    "timeframe": "1d",
+    "splits": [
+      "walk_forward",
+      "purged_time_split",
+      "embargo_time_split",
+      "regime_holdout"
+    ],
+    "cost_stress_bps": [
+      0,
+      5,
+      10,
+      25
+    ],
+    "minimum_trade_count": 20
+  },
+  "metrics": {
+    "primary": [
+      "trade_count",
+      "win_rate",
+      "mean_return_pct",
+      "median_return_pct",
+      "max_drawdown_pct",
+      "sharpe_like_score",
+      "cagr",
+      "turnover"
+    ],
+    "selector": [
+      "precision",
+      "recall",
+      "coverage",
+      "calibration_error",
+      "abstention_rate"
+    ]
+  }
+}

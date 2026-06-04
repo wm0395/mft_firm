@@ -3,7 +3,9 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from project.ui._streamlit import get_streamlit
+from project.ui.components.empty_state import render_empty_state
 from project.ui.components.hypothesis_card import render_hypothesis_card
+from project.ui.components.hypothesis_summary import render_hypothesis_summary
 from project.ui.components.json_debug import render_json_debug
 from project.ui.components.page_hero import render_page_hero
 from project.ui.components.status_card import render_status_cards
@@ -35,10 +37,6 @@ def render(repository) -> None:
             ),
         ),
     )
-    st.caption(
-        "Use the board to compare lifecycle state, then open a card for the "
-        "thesis and blockers."
-    )
     render_status_cards(_cards(view))
     if detail is not None:
         _render_detail_summary(st, detail)
@@ -64,7 +62,7 @@ def _render_board(st, view) -> None:
     columns = st.columns(len(view.columns))
     for column_ui, column in zip(columns, view.columns):
         with column_ui:
-            st.caption(f"{column.status.title()} • {len(column.cards)}")
+            _render_column_header(st, column.status, len(column.cards))
             for card in column.cards:
                 render_hypothesis_card(
                     card,
@@ -75,14 +73,21 @@ def _render_board(st, view) -> None:
 def _render_detail(st, view) -> None:
     detail = view.selected_detail
     if detail is None:
-        st.info("No hypothesis available.")
+        render_empty_state(
+            st,
+            "No hypothesis selected.",
+            "Pick a hypothesis from the board to inspect the thesis and blockers.",
+            "The selected detail panel stays empty until you choose a card.",
+            (
+                ("Board", f"{len(view.columns)} columns", "ok"),
+                ("Selected", "none", "warning"),
+                ("Next step", "Open a card", "action"),
+            ),
+        )
         return
     with st.container(border=True):
         st.subheader(f"Hypothesis: {detail.name}")
-        st.caption(
-            f"{detail.status.upper()} • v{detail.version} • "
-            f"{detail.explainability_level}"
-        )
+        render_hypothesis_summary(st, detail)
         _render_detail_fields(st, detail)
         if detail.blockers:
             warning_fn = getattr(st, "warning", None)
@@ -91,12 +96,8 @@ def _render_detail(st, view) -> None:
                 warning_fn(message)
             else:
                 st.write(message)
-        else:
-            st.caption("No readiness blockers.")
         st.write(f"Latest backtest: {detail.latest_backtest or 'none'}")
         st.write(f"Validation failures: {detail.validation_failures}")
-        if detail.strategy_spec is not None:
-            st.caption("Strategy specification present")
 
 
 def _render_detail_summary(st, detail) -> None:
@@ -164,6 +165,40 @@ def _detail_field_groups(
 ) -> tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]:
     midpoint = (len(fields) + 1) // 2
     return fields[:midpoint], fields[midpoint:]
+
+
+def _render_column_header(st, status: str, count: int) -> None:
+    markdown_fn = getattr(st, "markdown", None)
+    if callable(markdown_fn):
+        markdown_fn(
+            _column_header_html(status, count),
+            unsafe_allow_html=True,
+        )
+        return
+    st.write("Lifecycle column")
+    st.write(status.title())
+    st.write(_hypothesis_count_text(count))
+
+
+def _column_header_html(status: str, count: int) -> str:
+    return "".join(
+        [
+            "<section style='margin:0 0 0.65rem;padding:0.7rem 0.8rem;"
+            "border:1px solid #e2e8f0;border-radius:12px;"
+            "background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);'>",
+            "<div style='color:#64748b;font-size:0.62rem;font-weight:700;"
+            "letter-spacing:0.12em;text-transform:uppercase;'>Lifecycle column</div>",
+            f"<div style='color:#0f172a;font-size:0.9rem;font-weight:700;"
+            f"line-height:1.35;margin-top:0.2rem;'>{status.title()}</div>",
+            f"<div style='color:#475569;font-size:0.78rem;line-height:1.45;margin-top:0.1rem;'>"
+            f"{_hypothesis_count_text(count)}</div>",
+            "</section>",
+        ]
+    )
+
+
+def _hypothesis_count_text(count: int) -> str:
+    return f"{count} hypothesis" if count == 1 else f"{count} hypotheses"
 
 
 def _select_hypothesis(st, hypothesis_id: str) -> None:

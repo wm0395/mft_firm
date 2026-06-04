@@ -48,18 +48,17 @@ def render_launch_preview(
             unsafe_allow_html=True,
         )
     else:
-        st.info(
-            _preview_text(
-                launch,
-                asset_symbol,
-                snapshot_id,
-                hypothesis_id,
-                start_date,
-                end_date,
-                include_testing,
-                include_draft,
-            )
-        )
+        for line in _preview_lines(
+            launch,
+            asset_symbol,
+            snapshot_id,
+            hypothesis_id,
+            start_date,
+            end_date,
+            include_testing,
+            include_draft,
+        ):
+            _surface_text(st, line)
     render_status_cards_fn(
         _preview_cards(
             launch,
@@ -84,8 +83,7 @@ def _preview_html(
     include_testing: bool,
     include_draft: bool,
 ) -> str:
-    hypothesis = _selected_hypothesis(launch, hypothesis_id)
-    hypothesis_name = str(getattr(hypothesis, "name", None) or hypothesis_id or "n/a")
+    hypothesis_name = _hypothesis_name(launch, hypothesis_id)
     rows = [
         "<section style='margin:0.9rem 0 1rem;padding:1rem 1.1rem;border:1px solid "
         "#e2e8f0;border-radius:14px;background:linear-gradient(180deg,#ffffff 0%,"
@@ -106,6 +104,9 @@ def _preview_html(
         _chip_html("Window", f"{start_date} -> {end_date}", "primary"),
         _chip_html("Policy", _flag_text(include_testing, include_draft), _policy_tone(include_testing, include_draft)),
         "</div></section>",
+        "<div style='margin-top:0.75rem;color:#475569;font-size:0.84rem;"
+        "line-height:1.55;'>Review the exact command block below before submitting."
+        "</div>",
     ]
     return "".join(rows)
 
@@ -120,13 +121,47 @@ def _preview_text(
     include_testing: bool,
     include_draft: bool,
 ) -> str:
-    hypothesis = _selected_hypothesis(launch, hypothesis_id)
-    hypothesis_name = str(getattr(hypothesis, "name", None) or hypothesis_id or "n/a")
+    hypothesis_name = _hypothesis_name(launch, hypothesis_id)
     return (
         f"Ready to launch {hypothesis_name} on {asset_symbol} "
         f"with {snapshot_id} from {start_date} to {end_date}. "
         f"{_flag_text(include_testing, include_draft)}"
     )
+
+
+def _preview_lines(
+    launch,
+    asset_symbol: str,
+    snapshot_id: str,
+    hypothesis_id: str,
+    start_date: str,
+    end_date: str,
+    include_testing: bool,
+    include_draft: bool,
+) -> tuple[str, ...]:
+    hypothesis_name = _hypothesis_name(launch, hypothesis_id)
+    return (
+        _preview_text(
+            launch,
+            asset_symbol,
+            snapshot_id,
+            hypothesis_id,
+            start_date,
+            end_date,
+            include_testing,
+            include_draft,
+        ),
+        _preview_guidance(),
+        f"Asset: {asset_symbol}",
+        f"Snapshot: {snapshot_id}",
+        f"Hypothesis: {hypothesis_name}",
+        f"Window: {start_date} -> {end_date}",
+        f"Policy: {_flag_text(include_testing, include_draft)}",
+    )
+
+
+def _preview_guidance() -> str:
+    return "Review the exact command block below before submitting."
 
 
 def _preview_cards(
@@ -167,6 +202,11 @@ def _selected_hypothesis(view, hypothesis_id: str) -> object | None:
     return None
 
 
+def _hypothesis_name(launch, hypothesis_id: str) -> str:
+    hypothesis = _selected_hypothesis(launch, hypothesis_id)
+    return str(getattr(hypothesis, "name", None) or hypothesis_id or "n/a")
+
+
 def _flag_text(include_testing: bool, include_draft: bool) -> str:
     if include_testing and include_draft:
         return "Includes testing and draft hypotheses"
@@ -202,3 +242,13 @@ def _tone_color(tone: str) -> str:
     if tone == "warning":
         return "#b45309"
     return "#4f46e5"
+
+
+def _surface_text(st, text: str) -> None:
+    write_fn = getattr(st, "write", None)
+    if callable(write_fn):
+        write_fn(text)
+        return
+    caption_fn = getattr(st, "caption", None)
+    if callable(caption_fn):
+        caption_fn(text)

@@ -8,12 +8,20 @@ NOTEBOOK_ROOT = Path(__file__).resolve().parents[1]
 if str(NOTEBOOK_ROOT) not in sys.path:
     sys.path.insert(0, str(NOTEBOOK_ROOT))
 
-from research.rebuild_alpha101_sources import rebuild_alpha101_sources  # noqa: E402
-from research.alpha101_factory import run_alpha101_factory  # noqa: E402
-from research.alpha101_robustness import run_alpha101_robustness_batch2  # noqa: E402
-from research.alpha101_robustness_batch_runner import run_alpha101_robustness_batches  # noqa: E402
-from research.alpha101_closed_loop import write_closed_loop_summary  # noqa: E402
-from research.alpha101_tradeability import write_tradeability_metrics  # noqa: E402
+if __package__:
+    from .rebuild_alpha101_sources import rebuild_alpha101_sources  # noqa: E402
+    from .alpha101_factory import run_alpha101_factory  # noqa: E402
+    from .alpha101_robustness import run_alpha101_robustness_batch2  # noqa: E402
+    from .alpha101_robustness_batch_runner import run_alpha101_robustness_batches  # noqa: E402
+    from .alpha101_closed_loop import write_closed_loop_summary  # noqa: E402
+    from .alpha101_tradeability import write_tradeability_metrics  # noqa: E402
+else:  # pragma: no cover
+    from research.rebuild_alpha101_sources import rebuild_alpha101_sources  # noqa: E402
+    from research.alpha101_factory import run_alpha101_factory  # noqa: E402
+    from research.alpha101_robustness import run_alpha101_robustness_batch2  # noqa: E402
+    from research.alpha101_robustness_batch_runner import run_alpha101_robustness_batches  # noqa: E402
+    from research.alpha101_closed_loop import write_closed_loop_summary  # noqa: E402
+    from research.alpha101_tradeability import write_tradeability_metrics  # noqa: E402
 
 
 def rebuild_alpha101(refresh: bool = True) -> None:

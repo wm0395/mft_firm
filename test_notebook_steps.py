@@ -75,7 +75,7 @@ def test_notebook_steps():
         print(f"   ✓ Alpha #1 std: {alpha001.std().std():.6f}")
         
         # Show a sample of recent data
-        print(f"   ✓ Recent Alpha #1 values (last 3 days):")
+        print("   ✓ Recent Alpha #1 values (last 3 days):")
         recent_vals = alpha001.tail(3).mean(axis=1)
         for i, val in enumerate(recent_vals):
             print(f"     Day {-len(recent_vals)+i+1}: {val:.6f}")

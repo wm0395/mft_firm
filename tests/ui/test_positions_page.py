@@ -111,11 +111,20 @@ def test_positions_page_render_shows_empty_state_for_empty_repository(
     fake_st = _FakeStreamlit()
     captured: dict[str, object] = {}
     try:
+        monkeypatch.setattr(
+            positions_page,
+            "render_empty_state",
+            lambda *args: captured.setdefault("empty", args),
+        )
         _render_positions_page(monkeypatch, repository, fake_st, captured)
         view = cast(PositionsPageView, captured["view"])
 
         assert fake_st.titles == ["Positions"]
-        assert fake_st.infos == ["No positions match the current filter."]
+        _, title, summary, note, chips = captured["empty"]
+        assert title == "No positions match the current filter."
+        assert "table empty" in summary
+        assert "approve a trade idea" in note.lower()
+        assert chips[0] == ("Filter", "all", "warning")
         assert fake_st.writes == []
         assert _card_values(cast(tuple[StatusCardView, ...], captured["cards"])) == (
             ("Positions", "0"),
@@ -158,6 +167,31 @@ def test_positions_page_render_shows_detail_and_rows_for_closed_position(
         assert fake_st.writes == _summary_writes(detail) + _detail_writes(detail)
         assert rows == [_table_row(detail)]
         assert fake_st.json_payloads == [{"rsi_14": 22.5}]
+    finally:
+        repository.close()
+
+
+def test_positions_page_render_uses_filter_hint_card(monkeypatch, tmp_path: Path) -> None:
+    class _MarkdownStreamlit(_FakeStreamlit):
+        def __init__(self) -> None:
+            super().__init__()
+            self.markdowns: list[tuple[str, bool]] = []
+
+        def markdown(self, text: str, unsafe_allow_html: bool = False) -> None:
+            self.markdowns.append((text, unsafe_allow_html))
+
+    repository, _ = _seed_positions_repository(tmp_path)
+    fake_st = _MarkdownStreamlit()
+    captured: dict[str, object] = {}
+    try:
+        _render_positions_page(monkeypatch, repository, fake_st, captured)
+
+        hint_html = next(
+            html for html, unsafe in fake_st.markdowns if "Position filter" in html
+        )
+        assert "Use the status filter to narrow the table." in hint_html
+        assert "Current filter" in hint_html
+        assert "Open a position" in hint_html
     finally:
         repository.close()
 

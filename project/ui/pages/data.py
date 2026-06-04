@@ -4,9 +4,11 @@ import html
 from datetime import date
 
 from project.ui._streamlit import get_streamlit
+from project.ui.components.empty_state import render_empty_state
 from project.ui.components.evidence_table import render_evidence_table
 from project.ui.components.json_debug import render_json_debug
 from project.ui.components.page_hero import render_page_hero
+from project.ui.components.snapshot_result import render_snapshot_result
 from project.ui.components.status_card import render_status_cards
 from project.ui.components.workflow_stepper import render_workflow_stepper
 from project.ui.views.common import StatusCardView, WorkflowStepView
@@ -124,7 +126,17 @@ def _render_snapshot_form(st, repository, view) -> None:
         )
         _surface_caption(st, "Review the draft values before creating the snapshot.")
         if view.workflow_next_command == "create-dataset-snapshot":
-            st.info("Mission Control recommends creating a dataset snapshot.")
+            render_empty_state(
+                st,
+                "Mission Control recommends creating a dataset snapshot.",
+                "Prepare a reproducible cut of the current universe before launching research.",
+                "Review the draft values below, then create the snapshot when the inputs look right.",
+                (
+                    ("Next step", "Confirm inputs", "action"),
+                    ("Assets", f"{len(view.assets)} available", "ok"),
+                    ("Snapshots", f"{len(view.snapshots)} existing", "warning"),
+                ),
+            )
         symbol_labels = {asset.symbol: asset.name for asset in view.assets}
         symbols = st.multiselect(
             "Assets",
@@ -178,7 +190,7 @@ def _render_snapshot_form(st, repository, view) -> None:
                 st.error(str(error))
             else:
                 st.success(f"Created snapshot {result.dataset_snapshot_id}")
-                st.write(result.dataset_snapshot.__dict__)
+                render_snapshot_result(st, result)
 
 
 def _snapshot_errors(

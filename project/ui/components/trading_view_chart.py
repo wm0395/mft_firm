@@ -47,10 +47,40 @@ def _chart_html(bars: tuple[_ChartBar, ...]) -> str:
         [
             "<div style='width:100%;overflow-x:auto;padding:0.5rem 0;'>",
             "<div style='min-width:1120px;'>",
+            _chart_summary_html(bars),
             "<div style='margin-bottom:0.5rem;color:#64748b;font-size:0.78rem;'>",
             "Local OHLCV chart rendered without remote scripts.</div>",
             _chart_svg(bars),
             "</div></div>",
+        ]
+    )
+
+
+def _chart_summary_html(bars: tuple[_ChartBar, ...]) -> str:
+    first = bars[0]
+    last = bars[-1]
+    change = last.close - first.close
+    change_pct = (change / first.close * 100) if first.close else 0.0
+    avg_volume = sum(bar.volume for bar in bars) / len(bars)
+    period = first.label if len(bars) == 1 else f"{first.label} → {last.label}"
+    tone = "ok" if change >= 0 else "warning"
+    return "".join(
+        [
+            "<section style='margin:0.15rem 0 0.75rem;padding:0.95rem 1rem;"
+            "border:1px solid #e2e8f0;border-radius:14px;background:linear-gradient("
+            "180deg,#ffffff 0%,#f8fafc 100%);box-shadow:0 6px 18px "
+            "rgba(15,23,42,0.05);'>",
+            "<div style='color:#64748b;font-size:0.68rem;font-weight:700;"
+            "letter-spacing:0.14em;text-transform:uppercase;margin-bottom:0.25rem;'>"
+            "Chart snapshot</div>",
+            f"<div style='color:#0f172a;font-size:1rem;font-weight:700;line-height:1.3;'>"
+            f"{escape(period)}</div>",
+            "<div style='display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.75rem;'>",
+            _chart_chip("Last close", f"{last.close:.2f}", tone),
+            _chart_chip("Change", f"{change:+.2f} ({change_pct:+.2f}%)", tone),
+            _chart_chip("Avg volume", f"{avg_volume:,.0f}", "action"),
+            _chart_chip("Legend", "Green up / red down", "primary"),
+            "</div></section>",
         ]
     )
 
@@ -241,7 +271,35 @@ def _scale(
 
 def _empty_chart_html() -> str:
     return (
-        "<div style='padding:1rem 1.1rem;color:#64748b;"
-        "border:1px dashed #cbd5e1;border-radius:12px;'>"
+        "<div style='padding:1rem 1.1rem;border:1px dashed #cbd5e1;"
+        "border-radius:12px;background:#f8fafc;color:#475569;'>"
+        "<div style='font-weight:700;color:#0f172a;margin-bottom:0.25rem;'>"
         "No OHLCV data available.</div>"
+        "<div style='font-size:0.88rem;line-height:1.5;'>"
+        "Load market data or widen the selected range to render the chart.</div>"
+        "</div>"
     )
+
+
+def _chart_chip(label: str, value: str, tone: str) -> str:
+    return "".join(
+        [
+            "<div style='display:flex;flex-direction:column;gap:0.1rem;padding:0.55rem "
+            "0.7rem;border-radius:12px;background:#ffffff;border:1px solid #e2e8f0;"
+            "min-width:120px;'>",
+            f"<div style='color:#64748b;font-size:0.62rem;font-weight:700;"
+            f"letter-spacing:0.12em;text-transform:uppercase;'>{escape(label)}</div>",
+            f"<div style='color:{_chart_tone_color(tone)};font-size:0.84rem;"
+            f"font-weight:700;line-height:1.35;word-break:break-word;'>"
+            f"{escape(value)}</div>",
+            "</div>",
+        ]
+    )
+
+
+def _chart_tone_color(tone: str) -> str:
+    if tone == "ok":
+        return "#15803d"
+    if tone == "warning":
+        return "#b45309"
+    return "#4f46e5"

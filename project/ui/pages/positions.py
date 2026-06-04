@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 
 from project.ui._streamlit import get_streamlit
+from project.ui.components.empty_state import render_empty_state
 from project.ui.components.evidence_table import render_evidence_table
 from project.ui.components.json_debug import render_json_debug
 from project.ui.components.page_hero import render_page_hero
@@ -28,7 +29,7 @@ def render(repository) -> None:
     render_page_hero(
         f"{len(view.positions)} positions, {view.open_count} open, realized PnL "
         f"{_money(view.realized_pnl)}.",
-        f"Filter: {status_filter}",
+        "Open a position to inspect its linked trade details.",
         context=(
             ("Total", len(view.positions)),
             ("Open", view.open_count),
@@ -36,12 +37,21 @@ def render(repository) -> None:
             ("PnL", _money(view.realized_pnl)),
         ),
     )
-    st.caption("Use the filter to narrow the list, then pick one position to inspect.")
+    _render_filter_hint(st, status_filter)
     render_status_cards(_cards(view))
     filtered_positions = _filter_positions(view.positions, status_filter)
     if not filtered_positions:
-        st.info("No positions match the current filter.")
-        st.caption("Try a different filter state to surface open or closed positions.")
+        render_empty_state(
+            st,
+            "No positions match the current filter.",
+            "The current status selection leaves the table empty.",
+            "Try a different filter state or approve a trade idea to create the first position.",
+            (
+                ("Filter", status_filter, "warning"),
+                ("Positions", "0 visible", "ok"),
+                ("Next step", "Change filter", "action"),
+            ),
+        )
         render_evidence_table("Positions", ())
         render_json_debug("Raw JSON / Debug", view.debug_payload)
         return
@@ -112,6 +122,59 @@ def _status_filter(st) -> str:
         index=0,
         key="positions_status_filter",
     )
+
+
+def _render_filter_hint(st, status_filter: str) -> None:
+    markdown_fn = getattr(st, "markdown", None)
+    if callable(markdown_fn):
+        markdown_fn(_filter_hint_html(status_filter), unsafe_allow_html=True)
+        return
+    st.caption("Position filter")
+    st.caption(f"Current filter: {status_filter}")
+    st.caption("Use the filter to narrow the list, then pick one position to inspect.")
+
+
+def _filter_hint_html(status_filter: str) -> str:
+    return "".join(
+        [
+            "<section style='margin:0.75rem 0 0.9rem;padding:0.9rem 1rem;"
+            "border:1px solid #e2e8f0;border-radius:14px;"
+            "background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);"
+            "box-shadow:0 6px 18px rgba(15,23,42,0.05);'>",
+            "<div style='color:#64748b;font-size:0.68rem;font-weight:700;"
+            "letter-spacing:0.14em;text-transform:uppercase;margin-bottom:0.25rem;'>"
+            "Position filter</div>",
+            "<div style='color:#0f172a;font-size:0.95rem;font-weight:700;line-height:1.35;'>"
+            "Use the status filter to narrow the table.</div>",
+            "<div style='display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.75rem;'>",
+            _filter_chip_html("Current filter", status_filter, "ok"),
+            _filter_chip_html("Next step", "Open a position", "action"),
+            "</div></section>",
+        ]
+    )
+
+
+def _filter_chip_html(label: str, value: str, tone: str) -> str:
+    return "".join(
+        [
+            "<div style='display:flex;flex-direction:column;gap:0.1rem;padding:0.5rem "
+            "0.7rem;border-radius:12px;background:#ffffff;border:1px solid #e2e8f0;"
+            "min-width:120px;'>",
+            f"<div style='color:#64748b;font-size:0.62rem;font-weight:700;"
+            f"letter-spacing:0.12em;text-transform:uppercase;'>{html.escape(label)}</div>",
+            f"<div style='color:{_chip_tone_color(tone)};font-size:0.84rem;font-weight:700;"
+            f"line-height:1.35;word-break:break-word;'>{html.escape(value)}</div>",
+            "</div>",
+        ]
+    )
+
+
+def _chip_tone_color(tone: str) -> str:
+    if tone == "ok":
+        return "#15803d"
+    if tone == "warning":
+        return "#b45309"
+    return "#4f46e5"
 
 
 def _selected_position_id(

@@ -1,0 +1,141 @@
+{
+  "canonical_state_file": "research/projects/ipo_liquidity_pressure/research_state.json",
+  "project_id": "research_project:ipo_liquidity_pressure",
+  "project_status": "draft",
+  "phase": "pilot evidence collection and seed event study",
+  "state_as_of_utc": "2026-06-04T00:00:00Z",
+  "source_of_truth": "research/projects/ipo_liquidity_pressure/README.md",
+  "objective": "Test whether large IPOs temporarily reduce deployable secondary-market liquidity and whether allotment-driven release creates mean reversion.",
+  "summary_artifacts": [
+    "research/projects/ipo_liquidity_pressure/reports/mechanism_and_hypotheses.md",
+    "research/projects/ipo_liquidity_pressure/reports/data_contract.md",
+    "research/projects/ipo_liquidity_pressure/reports/event_design.md",
+    "research/projects/ipo_liquidity_pressure/reports/validation_framework.md",
+    "research/projects/ipo_liquidity_pressure/reports/source_inventory.md",
+    "research/projects/ipo_liquidity_pressure/reports/pilot_evidence.md",
+    "research/projects/ipo_liquidity_pressure/reports/pilot_event_study.md",
+    "research/projects/ipo_liquidity_pressure/reports/pilot_regime_control_panel.md",
+    "research/projects/ipo_liquidity_pressure/data/ipo_events_seed.csv",
+    "research/projects/ipo_liquidity_pressure/data/ipo_event_windows_seed.csv",
+    "research/projects/ipo_liquidity_pressure/data/ipo_pilot_event_study.csv",
+    "research/projects/ipo_liquidity_pressure/data/ipo_pilot_event_study_controls.csv",
+    "research/projects/ipo_liquidity_pressure/data/index_prices.parquet",
+    "research/projects/ipo_liquidity_pressure/data/market_liquidity.parquet",
+    "research/projects/ipo_liquidity_pressure/data/market_history_symbol_coverage.csv",
+    "research/projects/ipo_liquidity_pressure/reports/market_history_expansion.md",
+    "research/projects/ipo_liquidity_pressure/research_loop_report.md",
+    "research/projects/ipo_liquidity_pressure/review_packs/ipo_liquidity_pressure_pack.md"
+  ],
+  "active_refinements": [
+    "ipo_event_dataset",
+    "market_liquidity_baseline",
+    "event_window_generator",
+    "basket_constructor",
+    "pull_release_event_study",
+    "market_regime_controls"
+  ],
+  "current_baseline": {
+    "universe": "nifty500_mainboard",
+    "minimum_required_dates": [
+      "ipo_open_date",
+      "ipo_close_date",
+      "allotment_date",
+      "listing_date"
+    ],
+    "listing_regime_split": "pre_t_plus_3_and_post_t_plus_3"
+  },
+  "initial_tasks": [
+    {
+      "task_id": "seed_pilot_ipo_evidence",
+      "status": "completed",
+      "objective": "Capture a source-backed seed sample from official exchange notices for the first high-pressure mainboard IPOs.",
+      "deliverables": [
+        "data/ipo_events_seed.csv",
+        "reports/source_inventory.md",
+        "reports/pilot_evidence.md"
+      ]
+    },
+    {
+      "task_id": "pilot_event_study_seed_analysis",
+      "status": "completed",
+      "objective": "Run a first peer and basket event study on the source-backed seed sample using local market-history caches.",
+      "deliverables": [
+        "data/ipo_event_windows_seed.csv",
+        "data/ipo_pilot_event_study.csv",
+        "reports/pilot_event_study.md"
+      ]
+    },
+    {
+      "task_id": "build_market_liquidity_panel",
+      "status": "completed",
+      "objective": "Build a point-in-time daily market-liquidity panel from the local price cache and index history.",
+      "deliverables": [
+        "data/index_prices.parquet",
+        "data/market_liquidity.parquet",
+        "data/market_history_symbol_coverage.csv",
+        "reports/market_history_expansion.md"
+      ]
+    },
+    {
+      "task_id": "build_ipo_event_dataset",
+      "status": "planned",
+      "objective": "Assemble the historical IPO event table with the minimum required dates and subscription data.",
+      "deliverable": "ipo_events.csv"
+    },
+    {
+      "task_id": "build_market_datasets",
+      "status": "planned",
+      "objective": "Build the market, index, and stock history needed for event studies.",
+      "deliverables": [
+        "stock_prices.parquet",
+        "index_prices.parquet",
+        "market_liquidity.parquet"
+      ]
+    },
+    {
+      "task_id": "generate_event_windows",
+      "status": "planned",
+      "objective": "Create consistent pre, application, blocking, release, and listing windows for each IPO.",
+      "deliverable": "ipo_event_windows.parquet"
+    },
+    {
+      "task_id": "construct_baskets",
+      "status": "planned",
+      "objective": "Build the broad, retail-sensitive, winner, cash-source, and same-sector baskets.",
+      "deliverable": "ipo_baskets.parquet"
+    },
+    {
+      "task_id": "run_event_study",
+      "status": "planned",
+      "objective": "Measure pull-window and release-window abnormal returns by basket and IPO pressure bucket.",
+      "deliverables": [
+        "ipo_event_study_results.parquet",
+        "ipo_event_study_summary.csv",
+        "ipo_pull_release_classification.csv"
+      ]
+    },
+    {
+      "task_id": "define_trade_rules",
+      "status": "blocked",
+      "objective": "Write any strategy rules only after the mechanism, pull, release, and tradability gates pass.",
+      "deliverable": "ipo_liquidity_strategy_v0.md"
+    }
+  ],
+  "validation_gates": [
+    "Mechanism gate",
+    "Pull gate",
+    "Release gate",
+    "Tradability gate",
+    "Robustness gate"
+  ],
+  "notes": [
+    "ASBA blocking is a deployable-liquidity effect, not a literal stock-to-IPO cash transfer.",
+    "Pull and release should be modeled separately because they may touch different baskets.",
+    "SME IPOs remain excluded from the first pass.",
+    "The first pass should keep lookahead out of subscription and allotment features.",
+    "Pilot source evidence now covers Urban Company, Rubicon Research, Canara Robeco, Canara HSBC Life Insurance, LG Electronics, Medi Assist Healthcare Services, Euro Pratik Sales, Yatra Online, TruAlt Bioenergy, Saatvik Green Energy, Sudeep Pharma, Om Freight Forwarders, Brigade Hotel Ventures, Glottis, Fabtech Technologies, Lenskart Solutions, One 97 Communications, Delhivery, Niva Bupa Health Insurance, Sagility, Ather Energy, Schloss Bangalore, HDB Financial Services, Travel Food Services, Aegis Vopak Terminals, Afcons Infrastructure, NTPC Green Energy, and Vishal Mega Mart through official exchange, issuer, and merchant-banker documents.",
+    "A point-in-time daily market-liquidity panel now exists from the local wide OHLCV cache and the NIFTY/BANKNIFTY/FINNIFTY index history, but direct turnover, delivery, and sector-flow feeds are still missing.",
+    "The pilot regime-control panel keeps the focus windows in the volatile regime bucket and still shows mixed basket behavior.",
+    "The pilot event study remains mixed and does not support a simple monotonic pull-and-release rule."
+  ]
+}

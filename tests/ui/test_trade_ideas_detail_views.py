@@ -65,6 +65,30 @@ def test_trade_ideas_detail_preserves_manual_review_inputs(
     assert fake_st.rerun_calls == 1
 
 
+def test_trade_ideas_detail_renders_decision_preview_card(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured, fake_st, trade_id = _render_trade_detail_case(
+        tmp_path,
+        monkeypatch,
+        auto_review=False,
+        action="watch",
+        reason_label="Market conditions",
+        notes="manual notes",
+        decision_action="watch",
+        decision_reason="market_conditions",
+    )
+
+    preview_html = next(
+        html for html, unsafe in fake_st.markdowns if "Decision preview" in html
+    )
+    assert "Manual override" in preview_html
+    assert "Watch" in preview_html
+    assert "Market conditions" in preview_html
+    assert "manual notes" in preview_html
+    assert captured["args"] == (trade_id, "watch", "market_conditions", "manual notes")
+
+
 def test_create_snapshot_and_trade_decision_mutations(tmp_path: Path) -> None:
     repository, _, trade_id, _ = _seed_repository(tmp_path)
     try:
@@ -295,6 +319,7 @@ class _FakeTradeIdeasStreamlit:
         self.success_messages: list[str] = []
         self.errors: list[str] = []
         self.warning_messages: list[str] = []
+        self.markdowns: list[tuple[str, bool]] = []
         self.rerun_calls = 0
 
     def __getattr__(self, name: str):
@@ -312,6 +337,8 @@ class _FakeTradeIdeasStreamlit:
             return lambda *_args, **_kwargs: True
         if name in {"subheader", "write", "caption", "json"}:
             return lambda *_args, **_kwargs: None
+        if name == "markdown":
+            return self._markdown
         if name == "success":
             return self._success
         if name == "error":
@@ -331,6 +358,9 @@ class _FakeTradeIdeasStreamlit:
         if self.auto_review:
             raise AssertionError("manual reason control should not be shown")
         return self.reason_label
+
+    def _markdown(self, text: str, unsafe_allow_html: bool = False) -> None:
+        self.markdowns.append((text, unsafe_allow_html))
 
     def _success(self, message: str) -> None:
         self.success_messages.append(message)

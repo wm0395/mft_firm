@@ -130,6 +130,75 @@ def test_research_page_launch_requires_explicit_submit(
         assert fake_st.code_calls[0].startswith(
             "mft research run hypothesis:rsi_mean_reversion AAPL --snapshot dataset_snapshot:research:demo"
         )
+        assert fake_st.write_calls[1] == (
+            "Review the exact command block below before submitting."
+        )
+        assert ("subheader", "Launch command") in fake_st.calls
+    finally:
+        repository.close()
+
+
+def test_research_page_launch_shows_requirements_when_inputs_missing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    repository = _repository(tmp_path)
+    fake_st = _FakeStreamlit(submitted=False)
+    captured: dict[str, object] = {}
+    view = SimpleNamespace(
+        projects=(),
+        runs=(),
+        candidates=(),
+        launch=SimpleNamespace(
+            assets=(),
+            snapshots=(),
+            hypotheses=(),
+            workflow_note="Needs inputs",
+            default_asset_symbol="",
+            default_dataset_snapshot_id="",
+            default_hypothesis_id="",
+            default_start_date="2026-05-01",
+            default_end_date="2026-05-05",
+        ),
+        strategy_dossier=None,
+        debug_payload={},
+    )
+
+    monkeypatch.setattr(research_page, "get_streamlit", lambda: fake_st)
+    monkeypatch.setattr(
+        research_page,
+        "get_research_page_view",
+        lambda _repository: view,
+    )
+    monkeypatch.setattr(
+        research_page,
+        "render_status_cards",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        research_page,
+        "render_evidence_table",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        research_page,
+        "render_json_debug",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        research_page,
+        "render_launch_requirements",
+        lambda _st, launch: captured.setdefault("launch", launch),
+    )
+
+    try:
+        research_page.render(repository)
+
+        assert captured["launch"] is view.launch
+        assert (
+            "caption",
+            "Choose the launch inputs, then review the command preview before submitting.",
+        ) not in fake_st.calls
+        assert ("subheader", "Launch command") not in fake_st.calls
     finally:
         repository.close()
 

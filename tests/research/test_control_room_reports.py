@@ -16,6 +16,7 @@ def test_materialize_reports_builds_control_room_artifacts(tmp_path: Path) -> No
     assert (reports_dir / "data_source_status.md").exists()
     assert (reports_dir / "multi_asset_status.md").exists()
     assert (reports_dir / "weekly_review.md").exists()
+    assert len(payloads["research_control_room"]["active_projects"]) == 2
     assert payloads["alpha101_status"]["promoted_total"] == 28
     assert payloads["data_source_status"]["source_count"] == 7
     assert payloads["multi_asset_status"]["project_status"] == "draft"
@@ -29,6 +30,8 @@ def test_materialize_reports_builds_control_room_artifacts(tmp_path: Path) -> No
     multi_asset_markdown = (reports_dir / "multi_asset_status.md").read_text(encoding="utf-8")
     assert "# Research Control Room" in control_room_markdown
     assert "project_id=research_project:alpha101_formulaic_alphas" in control_room_markdown
+    assert "project_id=research_project:ipo_liquidity_pressure" in control_room_markdown
+    assert "pilot evidence collection and seed event study" in control_room_markdown
     assert "alpha_id=alpha024" in control_room_markdown
     assert "vp_research.strict_liquidity_focus_review" in control_room_markdown
     assert "project_phase: alpha101 transfer lane scaffolding" in multi_asset_markdown

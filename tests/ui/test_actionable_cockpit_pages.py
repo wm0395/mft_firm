@@ -126,8 +126,8 @@ def test_mission_control_render_wires_action_context(monkeypatch) -> None:
     monkeypatch.setattr(
         mission_control_page,
         "render_action_panel",
-        lambda title, explanation, button_label, *, key, on_click: captured.update(
-            action_panel=(title, explanation, button_label, key, on_click)
+        lambda title, explanation, button_label, *, key, on_click, **kwargs: captured.update(
+            action_panel=(title, explanation, button_label, key, on_click, kwargs)
         ),
     )
 
@@ -140,7 +140,7 @@ def test_mission_control_render_wires_action_context(monkeypatch) -> None:
         "Latest research run: completed",
     ]
     action_panel = cast(
-        tuple[str, str, str, str, Callable[[], None]],
+        tuple[str, str, str, str, Callable[[], None] | None, dict[str, object]],
         captured["action_panel"],
     )
     assert action_panel[:4] == (
@@ -149,8 +149,12 @@ def test_mission_control_render_wires_action_context(monkeypatch) -> None:
         "Run Research",
         "mission-control-action",
     )
+    assert action_panel[5]["target_page"] == "Research"
+    assert action_panel[5]["disabled"] is False
+    assert action_panel[5]["disabled_reason"] is None
 
     on_click = action_panel[4]
+    assert on_click is not None
     on_click()
 
     assert fake_st.session_state["ui_page"] == "Research"
@@ -197,8 +201,8 @@ def test_mission_control_render_uses_html_summary_when_available(
     monkeypatch.setattr(
         mission_control_page,
         "render_action_panel",
-        lambda title, explanation, button_label, *, key, on_click: captured.update(
-            action_panel=(title, explanation, button_label, key, on_click)
+        lambda title, explanation, button_label, *, key, on_click, **kwargs: captured.update(
+            action_panel=(title, explanation, button_label, key, on_click, kwargs)
         ),
     )
 
@@ -261,6 +265,11 @@ def test_data_render_submits_structured_snapshot_payload(monkeypatch) -> None:
         "create_snapshot",
         lambda *args: _capture_snapshot_args(captured, args),
     )
+    monkeypatch.setattr(
+        data_page,
+        "render_snapshot_result",
+        lambda _st, result: captured.setdefault("snapshot_result", result),
+    )
 
     data_page.render(repository)
 
@@ -279,9 +288,15 @@ def test_data_render_submits_structured_snapshot_payload(monkeypatch) -> None:
         "Dataset Snapshots",
         "Asset Universe",
     ]
-    assert fake_st.info_messages == [
-        "Mission Control recommends creating a dataset snapshot."
+    assert fake_st.writes[:6] == [
+        "Mission Control recommends creating a dataset snapshot.",
+        "Prepare a reproducible cut of the current universe before launching research.",
+        "Review the draft values below, then create the snapshot when the inputs look right.",
+        "Next step: Confirm inputs",
+        "Assets: 2 available",
+        "Snapshots: 1 existing",
     ]
+    assert fake_st.info_messages == []
     assert fake_st.button_calls == [("Create Snapshot", "primary", False)]
     assert captured["snapshot_args"] == (
         repository,
@@ -293,13 +308,9 @@ def test_data_render_submits_structured_snapshot_payload(monkeypatch) -> None:
         "1d",
         None,
     )
+    assert captured["snapshot_result"].dataset_snapshot_id == "dataset_snapshot:demo"
     assert fake_st.success_messages == ["Created snapshot dataset_snapshot:demo"]
     assert fake_st.error_messages == []
-    assert fake_st.writes[-1] == {
-        "dataset_snapshot_id": "dataset_snapshot:demo",
-        "universe_id": "research_universe:demo",
-        "asset_ids": ("NIFTY", "BANKNIFTY", "FINANCE"),
-    }
     assert captured["debug"] == ("Raw JSON / Debug", view.debug_payload)
 
 
@@ -363,14 +374,17 @@ def test_data_render_uses_html_snapshot_preview_when_available(
 
     data_page.render(repository)
 
-    assert fake_st.info_messages == [
-        "Mission Control recommends creating a dataset snapshot."
-    ]
-    html = fake_st.markdowns[0][0]
-    assert "Snapshot draft" in html
-    assert "Operator Snapshot" in html
-    assert "BANKNIFTY" in html
-    assert "Readiness" in html
+    guidance_html = next(
+        html
+        for html, unsafe in fake_st.markdowns
+        if "Mission Control recommends creating a dataset snapshot." in html
+    )
+    assert "Confirm inputs" in guidance_html
+    assert fake_st.info_messages == []
+    preview_html = next(html for html, unsafe in fake_st.markdowns if "Snapshot draft" in html)
+    assert "Operator Snapshot" in preview_html
+    assert "BANKNIFTY" in preview_html
+    assert "Readiness" in preview_html
 
 
 def test_data_render_blocks_invalid_snapshot_submission(monkeypatch) -> None:
@@ -444,10 +458,24 @@ def test_research_render_keeps_guided_surface_readable(monkeypatch) -> None:
     research_page.render(object())
 
     assert fake_st.titles == ["Research"]
+    assert fake_st.writes[:7] == [
+        "Ready to launch RSI Mean Reversion on NIFTY with dataset_snapshot:demo from 2026-05-01 to 2026-05-25. Production hypotheses only",
+        "Review the exact command block below before submitting.",
+        "Asset: NIFTY",
+        "Snapshot: dataset_snapshot:demo",
+        "Hypothesis: RSI Mean Reversion",
+        "Window: 2026-05-01 -> 2026-05-25",
+        "Policy: Production hypotheses only",
+    ]
     assert fake_st.captions == [
         "Launch flags: include_testing=False, include_draft=False",
-        "Read the summary above, then inspect the raw dossier JSON below.",
+        "Project records tied to strategy work.",
+        "Historical run executions and outcomes.",
+        "Draft and promoted candidates in review.",
+        "Snapshot choices available for launch.",
+        "Actionable hypotheses in scope for launch.",
     ]
+    assert "Read the summary above, then inspect the raw dossier JSON below." in fake_st.writes
     assert fake_st.codes == [
         (
             "mft research run hypothesis:rsi_mean_reversion NIFTY --snapshot "
@@ -487,6 +515,9 @@ def _mission_control_view() -> SimpleNamespace:
             explanation="No research run exists yet.",
             button_label="Run Research",
             command="run-strategy-research",
+            target_page="Research",
+            is_executable=True,
+            disabled_reason=None,
         ),
         warnings=(
             SimpleNamespace(

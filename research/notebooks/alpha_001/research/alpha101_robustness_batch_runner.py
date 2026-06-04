@@ -5,24 +5,38 @@ import sys
 
 import pandas as pd  # type: ignore[import-untyped]
 
-
 NOTEBOOK_ROOT = Path(__file__).resolve().parents[1]
 if str(NOTEBOOK_ROOT) not in sys.path:
     sys.path.insert(0, str(NOTEBOOK_ROOT))
 
-from research.alpha101_robustness import (  # noqa: E402
-    ROBUSTNESS_DIR,
-    ROBUSTNESS_REPORT,
-    ROBUSTNESS_TABLES,
-    candidate_lanes,
-    classify_shortlist,
-    final_report,
-    industry_snapshot_risk,
-    proxy_sensitivity,
-    run_walk_forward,
-    strict_liquidity_primary_report,
-    validation_report,
-)
+if __package__:
+    from .alpha101_robustness import (  # noqa: E402
+        ROBUSTNESS_DIR,
+        ROBUSTNESS_REPORT,
+        ROBUSTNESS_TABLES,
+        candidate_lanes,
+        classify_shortlist,
+        final_report,
+        industry_snapshot_risk,
+        proxy_sensitivity,
+        run_walk_forward,
+        strict_liquidity_primary_report,
+        validation_report,
+    )
+else:  # pragma: no cover
+    from alpha101_robustness import (  # noqa: E402
+        ROBUSTNESS_DIR,
+        ROBUSTNESS_REPORT,
+        ROBUSTNESS_TABLES,
+        candidate_lanes,
+        classify_shortlist,
+        final_report,
+        industry_snapshot_risk,
+        proxy_sensitivity,
+        run_walk_forward,
+        strict_liquidity_primary_report,
+        validation_report,
+    )
 
 
 BATCH_ROOT = ROBUSTNESS_DIR / "_robustness_batches"

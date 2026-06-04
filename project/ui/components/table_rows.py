@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
+from typing import overload
 
 
 @dataclass(frozen=True)
@@ -14,7 +15,17 @@ class TableRows(Sequence[dict[str, object]]):
     def __len__(self) -> int:
         return len(self.rows)
 
+    @overload
     def __getitem__(self, index: int) -> dict[str, object]:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[dict[str, object]]:
+        ...
+
+    def __getitem__(
+        self, index: int | slice
+    ) -> dict[str, object] | Sequence[dict[str, object]]:
         return self.rows[index]
 
     def to_dict(self, orient: str = "records") -> list[dict[str, object]]:

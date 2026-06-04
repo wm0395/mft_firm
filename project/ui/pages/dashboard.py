@@ -4,6 +4,8 @@ from collections import Counter
 
 from project.data.quality import build_data_quality_report
 from project.ui._streamlit import get_streamlit
+from project.ui.components.empty_state import render_empty_state
+from project.ui.components.page_hero import render_page_hero
 
 
 def render(repository) -> None:
@@ -13,7 +15,7 @@ def render(repository) -> None:
     assets = _load_assets(repository)
     data_summary = _load_data_summary(repository)
 
-    _render_hero(st, assets, data_summary)
+    _render_hero(assets, data_summary)
     _render_metrics(st, assets, data_summary)
     _render_quick_actions(st, assets)
     _render_quality(st, repository, assets)
@@ -56,30 +58,43 @@ def _format_num(n):
     return str(n)
 
 
-def _render_hero(st, assets, data_summary) -> None:
+def _render_hero(assets, data_summary) -> None:
     sectors = Counter(getattr(a, "sector", "Unknown") or "Unknown" for a in assets)
     top_sectors = sectors.most_common(3)
-    total_rows = data_summary.get("total_rows", 0)
-    chips = "".join(
-        f'<span class="ui-hero__chip">'
-        f'<span class="ui-hero__chip-label">{s}</span>'
-        f'<span class="ui-hero__chip-value">{c}</span>'
-        f"</span>"
-        for s, c in top_sectors
+    render_page_hero(
+        "Track coverage and concentration across the current asset universe.",
+        _hero_note(top_sectors),
+        context=(
+            ("Assets", len(assets)),
+            ("Active", _active_assets(assets)),
+            ("Rows", _format_num(data_summary.get("total_rows", 0))),
+            ("Window", _data_window_label(data_summary)),
+        ),
     )
-    st.markdown(
-        f"""
-    <section class="ui-hero">
-      <div class="ui-hero__eyebrow">Platform Overview</div>
-      <div class="ui-hero__summary">
-        Tracking <strong>{len(assets)} assets</strong> with
-        <strong>{_format_num(total_rows)}</strong> market data records
-      </div>
-      <div class="ui-hero__chips">{chips}</div>
-    </section>
-    """,
-        unsafe_allow_html=True,
+
+
+def _hero_note(top_sectors) -> str:
+    if not top_sectors:
+        return "Sector mix is not available yet. Use quick actions below to jump into charts or trading."
+    sectors = ", ".join(f"{sector} ({count})" for sector, count in top_sectors)
+    return (
+        f"Top sectors: {sectors}. "
+        "Use quick actions below to jump into charts or trading."
     )
+
+
+def _active_assets(assets) -> int:
+    return sum(1 for a in assets if getattr(a, "is_active", True))
+
+
+def _data_window_label(data_summary) -> str:
+    ds = data_summary.get("data_start")
+    de = data_summary.get("data_end")
+    if ds and de:
+        dsf = ds.strftime("%b %d, %Y") if hasattr(ds, "strftime") else str(ds)
+        def_ = de.strftime("%b %d, %Y") if hasattr(de, "strftime") else str(de)
+        return f"{dsf} – {def_}"
+    return "Coverage unavailable"
 
 
 def _render_metrics(st, assets, data_summary) -> None:
@@ -142,7 +157,17 @@ def _render_quality(st, repository, assets) -> None:
     st.markdown('<h2>Data Quality</h2>', unsafe_allow_html=True)
     symbols = tuple(a.symbol for a in assets[:30])
     if not symbols:
-        st.info("No assets to check.")
+        render_empty_state(
+            st,
+            "No assets to check.",
+            "Add assets before running the quality report.",
+            "The dashboard cannot score quality until at least one asset is registered.",
+            (
+                ("Assets", "0 registered", "warning"),
+                ("Quality", "Not started", "ok"),
+                ("Next step", "Load universe", "action"),
+            ),
+        )
         return
     with st.container():
         try:
@@ -155,11 +180,34 @@ def _render_quality(st, repository, assets) -> None:
             _kpi(cols[2], "Sources", str(quality.source_count), "Data sources")
             _kpi(cols[3], "Max Staleness", f"{quality.max_staleness_days}d", "Allowed gap")
         except Exception as e:
-            st.info(f"Quality report unavailable: {e}")
+            render_empty_state(
+                st,
+                "Data quality report unavailable.",
+                "The dashboard could not build a quality report for the current assets.",
+                f"Error: {e}",
+                (
+                    ("Symbols checked", str(len(symbols)), "warning"),
+                    ("Sources", "Unavailable", "warning"),
+                    ("Next step", "Retry", "action"),
+                ),
+            )
 
 
 def _render_asset_table(st, assets) -> None:
     st.markdown('<h2>Asset Universe</h2>', unsafe_allow_html=True)
+    if not assets:
+        render_empty_state(
+            st,
+            "No assets registered.",
+            "Add assets to make the dashboard useful.",
+            "The asset universe is empty right now.",
+            (
+                ("Assets", "0 registered", "warning"),
+                ("Coverage", "Unavailable", "warning"),
+                ("Next step", "Load assets", "action"),
+            ),
+        )
+        return
     search = st.text_input(
         "",
         placeholder="Search by symbol or name...",
@@ -181,7 +229,17 @@ def _render_asset_table(st, assets) -> None:
         unsafe_allow_html=True,
     )
     if not filtered:
-        st.info("No assets match your search.")
+        render_empty_state(
+            st,
+            "No assets match your search.",
+            "Adjust the filter or clear it to show the full universe.",
+            f"{len(assets)} assets are currently loaded.",
+            (
+                ("Results", "0", "warning"),
+                ("Universe", str(len(assets)), "ok"),
+                ("Next step", "Clear search", "action"),
+            ),
+        )
         return
     rows = []
     for a in filtered:

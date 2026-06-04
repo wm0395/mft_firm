@@ -19,7 +19,7 @@ def test_working_approach():
     # 2. Add project root to Python path
     if os.getcwd() not in sys.path:
         sys.path.insert(0, os.getcwd())
-    print(f"   🔗 Added project root to Python path")
+    print("   🔗 Added project root to Python path")
     
     # 3. FIX THE IMPORT ISSUE WITH MONKEY-PATCHING
     print("   🔧 Fixing import issue...")
@@ -128,7 +128,6 @@ def test_working_approach():
     
     print("\n4. Performing Basic Analysis...")
     try:
-        import pandas as pd
         import numpy as np
         
         # Calculate forward returns (next day)
@@ -168,7 +167,7 @@ def test_working_approach():
         
         # Show volatility (annualized)
         annual_factor = np.sqrt(252)
-        print(f"   📊 Annualized volatilities:")
+        print("   📊 Annualized volatilities:")
         print(f"      Alpha #1: {alpha001.std().mean() * annual_factor:.4f}")
         print(f"      Alpha #2: {alpha002.std().mean() * annual_factor:.4f}")
         print(f"      Alpha #101: {alpha101.std().mean() * annual_factor:.4f}")

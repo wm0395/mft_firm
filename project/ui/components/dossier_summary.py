@@ -24,7 +24,7 @@ def render_dossier_summary(st, dossier: dict[str, object]) -> None:
     validation_errors = _strings(dossier.get("validation_errors"))
     if validation_errors:
         _surface_warning(st, "Validation errors: " + ", ".join(validation_errors))
-    st.caption("Read the summary above, then inspect the raw dossier JSON below.")
+    _surface_note(st, "Read the summary above, then inspect the raw dossier JSON below.")
 
 
 def _cards(dossier: dict[str, object]) -> tuple[StatusCardView, ...]:
@@ -260,3 +260,33 @@ def _surface_warning(st, text: str) -> None:
         warning_fn(text)
         return
     st.write(text)
+
+
+def _surface_note(st, text: str) -> None:
+    markdown_fn = getattr(st, "markdown", None)
+    if callable(markdown_fn):
+        markdown_fn(_note_html(text), unsafe_allow_html=True)
+        return
+    write_fn = getattr(st, "write", None)
+    if callable(write_fn):
+        write_fn(text)
+        return
+    caption_fn = getattr(st, "caption", None)
+    if callable(caption_fn):
+        caption_fn(text)
+
+
+def _note_html(text: str) -> str:
+    return "".join(
+        [
+            "<section style='margin:0.75rem 0 0;padding:0.85rem 1rem;"
+            "border:1px solid #e2e8f0;border-radius:12px;"
+            "background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);'>",
+            "<div style='color:#64748b;font-size:0.64rem;font-weight:700;"
+            "letter-spacing:0.14em;text-transform:uppercase;margin-bottom:0.2rem;'>"
+            "Review note</div>",
+            f"<div style='color:#475569;font-size:0.82rem;line-height:1.5;'>"
+            f"{html.escape(text)}</div>",
+            "</section>",
+        ]
+    )
