@@ -8,7 +8,7 @@ import pandas as pd
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from research.notebooks.alpha_001.research.alpha101_engine import load_panel
+from research.notebooks.alpha_001.research.alpha101_engine import forward_return, load_panel
 from research.projects.price_action_strategy_meta.regime_analysis_report import (
     base_strategy_specs,
     daily_group_summary,
@@ -36,6 +36,7 @@ REPORT_DIR = Path(__file__).resolve().parent / "reports"
 MD_PATH = REPORT_DIR / "selector_gate.md"
 BACKTEST_CSV = REPORT_DIR / "selector_gate_backtest.csv"
 RULES_CSV = REPORT_DIR / "selector_gate_rules.csv"
+SELECTED_CSV = REPORT_DIR / "selector_gate_selected.csv"
 HORIZON = 5
 TRAIN_FRACTION = 0.7
 REGIME_DIMS = (
@@ -45,6 +46,7 @@ REGIME_DIMS = (
     "gap_state",
     "liquidity_state",
     "risk_state",
+    "drawdown_state",
 )
 SECTOR_CSV = REPORT_DIR / "regime_sector_summary.csv"
 LIQUIDITY_CSV = REPORT_DIR / "regime_liquidity_summary.csv"
@@ -59,9 +61,18 @@ STRATEGY_FAMILY = {spec.name: spec.family for spec in strategy_specs_all()}
 
 def build_universe_data(universe: str) -> UniverseData:
     panel = subset_high_vol_panel(load_panel(universe))
+    base_mask = panel.high_vol_mask & panel.active_mask
+    future = forward_return(panel.close, HORIZON)
     frames: dict[str, pd.DataFrame] = {}
     for spec in strategy_specs_all():
-        frame = strategy_daily_frame(panel, spec, HORIZON)
+        frame = strategy_daily_frame(
+            panel,
+            spec,
+            HORIZON,
+            compute_rank_ic=False,
+            future=future,
+            base_mask=base_mask,
+        )
         frame.attrs["family"] = spec.family
         frames[spec.name] = frame
     return {
@@ -135,6 +146,7 @@ def protocol_lines(cutoff: pd.Timestamp) -> list[str]:
         "- Selector job: choose one strategy or abstain.",
         "- Strategy pool: the base screen plus the supplemental first-principles extras, including trend, reversal, structure, and regime helpers.",
         "- Confidence gate: a strategy must match at least two regime dimensions, clear a score threshold derived from positive train-set regime cells, and be supported by multiple strategies on the same day.",
+        "- Family alignment bonus: reversal is favored in high-vol, bear, risk-off, gap-shock, and deep-drawdown states; trend is favored in bull and risk-on states; low-liquidity states are penalized.",
         "- Costs: 10 bps already embedded in the strategy return series.",
     ]
 
@@ -207,8 +219,10 @@ def takeaway_section() -> list[str]:
     return [
         "## Takeaway",
         "",
-        "- The gate is intentionally sparse: it should abstain unless several regime dimensions agree and the train-set edge is strong.",
-        "- If the out-of-sample precision does not stay above the always-on baseline, this policy should stay research-only.",
+        "- The chosen `loose` policy is sparse, but it still loses to the combined always-on baseline on the current holdout.",
+        "- The looser scan variants improve the point estimate, but the best portfolio mean remains below the combined always-on baseline.",
+        "- Activity is concentrated in `nifty500` and a few rules, which is evidence of a narrow pocket rather than a durable all-regime selector.",
+        "- The gate stays research-only until holdout and embargo both clear the always-on baseline after costs.",
     ]
 
 
@@ -219,7 +233,7 @@ def gate_report(
     train_mask: pd.Series,
     test_mask: pd.Series,
     cutoff: pd.Timestamp,
-) -> tuple[str, pd.DataFrame, pd.DataFrame]:
+) -> tuple[str, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     candidates, policy, rules = candidate_scan(
         universe_data, summary, priors, train_mask, test_mask
     )
@@ -240,28 +254,33 @@ def gate_report(
         *context_section(),
         *takeaway_section(),
     ]
-    return "\n".join(lines), candidates, rules
+    return "\n".join(lines), candidates, rules, selected_frame
 
 
-def write_outputs(md: str, candidates: pd.DataFrame, rules: pd.DataFrame) -> None:
+def write_outputs(md: str, candidates: pd.DataFrame, rules: pd.DataFrame, selected_frame: pd.DataFrame) -> None:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     MD_PATH.write_text(md, encoding="utf-8")
     candidates.to_csv(BACKTEST_CSV, index=False)
     rules.to_csv(RULES_CSV, index=False)
+    selected_frame.to_csv(SELECTED_CSV, index=False)
 
 
 def main() -> int:
-    universe_data = {universe: build_universe_data(universe) for universe in ("nifty500", "expanded")}
+    universe_data: dict[str, UniverseData] = {}
+    for universe in ("nifty500", "expanded"):
+        print(f"gate: building {universe}", flush=True)
+        universe_data[universe] = build_universe_data(universe)
     reference_index = next(iter(universe_data.values()))["regime"].index
     train_mask, test_mask, cutoff = split_mask(reference_index)
     summary, priors = training_summary(universe_data, train_mask)
-    md, candidates, rules = gate_report(
+    md, candidates, rules, selected_frame = gate_report(
         universe_data, summary, priors, train_mask, test_mask, cutoff
     )
-    write_outputs(md, candidates, rules)
+    write_outputs(md, candidates, rules, selected_frame)
     print(f"Wrote {MD_PATH}")
     print(f"Wrote {BACKTEST_CSV}")
     print(f"Wrote {RULES_CSV}")
+    print(f"Wrote {SELECTED_CSV}")
     return 0
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from typing import Any, cast
 
 import pandas as pd
 
@@ -338,7 +339,9 @@ def _render_table(frame: pd.DataFrame) -> str:
 def _format_pct(value: object) -> str:
     if value is None or (isinstance(value, float) and math.isnan(value)):
         return ""
-    return f"{float(value):.4%}"
+    if isinstance(value, (int, float)):
+        return f"{value:.4%}"
+    return f"{float(cast(Any, value)):.4%}"
 
 
 if __name__ == "__main__":

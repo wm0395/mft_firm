@@ -1,8 +1,6 @@
 # Next Queue
 
-1. Expand the seed sample into a broader historical mainboard IPO table with source traceability.
-2. Add more low and medium pressure comparators so the pressure gradient can be tested properly.
-3. Re-run the regime-control panel on the broader table and check whether volatile/bull/bear/calm conditioning changes the readout.
-4. Measure pull-window abnormal returns by IPO pressure bucket and basket type.
-5. Measure release-window reversal after allotment or unblocking.
-6. Narrow or reject the thesis if the pattern stays mixed after the larger sample.
+1. Consolidate the 38-event raw NSE cache into a direct liquidity panel with turnover, delivery, and category-flow features aligned to the seed windows.
+2. Re-run the pilot, regime-control, sector-conditioned, sector-adjusted, gradient, and stability passes on the direct panel.
+3. Sample the remaining `Historical Reports - Capital Market` archive family or prove it should stay manifest-only.
+4. Keep `define_trade_rules` blocked until pull, release, monotonicity, robustness, and direct-window coverage all pass.

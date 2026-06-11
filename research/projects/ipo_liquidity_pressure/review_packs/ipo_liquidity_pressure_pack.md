@@ -15,26 +15,30 @@ exists.
 - `../reports/data_contract.md`
 - `../reports/event_design.md`
 - `../reports/validation_framework.md`
+- `../reports/market_history_expansion.md`
+- `../reports/direct_market_history_sources.md`
+- `../reports/direct_market_history_loader.md`
+- `../reports/sector_history_expansion.md`
+- `../reports/sector_conditioned_event_study.md`
+- `../reports/sector_adjusted_basket_event_study.md`
+- `../reports/pressure_gradient_diagnostics.md`
+- `../reports/pressure_gradient_stability.md`
 
 ## State Snapshot
 
 - Project status: `draft`
-- Phase: `pilot evidence collection and seed event study`
+- Phase: `pilot evidence collection, seed event study, and market-history expansion`
 - Scope: mainboard IPO liquidity pressure and post-allotment reinvestment
 - Metrics: event-window abnormal return, pressure bucket effect, and reversal
   classification
 - Research stance: no deployment claim yet
-- Current evidence: source-backed seed sample exists for Urban Company,
-  Rubicon Research, Canara Robeco, Canara HSBC Life Insurance, LG
-  Electronics, Medi Assist Healthcare Services, Euro Pratik Sales, Yatra
-  Online, TruAlt Bioenergy, Saatvik Green Energy, Sudeep Pharma,
-  Om Freight Forwarders, Brigade Hotel Ventures, Glottis, Fabtech
-  Technologies, Lenskart Solutions, One 97 Communications, Delhivery,
-  Niva Bupa Health Insurance, Sagility, Ather Energy, Schloss Bangalore,
-  HDB Financial Services, Travel Food Services, Aegis Vopak Terminals,
-  Afcons Infrastructure, NTPC Green Energy, and Vishal Mega Mart; the
-  pilot event study is mixed; and the regime-control panel leaves the
-  sample in the volatile bucket without producing a clean gradient.
+- Current evidence: source-backed seed sample exists for thirty-eight
+  mainboard IPOs; the pilot event study is mixed; the regime-control panel
+  leaves the sample in the volatile bucket without producing a clean
+  gradient; the market-history panel is available as a proxy-based
+  conditioning layer; a sector-return / sector-turnover proxy panel is now
+  available for same-sector conditioning; the direct NSE market-history source inventory has identified the archive families for turnover, delivery, category flow, mode of trading, and FII/DII activity; the direct loader now normalizes the market-activity, security-wise price-volume, delivery-position, and FII/DII CSV families into a local collection manifest; and the sector-adjusted same-sector peer pass remains mixed on the 26 mapped IPOs. The broader sector-adjusted basket pass also remains mixed across the application and release windows.
+  The pressure-gradient diagnostic adds one narrow sector-adjusted lead: the midcap150 basket in the release_5 window orders low to extreme with Spearman rho 1.0, but the rest of the combinations remain mixed. The stability pass shows that the lead does not generalize to adjacent windows and that the release-window basket neighborhood remains mixed outside midcap150.
 
 ## Decision
 

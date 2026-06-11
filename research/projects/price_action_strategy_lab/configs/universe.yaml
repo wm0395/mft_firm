@@ -1,0 +1,53 @@
+# Research-only NSE universe configuration.
+# Future loaders must access market-collector data through project/data APIs.
+
+universe:
+  name: all_nse_market_collector
+  source: market_collector
+  exchange: NSE
+  timeframe: 1d
+  mode: all_nse
+
+filters:
+  min_history_days: 252
+  min_price: 10.0
+  min_median_volume: 10000
+  min_median_turnover: 1000000.0
+  max_missing_ratio: 0.15
+  require_ohlcv: true
+
+alternates:
+  liquid_nse:
+    mode: liquid_nse
+    min_history_days: 504
+    min_median_turnover: 10000000.0
+  high_vol_nse:
+    mode: high_vol_nse
+    reference_window_days: 504
+    max_symbols: 100
+  custom_symbols:
+    mode: custom_symbols
+    symbols: []
+
+outputs:
+  panel_fields:
+    - open
+    - high
+    - low
+    - close
+    - volume
+    - active_mask
+  artifact_name: nse_market_collector_panel
+  cache_policy:
+    enabled: true
+    key_fields:
+      - universe.name
+      - exchange
+      - timeframe
+      - min_history_days
+      - max_missing_ratio
+      - latest_timestamp
+    note: >
+      Panel cache keys must change when the date range, symbol set, or OHLCV
+      contents change. Research code should load through project/data and should
+      not query market-collector storage directly.

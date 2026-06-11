@@ -118,9 +118,13 @@ def test_positions_page_render_shows_empty_state_for_empty_repository(
         )
         _render_positions_page(monkeypatch, repository, fake_st, captured)
         view = cast(PositionsPageView, captured["view"])
+        empty = cast(
+            tuple[object, str, str, str, tuple[tuple[str, str, str], ...]],
+            captured["empty"],
+        )
 
         assert fake_st.titles == ["Positions"]
-        _, title, summary, note, chips = captured["empty"]
+        _, title, summary, note, chips = empty
         assert title == "No positions match the current filter."
         assert "table empty" in summary
         assert "approve a trade idea" in note.lower()
@@ -200,6 +204,9 @@ def test_navigation_includes_positions_page() -> None:
     assert "Positions" in page_titles()
     assert "Positions" in app.PAGES
     assert app.PAGES["Positions"] is positions_page.render
+    assert "Dashboard" in page_titles()
+    assert "Dashboard" in app.PAGES
+    assert callable(app.PAGES["Dashboard"])
     assert "Charts" in page_titles()
     assert "Trading" in page_titles()
     assert app.PAGES["Charts"] is charts_page.render

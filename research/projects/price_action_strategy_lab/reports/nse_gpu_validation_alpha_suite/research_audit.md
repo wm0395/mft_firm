@@ -1,0 +1,20 @@
+# Research Audit
+
+- panel_name: all_nse_market_collector
+- alpha_count: 5
+- result_rows: 180
+- fold_rows: 3240
+- schemes: walk_forward,purged,embargo
+- train_size: 756
+- test_size: 63
+- step_size: 63
+- lookahead: 10
+- embargo: 10
+- outer_folds: 6
+- bootstrap_reps: 1000
+- bootstrap_block_length: 10
+- target_cost_bps: 10.0
+- min_active_days: 40
+- primary_scheme: embargo
+- turnover_penalty_bps: 25.0
+- instability_penalty_bps: 1.0

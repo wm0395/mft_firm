@@ -140,6 +140,17 @@ The `trade_profiles` module adds pattern scoring and trade ladders:
 - hybrid trend/volume score stacks: `hybrid_trend_volume_scores`
 - ATR pyramiding and scale-out ladders: `pyramiding_ladder`
 
+## Candlestick Pattern Layer
+
+The `price_action_pattern_specs` module in the research lab now also uses
+explicit candlestick-style scores built from the OHLC helpers:
+
+- doji reversal: `doji_reversal_score`
+- engulfing reversal: `engulfing_reversal_score`
+- hammer / shooting-star reversal: `hammer_shooting_star_score`
+- inside-bar breakout / outside-bar reversal: `inside_outside_bar_score`
+- piercing-line / dark-cloud-cover reversal: `piercing_dark_cloud_score`
+
 ## Relative Strength Layer
 
 The `relative_strength` module adds benchmark-relative overlays and divergence:

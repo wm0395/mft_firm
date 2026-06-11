@@ -50,8 +50,9 @@ See [reports/extra_strategy_screening.md](./reports/extra_strategy_screening.md)
 for the supplemental pass over the extra first-principles strategies. The
 useful addition is narrow:
 
-- `fisher_transform_reversal_10` is the only stable extra winner.
-- Its best pockets are in `bear`, `high_vol`, `up_gap_shock`, and
+- `fisher_transform_reversal_10` and
+  `inverse_fisher_rsi_reversal_10` are the cleanest extra winners.
+- Their best pockets are in `bear`, `high_vol`, `up_gap_shock`, and
   `low_liquidity` states.
 - `relative_volume_breakout_20`, `elder_ray_trend`, and
   `ultimate_oscillator_reversal` are clear losers after cost stress.
@@ -77,8 +78,9 @@ The current signal is more specific:
   cost-negative; `keltner_breakout_20` is the weakest breakout variant in
   low-liquidity and gap-shock states.
 - The supplemental extra screen adds one real candidate:
-  `fisher_transform_reversal_10` is the strongest additional reversal signal
-  and is especially strong in bear / high-vol / up-gap-shock states.
+  `fisher_transform_reversal_10` and
+  `inverse_fisher_rsi_reversal_10` are the strongest additional reversal
+  signals and are especially strong in bear / high-vol / up-gap-shock states.
 - `Metals & Mining` and `Capital Goods` are the strongest 5-day sector pockets
   in bullish or risk-on environments.
 - Low-liquidity `risk_off` slices are consistently weak.
@@ -130,15 +132,17 @@ Selector metrics:
 ## Selector Gate
 
 See [reports/selector_gate.md](./reports/selector_gate.md) for the first
-abstaining gate prototype. The current strict policy is intentionally sparse:
+abstaining gate prototype. The current gate policy is intentionally sparse:
 
 - `strict` selects only when at least three regime dimensions agree and the
   train-set cells clear high mean-return, win-rate, t-stat, and sample-size
   thresholds.
-- On the 5-day chronological holdout, the gate reached 54.3% precision with
-  13.5% coverage and 6.735 bps mean portfolio return.
-- The combined always-on baseline on the same holdout was 5.647 bps, so the
-  gate still clears the simple baseline while staying selective.
+- On the 5-day chronological holdout, the chosen `loose` policy reached
+  54.9% precision with 17.6% coverage and 6.109 bps mean portfolio return.
+- The combined always-on baseline on the same holdout was 9.803 bps, so the
+  gate still loses to the simple baseline.
+- The stricter `high_conf` policy remains lower at 4.564 bps, and the
+  looser scan variants still remain below the combined always-on baseline.
 
 ## Walk-Forward Validation
 
@@ -148,12 +152,28 @@ selector gate.
 
 - The walk-forward layer now refits the same candidate scan on each fold and
   records `abstain` when no policy survives the scan.
-- The walk-forward, purged, and embargoed splits still show negative lift
-  versus the combined always-on baseline.
-- Average lift stays negative even after the adaptive scan:
-  walk-forward `-21.136` bps, purged `-15.988` bps, and embargo
-  `-21.070` bps.
-- The gate therefore remains research-only.
+- The selector now adds a family-aware regime bonus: reversal is favored in
+  high-vol, bear, risk-off, and gap-shock states; trend is favored in bull and
+  risk-on states; low-liquidity states are penalized.
+- The walk-forward, purged, and embargo splits all remain below the combined
+  always-on baseline.
+- Only fold 5 activates; folds 1-4 abstain.
+- The gate is still research-only because embargo remains below the
+  always-on baseline.
+- Split-sensitivity sweeps over shifted boundaries, embargo lengths, and
+  train windows also remain below the always-on baseline.
+
+## Audit And Robustness
+
+See [reports/research_audit.md](./reports/research_audit.md),
+[reports/embargo_failure_diagnosis.md](./reports/embargo_failure_diagnosis.md),
+[reports/selector_robustness.md](./reports/selector_robustness.md), and
+[reports/selector_split_sensitivity.md](./reports/selector_split_sensitivity.md),
+[reports/selector_null_benchmark.md](./reports/selector_null_benchmark.md),
+and [reports/selector_neutral_variant.md](./reports/selector_neutral_variant.md)
+for the current evidence audit, embargo failure diagnosis, robustness battery,
+split-sensitivity sweep, null benchmark, and selected-portfolio neutral
+sensitivity.
 
 ## Done Conditions
 
@@ -166,6 +186,6 @@ selector gate.
 
 Draft. The project is scoped, the metrics panel is explicit, and the first-pass
 screening readout, regime-conditioned scan, stock-level regime map, sparse
-selector gate prototype, and leakage-controlled walk-forward validation all
-exist. No deployment claim is made yet. The gate still needs positive
-out-of-sample lift before anything is promoted.
+selector gate prototype, leakage-controlled walk-forward validation, and the
+audit/robustness reports all exist. No deployment claim is made yet. The gate
+still needs positive out-of-sample lift before anything is promoted.

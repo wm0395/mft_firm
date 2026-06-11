@@ -11,6 +11,7 @@ class PageDefinition:
 
 PAGES = (
     PageDefinition("Mission Control", "System health, warnings, and workflow handoff."),
+    PageDefinition("Dashboard", "Asset coverage, data quality, and research suite."),
     PageDefinition("Data", "Dataset snapshots, data quality, and asset coverage."),
     PageDefinition("Research", "Launch research runs and review strategy dossiers."),
     PageDefinition("Hypotheses", "Browse lifecycle states and hypothesis readiness."),

@@ -41,6 +41,25 @@ class GatePolicy:
     strategy_bonus: tuple[tuple[str, float], ...]
 
 
+@dataclass(frozen=True)
+class StrategyCache:
+    family: str | None
+    gross_return: np.ndarray
+    turnover: np.ndarray
+    net_return: np.ndarray
+
+
+REGIME_DIMS = (
+    "vol_state",
+    "trend_state",
+    "breadth_state",
+    "gap_state",
+    "liquidity_state",
+    "risk_state",
+    "drawdown_state",
+)
+
+
 def candidate_thresholds() -> list[GateThresholds]:
     return [
         GateThresholds("strict", 40.0, 0.55, 1.50, 250, 3, 3.00, 2),
@@ -56,39 +75,28 @@ def candidate_thresholds() -> list[GateThresholds]:
 
 
 def score_strategy(
-    universe: str,
     strategy: str,
-    states: pd.Series,
-    frame: pd.DataFrame,
-    lookup: dict[str, dict[str, dict[str, float]]],
+    state_values: tuple[str, ...],
+    state_keys: tuple[str, ...],
+    cache: StrategyCache,
+    rule_weights: dict[str, float],
     bonus: dict[str, float],
     thresholds: GateThresholds,
+    net_return: float,
 ) -> tuple[str, str | None, float, int, float] | None:
-    if universe not in lookup or strategy not in lookup[universe]:
-        return None
     score = bonus.get(strategy, 0.0)
+    score += family_regime_bonus(cache.family, state_values)
     matches = 0
-    for dimension in (
-        "vol_state",
-        "trend_state",
-        "breadth_state",
-        "gap_state",
-        "liquidity_state",
-        "risk_state",
-    ):
-        key = f"{dimension}:{states[dimension]}"
-        weight = lookup[universe][strategy].get(key)
+    for key in state_keys:
+        weight = rule_weights.get(key)
         if weight is not None:
             score += weight
             matches += 1
     if matches < thresholds.min_matches or score < thresholds.min_score:
         return None
-    value = frame.at[states.name, "net_return"]
-    if pd.isna(value):
+    if pd.isna(net_return):
         return None
-    family = frame.attrs.get("family")
-    family_name = family if isinstance(family, str) else None
-    return strategy, family_name, score, matches, float(value)
+    return strategy, cache.family, score, matches, float(net_return)
 
 
 def build_policy(summary: pd.DataFrame, priors: pd.DataFrame, thresholds: GateThresholds) -> GatePolicy:
@@ -150,37 +158,226 @@ def bonus_lookup(policy: GatePolicy) -> dict[str, float]:
     return {strategy: bonus for strategy, bonus in policy.strategy_bonus}
 
 
-def support_floor(states: pd.Series, thresholds: GateThresholds) -> int:
+def build_strategy_cache(frames: dict[str, pd.DataFrame]) -> dict[str, StrategyCache]:
+    return {
+        strategy: StrategyCache(
+            family=frame.attrs.get("family") if isinstance(frame.attrs.get("family"), str) else None,
+            gross_return=frame["gross_return"].to_numpy(),
+            turnover=frame["turnover"].to_numpy(),
+            net_return=frame["net_return"].to_numpy(),
+        )
+        for strategy, frame in frames.items()
+    }
+
+
+def regime_state_keys(state_values: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(
+        f"{dimension}:{state}" for dimension, state in zip(REGIME_DIMS, state_values)
+    )
+
+
+def selected_positions(frames: dict[str, pd.DataFrame], index: pd.Index) -> np.ndarray:
+    positions = next(iter(frames.values())).index.get_indexer(index)
+    if (positions < 0).any():
+        raise ValueError("mask index is not aligned with strategy frames")
+    return positions
+
+
+def support_floor(state_values: tuple[str, ...], thresholds: GateThresholds) -> int:
+    vol, trend, _, gap, liquidity, risk, drawdown = state_values
     hard_states = (
-        states["vol_state"] == "high_vol",
-        states["trend_state"] == "bear",
-        states["gap_state"] == "up_gap_shock",
-        states["liquidity_state"] == "low_liquidity",
-        states["risk_state"] == "risk_off",
+        vol == "high_vol",
+        trend == "bear",
+        gap == "up_gap_shock",
+        liquidity == "low_liquidity",
+        risk == "risk_off",
+        drawdown == "deep_drawdown",
     )
     if any(hard_states):
         return thresholds.min_support
     return max(1, thresholds.min_support - 1)
 
 
+def family_regime_bonus(family: str | None, state_values: tuple[str, ...]) -> float:
+    if family is None:
+        return 0.0
+    vol, trend, breadth, gap, liquidity, risk, drawdown = state_values
+    score = -0.5 if liquidity == "low_liquidity" else 0.0
+    if family == "reversal_exhaustion":
+        if vol == "high_vol":
+            score += 1.5
+        if trend == "bear":
+            score += 1.0
+        if risk == "risk_off":
+            score += 1.0
+        if gap in {"up_gap_shock", "down_gap_shock"}:
+            score += 1.0
+        if drawdown == "deep_drawdown":
+            score += 1.0
+        if trend == "bull" and risk == "risk_on":
+            score -= 1.5
+        return score
+    if family == "trend_following":
+        if trend == "bull" or risk == "risk_on":
+            score += 1.5
+        if breadth == "bullish":
+            score += 0.5
+        if vol == "high_vol" or trend == "bear" or risk == "risk_off" or drawdown == "deep_drawdown":
+            score -= 1.5
+        return score
+    if family == "gap_reaction":
+        return score + (1.5 if gap in {"up_gap_shock", "down_gap_shock"} else -0.5)
+    if family == "volume_confirmation":
+        score += 0.75 if liquidity != "low_liquidity" else -1.0
+        if risk == "risk_on" or breadth == "bullish":
+            score += 0.5
+        if risk == "risk_off":
+            score -= 0.5
+        return score
+    if family == "structure_levels":
+        score += 0.25 if liquidity != "low_liquidity" else -0.75
+        if breadth == "bullish" or trend == "bull":
+            score += 0.25
+        return score
+    if family == "breakout_continuation":
+        if trend == "bull" and risk == "risk_on":
+            score += 1.0
+        if vol == "high_vol" or trend == "bear" or risk == "risk_off" or drawdown == "deep_drawdown":
+            score -= 1.0
+        return score
+    return 0.0
+
+
 def select_day(
     universe: str,
-    states: pd.Series,
-    frames: dict[str, pd.DataFrame],
+    state_values: tuple[str, ...],
+    state_keys: tuple[str, ...],
+    strategy_cache: dict[str, StrategyCache],
     lookup: dict[str, dict[str, dict[str, float]]],
     bonus: dict[str, float],
     thresholds: GateThresholds,
+    pos: int,
 ) -> tuple[str | None, str | None, float, int, float]:
     candidates: list[tuple[str, str | None, float, int, float]] = []
-    for strategy, frame in frames.items():
+    universe_lookup = lookup.get(universe)
+    if universe_lookup is None:
+        return None, None, float("-inf"), 0, float("nan")
+    for strategy, cache in strategy_cache.items():
+        rule_weights = universe_lookup.get(strategy)
+        if rule_weights is None:
+            continue
         candidate = score_strategy(
-            universe, strategy, states, frame, lookup, bonus, thresholds
+            strategy,
+            state_values,
+            state_keys,
+            cache,
+            rule_weights,
+            bonus,
+            thresholds,
+            cache.net_return[pos],
         )
         if candidate is not None:
             candidates.append(candidate)
-    if len(candidates) < support_floor(states, thresholds):
+    if len(candidates) < support_floor(state_values, thresholds):
         return None, None, float("-inf"), 0, float("nan")
     return max(candidates, key=lambda item: item[2])
+
+
+def build_backtest_row(
+    universe: str,
+    date: pd.Timestamp,
+    strategy: str | None,
+    family: str | None,
+    score: float,
+    matches: int,
+    gross_return: float,
+    turnover: float,
+    net_return: float,
+    active: bool,
+) -> dict[str, object]:
+    return {
+        "date": date,
+        "universe": universe,
+        "active": active,
+        "strategy": strategy,
+        "family": family,
+        "score": score if active else float("nan"),
+        "matches": matches if active else 0,
+        "gross_return": gross_return,
+        "turnover": turnover,
+        "net_return": net_return if active else 0.0,
+    }
+
+
+def single_backtest_row(
+    universe: str,
+    date: pd.Timestamp,
+    pos: int,
+    state_values: tuple[str, ...],
+    strategy_cache: dict[str, StrategyCache],
+    lookup: dict[str, dict[str, dict[str, float]]],
+    bonus: dict[str, float],
+    thresholds: GateThresholds,
+) -> dict[str, object]:
+    state_keys = regime_state_keys(state_values)
+    strategy, family, score, matches, net_return = select_day(
+        universe,
+        state_values,
+        state_keys,
+        strategy_cache,
+        lookup,
+        bonus,
+        thresholds,
+        pos,
+    )
+    active = strategy is not None
+    selected = strategy_cache[strategy] if active and strategy is not None else None
+    gross_return = float(selected.gross_return[pos]) if selected is not None else 0.0
+    turnover = float(selected.turnover[pos]) if selected is not None else 0.0
+    return build_backtest_row(
+        universe,
+        date,
+        strategy,
+        family,
+        score,
+        matches,
+        gross_return,
+        turnover,
+        net_return,
+        active,
+    )
+
+
+def universe_backtest_rows(
+    universe: str,
+    data: UniverseData,
+    lookup: dict[str, dict[str, dict[str, float]]],
+    bonus: dict[str, float],
+    thresholds: GateThresholds,
+    mask: pd.Series,
+) -> list[dict[str, object]]:
+    regime = data["regime"].loc[mask]
+    strategy_cache = build_strategy_cache(data["frames"])
+    positions = selected_positions(data["frames"], regime.index)
+    rows: list[dict[str, object]] = []
+    for pos, date, state_values in zip(
+        positions,
+        regime.index,
+        regime[list(REGIME_DIMS)].itertuples(index=False, name=None),
+    ):
+        rows.append(
+            single_backtest_row(
+                universe,
+                date,
+                int(pos),
+                state_values,
+                strategy_cache,
+                lookup,
+                bonus,
+                thresholds,
+            )
+        )
+    return rows
 
 
 def backtest_policy(
@@ -192,26 +389,59 @@ def backtest_policy(
     bonus = bonus_lookup(policy)
     rows: list[dict[str, object]] = []
     for universe, data in universe_data.items():
-        regime = data["regime"].loc[mask]
-        frames = data["frames"]
-        for date, states in regime.iterrows():
-            strategy, family, score, matches, net_return = select_day(
-                universe, states, frames, lookup, bonus, policy.thresholds
-            )
-            active = strategy is not None
-            rows.append(
+        rows.extend(
+            universe_backtest_rows(universe, data, lookup, bonus, policy.thresholds, mask)
+        )
+    return pd.DataFrame(rows)
+
+
+def candidate_rows(
+    universe_data: dict[str, UniverseData],
+    summary: pd.DataFrame,
+    priors: pd.DataFrame,
+    train_mask: pd.Series,
+    test_mask: pd.Series | None,
+    include_test_metrics: bool,
+) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for thresholds in candidate_thresholds():
+        policy = build_policy(summary, priors, thresholds)
+        train_frame = backtest_policy(universe_data, policy, train_mask)
+        train_metrics = selection_metrics(train_frame)
+        row = {
+            "policy": thresholds.name,
+            "min_mean_net_bps": thresholds.min_mean_net_bps,
+            "min_win_rate": thresholds.min_win_rate,
+            "min_tstat": thresholds.min_tstat,
+            "min_obs": thresholds.min_obs,
+            "min_matches": thresholds.min_matches,
+            "min_score": thresholds.min_score,
+            "min_support": thresholds.min_support,
+            "train_precision": train_metrics["precision"],
+            "train_coverage": train_metrics["coverage"],
+            "train_active_days": train_metrics["active_days"],
+            "train_mean_net_bps": train_metrics["active_mean_net_bps"],
+        }
+        if include_test_metrics and test_mask is not None:
+            test_frame = backtest_policy(universe_data, policy, test_mask)
+            test_metrics = selection_metrics(test_frame)
+            row.update(
                 {
-                    "date": date,
-                    "universe": universe,
-                    "active": active,
-                    "strategy": strategy,
-                    "family": family,
-                    "score": score if active else float("nan"),
-                    "matches": matches if active else 0,
-                    "net_return": net_return if active else 0.0,
+                    "test_precision": test_metrics["precision"],
+                    "test_coverage": test_metrics["coverage"],
+                    "test_active_days": test_metrics["active_days"],
+                    "test_mean_net_bps": test_metrics["active_mean_net_bps"],
+                    "test_portfolio_mean_net_bps": test_metrics["portfolio_mean_net_bps"],
                 }
             )
-    return pd.DataFrame(rows)
+        rows.append(row)
+    candidates = pd.DataFrame(rows).sort_values(
+        ["train_mean_net_bps", "train_precision", "train_active_days", "train_coverage"],
+        ascending=[False, False, False, False],
+    )
+    return candidates[
+        candidates["train_active_days"].ge(200) & candidates["train_coverage"].ge(0.02)
+    ]
 
 
 def selection_metrics(frame: pd.DataFrame) -> dict[str, float]:
@@ -281,40 +511,14 @@ def candidate_scan(
     train_mask: pd.Series,
     test_mask: pd.Series,
 ) -> tuple[pd.DataFrame, GatePolicy, pd.DataFrame]:
-    rows: list[dict[str, object]] = []
-    for thresholds in candidate_thresholds():
-        policy = build_policy(summary, priors, thresholds)
-        train_frame = backtest_policy(universe_data, policy, train_mask)
-        test_frame = backtest_policy(universe_data, policy, test_mask)
-        train_metrics = selection_metrics(train_frame)
-        test_metrics = selection_metrics(test_frame)
-        rows.append(
-            {
-                "policy": thresholds.name,
-                "min_mean_net_bps": thresholds.min_mean_net_bps,
-                "min_win_rate": thresholds.min_win_rate,
-                "min_tstat": thresholds.min_tstat,
-                "min_obs": thresholds.min_obs,
-                "min_matches": thresholds.min_matches,
-                "min_score": thresholds.min_score,
-                "min_support": thresholds.min_support,
-                "train_precision": train_metrics["precision"],
-                "train_coverage": train_metrics["coverage"],
-                "train_active_days": train_metrics["active_days"],
-                "train_mean_net_bps": train_metrics["active_mean_net_bps"],
-                "test_precision": test_metrics["precision"],
-                "test_coverage": test_metrics["coverage"],
-                "test_active_days": test_metrics["active_days"],
-                "test_mean_net_bps": test_metrics["active_mean_net_bps"],
-                "test_portfolio_mean_net_bps": test_metrics["portfolio_mean_net_bps"],
-            }
-        )
-    candidates = pd.DataFrame(rows).sort_values(
-        ["train_precision", "train_active_days", "train_coverage", "train_mean_net_bps"],
-        ascending=[False, False, False, False],
+    candidates = candidate_rows(
+        universe_data,
+        summary,
+        priors,
+        train_mask,
+        test_mask,
+        include_test_metrics=True,
     )
-    candidates = candidates[candidates["train_active_days"].gt(0)]
-    candidates = candidates[candidates["train_coverage"].ge(0.05)]
     if candidates.empty:
         raise ValueError("No active gate candidates survived the threshold scan")
     chosen_name = candidates.iloc[0]["policy"]
@@ -322,3 +526,24 @@ def candidate_scan(
     chosen_policy = build_policy(summary, priors, thresholds)
     chosen_rules = pd.DataFrame([rule.__dict__ for rule in chosen_policy.rules])
     return candidates, chosen_policy, chosen_rules
+
+
+def candidate_scan_train_only(
+    universe_data: dict[str, UniverseData],
+    summary: pd.DataFrame,
+    priors: pd.DataFrame,
+    train_mask: pd.Series,
+) -> GatePolicy:
+    candidates = candidate_rows(
+        universe_data,
+        summary,
+        priors,
+        train_mask,
+        None,
+        include_test_metrics=False,
+    )
+    if candidates.empty:
+        raise ValueError("No active gate candidates survived the threshold scan")
+    chosen_name = candidates.iloc[0]["policy"]
+    thresholds = next(item for item in candidate_thresholds() if item.name == chosen_name)
+    return build_policy(summary, priors, thresholds)

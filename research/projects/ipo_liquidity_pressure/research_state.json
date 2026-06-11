@@ -2,8 +2,8 @@
   "canonical_state_file": "research/projects/ipo_liquidity_pressure/research_state.json",
   "project_id": "research_project:ipo_liquidity_pressure",
   "project_status": "draft",
-  "phase": "pilot evidence collection and seed event study",
-  "state_as_of_utc": "2026-06-04T00:00:00Z",
+  "phase": "pilot evidence collection, seed event study, and market-history expansion",
+  "state_as_of_utc": "2026-06-05T00:00:00Z",
   "source_of_truth": "research/projects/ipo_liquidity_pressure/README.md",
   "objective": "Test whether large IPOs temporarily reduce deployable secondary-market liquidity and whether allotment-driven release creates mean reversion.",
   "summary_artifacts": [
@@ -22,7 +22,23 @@
     "research/projects/ipo_liquidity_pressure/data/index_prices.parquet",
     "research/projects/ipo_liquidity_pressure/data/market_liquidity.parquet",
     "research/projects/ipo_liquidity_pressure/data/market_history_symbol_coverage.csv",
+    "research/projects/ipo_liquidity_pressure/data/sector_history.parquet",
+    "research/projects/ipo_liquidity_pressure/data/sector_history_coverage.csv",
+    "research/projects/ipo_liquidity_pressure/data/ipo_sector_conditioned_event_study.csv",
+    "research/projects/ipo_liquidity_pressure/data/ipo_sector_adjusted_basket_event_study.csv",
+    "research/projects/ipo_liquidity_pressure/data/ipo_pressure_gradient_diagnostics.csv",
+    "research/projects/ipo_liquidity_pressure/data/ipo_pressure_gradient_stability.csv",
     "research/projects/ipo_liquidity_pressure/reports/market_history_expansion.md",
+    "research/projects/ipo_liquidity_pressure/data/direct_market_history_sources.csv",
+    "research/projects/ipo_liquidity_pressure/reports/direct_market_history_sources.md",
+    "research/projects/ipo_liquidity_pressure/data/direct_market_history_collection_manifest.csv",
+    "research/projects/ipo_liquidity_pressure/reports/direct_market_history_loader.md",
+    "research/projects/ipo_liquidity_pressure/reports/direct_liquidity_falsification.md",
+    "research/projects/ipo_liquidity_pressure/reports/sector_history_expansion.md",
+    "research/projects/ipo_liquidity_pressure/reports/sector_conditioned_event_study.md",
+    "research/projects/ipo_liquidity_pressure/reports/sector_adjusted_basket_event_study.md",
+    "research/projects/ipo_liquidity_pressure/reports/pressure_gradient_diagnostics.md",
+    "research/projects/ipo_liquidity_pressure/reports/pressure_gradient_stability.md",
     "research/projects/ipo_liquidity_pressure/research_loop_report.md",
     "research/projects/ipo_liquidity_pressure/review_packs/ipo_liquidity_pressure_pack.md"
   ],
@@ -74,6 +90,70 @@
         "data/market_liquidity.parquet",
         "data/market_history_symbol_coverage.csv",
         "reports/market_history_expansion.md"
+      ]
+    },
+    {
+      "task_id": "build_sector_history_panel",
+      "status": "completed",
+      "objective": "Build a point-in-time sector-return and sector-turnover proxy panel from the expanded-parent industry map.",
+      "deliverables": [
+        "data/sector_history.parquet",
+        "data/sector_history_coverage.csv",
+        "reports/sector_history_expansion.md"
+      ]
+    },
+    {
+      "task_id": "build_sector_conditioned_event_study",
+      "status": "completed",
+      "objective": "Measure whether the same-sector peer signal survives a sector-return adjustment using the proxy sector panel.",
+      "deliverables": [
+        "data/ipo_sector_conditioned_event_study.csv",
+        "reports/sector_conditioned_event_study.md"
+      ]
+    },
+    {
+      "task_id": "build_sector_adjusted_basket_event_study",
+      "status": "completed",
+      "objective": "Check whether the full basket set remains mixed after sector adjustment using the proxy sector panel.",
+      "deliverables": [
+        "data/ipo_sector_adjusted_basket_event_study.csv",
+        "reports/sector_adjusted_basket_event_study.md"
+      ]
+    },
+    {
+      "task_id": "build_pressure_gradient_diagnostics",
+      "status": "completed",
+      "objective": "Summarize raw and sector-adjusted pressure gradients across baskets and windows to identify any monotonic ordering.",
+      "deliverables": [
+        "data/ipo_pressure_gradient_diagnostics.csv",
+        "reports/pressure_gradient_diagnostics.md"
+      ]
+    },
+    {
+      "task_id": "build_pressure_gradient_stability",
+      "status": "completed",
+      "objective": "Stress-test the lone clean sector-adjusted pressure-gradient case against adjacent windows and basket definitions.",
+      "deliverables": [
+        "data/ipo_pressure_gradient_stability.csv",
+        "reports/pressure_gradient_stability.md"
+      ]
+    },
+    {
+      "task_id": "discover_direct_market_history_sources",
+      "status": "completed",
+      "objective": "Identify the official NSE archive families that can supply direct turnover, delivery, category-flow, and FII/DII history.",
+      "deliverables": [
+        "data/direct_market_history_sources.csv",
+        "reports/direct_market_history_sources.md"
+      ]
+    },
+    {
+      "task_id": "build_direct_market_history_loader",
+      "status": "completed",
+      "objective": "Normalize the parser-ready NSE direct-market CSV families into a local collection manifest and loader entry point.",
+      "deliverables": [
+        "data/direct_market_history_collection_manifest.csv",
+        "reports/direct_market_history_loader.md"
       ]
     },
     {
@@ -133,9 +213,17 @@
     "Pull and release should be modeled separately because they may touch different baskets.",
     "SME IPOs remain excluded from the first pass.",
     "The first pass should keep lookahead out of subscription and allotment features.",
-    "Pilot source evidence now covers Urban Company, Rubicon Research, Canara Robeco, Canara HSBC Life Insurance, LG Electronics, Medi Assist Healthcare Services, Euro Pratik Sales, Yatra Online, TruAlt Bioenergy, Saatvik Green Energy, Sudeep Pharma, Om Freight Forwarders, Brigade Hotel Ventures, Glottis, Fabtech Technologies, Lenskart Solutions, One 97 Communications, Delhivery, Niva Bupa Health Insurance, Sagility, Ather Energy, Schloss Bangalore, HDB Financial Services, Travel Food Services, Aegis Vopak Terminals, Afcons Infrastructure, NTPC Green Energy, and Vishal Mega Mart through official exchange, issuer, and merchant-banker documents.",
-    "A point-in-time daily market-liquidity panel now exists from the local wide OHLCV cache and the NIFTY/BANKNIFTY/FINNIFTY index history, but direct turnover, delivery, and sector-flow feeds are still missing.",
+    "Pilot source evidence now covers thirty-eight official mainboard IPOs through official exchange, issuer, and merchant-banker documents, including the original 28-name set plus Blue Jet Healthcare, Honasa Consumer, Chemplast Sanmar, Fino Payments Bank, Fedbank Financial Services, BlackBuck, Bajaj Housing Finance, Tata Technologies, Waaree Energies, and KRN Heat Exchanger and Refrigeration.",
+    "A point-in-time daily market-liquidity panel now exists from the local wide OHLCV cache and the NIFTY/BANKNIFTY/FINNIFTY/MIDCPNIFTY index history, a sector-return and sector-turnover proxy panel now exists from the expanded-parent industry map, and direct turnover, delivery, and exchange-stamped sector-flow feeds are still missing.",
+    "The sector-conditioned same-sector peer pass covers 26 of the 38 seed IPO symbols and remains mixed after sector adjustment.",
+    "The broader sector-adjusted basket pass still leaves recent winners, cash-source names, and the small/midcap baskets mixed across application and release windows.",
+    "The pressure-gradient diagnostic finds one narrow sector-adjusted release-window case: the midcap150 basket in the release_5 window orders low to extreme with Spearman rho 1.0, but the rest of the basket/window combinations remain mixed.",
+    "The pressure-gradient stability pass shows that the midcap150 sector-adjusted lead does not generalize to adjacent windows and that the release-window basket neighborhood remains mixed outside midcap150.",
+    "A direct NSE market-history source inventory now identifies archive families for business growth, segment-wise historical reports, security-wise price volume archives, market activity, delivery positions, category turnover, mode of trading, and FII/DII activity, and the segment-wise monthly workbook now yields category-turnover, mode-of-trading, and top-N concentration rows locally.",
+    "The first direct-market loader now normalizes the market-activity, security-wise price-volume, delivery-position, FII/DII CSV families, and the workbook-backed segment-wise capital-market archive into a local manifest; only the umbrella Historical Reports - Capital Market family remains manifest-only.",
+    "The raw NSE daily cache now spans all 38 seed IPO event windows across 38 event directories and about 1.98 million parsed rows, so the next step is to consolidate that direct panel and rerun the event-study chain.",
     "The pilot regime-control panel keeps the focus windows in the volatile regime bucket and still shows mixed basket behavior.",
-    "The pilot event study remains mixed and does not support a simple monotonic pull-and-release rule."
+    "The pilot event study remains mixed and does not support a simple monotonic pull-and-release rule.",
+    "The direct-data falsification pass narrows the thesis but does not validate a broad pull/release rule, so define_trade_rules stays blocked."
   ]
 }

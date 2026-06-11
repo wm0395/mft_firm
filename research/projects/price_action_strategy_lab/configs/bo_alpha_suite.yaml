@@ -1,0 +1,88 @@
+# Research-only profile for running the five encoded price-action alphas
+# across BO-suffixed symbols in market-collector's default runtime database.
+
+universe:
+  name: all_bo_market_collector
+  source: market_collector_native
+  database_path: ../runtime/market_collector_central/market.duckdb
+  exchange: ""
+  symbol_suffix: ".BO"
+  timeframe: 1d
+  start_date: "2025-01-01"
+  min_history_days: 252
+  max_missing_ratio: 0.15
+  require_ohlcv: true
+
+alphas:
+  - bollinger_percent_b_mean_reversion_20
+  - stochastic_mean_reversion_14
+  - williams_r_mean_reversion_14
+  - fisher_transform_reversal_10
+  - inverse_fisher_rsi_reversal_10
+
+expression_modes:
+  - cross_sectional_quintile
+  - time_series_threshold
+  - ranked_long_only
+
+backtests:
+  horizons: [1, 5, 10]
+  turnover_cost_bps: [0.0, 5.0, 10.0, 25.0]
+  min_active_names: 20
+  threshold: 0.0
+  top_quantile: 0.8
+  bottom_quantile: 0.2
+
+compute:
+  cache_enabled: true
+  cache_dir: research/projects/price_action_strategy_lab/cache/bo_alpha_suite
+  report_dir: research/projects/price_action_strategy_lab/reports/bo_alpha_suite
+  max_workers: 1
+
+gpu:
+  enabled: false
+  backend: auto
+  reason: >
+    The runner now has an optional GPU rank-precompute path. Enable it on a
+    CUDA machine with CuPy available; otherwise it falls back to CPU. The
+    indicator layer is still pandas/numpy based, so the main win is caching the
+    per-alpha rank matrices once and reusing them across backtest modes.
+
+validation:
+  enabled: true
+  schemes:
+    - walk_forward
+    - purged
+    - embargo
+  outer_folds: 6
+  train_size: 756
+  test_size: 63
+  step_size: 63
+  lookahead: 10
+  embargo: 10
+  bootstrap_reps: 1000
+  bootstrap_block_length: 10
+  target_cost_bps: 10.0
+  min_active_days: 40
+
+selector_hardening:
+  lower_bound_margin_bps: 0.0
+  turnover_penalty_bps: 25.0
+  instability_penalty_bps: 1.0
+  minimum_fold_pass_rate: 0.5
+  abstain_lower_bound_bps: 0.0
+  primary_scheme: embargo
+
+outputs:
+  - run_summary.md
+  - alpha_results.csv
+  - mode_comparison.csv
+  - alpha_mode_matrix.csv
+  - cache_events.csv
+  - selector_results.csv
+  - validation_folds.csv
+  - validation_summary.csv
+  - research_audit.md
+  - embargo_failure_diagnosis.md
+  - selector_robustness.md
+  - alpha_suite_decision_report.md

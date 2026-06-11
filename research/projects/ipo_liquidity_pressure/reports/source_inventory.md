@@ -76,9 +76,24 @@ sources are used in the seed sample.
 
 ## Coverage Notes
 
-- The seed sample is intentionally narrow, even after expanding to 28 official
+- The seed sample is intentionally narrow, even after expanding to 38 official
   mainboard IPOs.
 - The notices prove event size, timing, and subscription intensity.
 - The notices do not prove secondary-market pull or release pressure.
 - The next data step is to pair these events with historical market and stock
   returns.
+
+## Additional Seed Bundles
+
+| bundle_id | source_id | official_url | Supports | Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `blue_jet_healthcare_seed_bundle` | `blue_jet_healthcare_basis_allotment_notice` | `https://nsearchives.nseindia.com/web/sites/default/files/inline-files/Advt_BueJet_2.pdf` | Issue window, allotment date, subscription ratios, ASBA unblocking | Seeded | Official NSE basis-of-allotment notice shows the 24,285,160-share issue at Rs 346, the 5.97x overall subscription, and trading on 1-Nov-2023. |
+| `honasa_consumer_seed_bundle` | `honasa_consumer_basis_allotment_notice` | `https://nsearchives.nseindia.com/web/sites/default/files/inline-files/Advt_2_Honasa.pdf` | Issue window, allotment date, subscription ratios, ASBA unblocking | Seeded | Official NSE basis-of-allotment notice shows the 52,516,742-share issue at Rs 324, the 4.66x overall subscription, and trading on 7-Nov-2023. |
+| `chemplast_sanmar_seed_bundle` | `chemplast_sanmar_basis_allotment_notice` | `https://www.bseindia.com/corporates/download/376473/ipo_T5/BasisofAllotmentAd_20210823171913.pdf` | Issue window, allotment date, subscription ratios, ASBA unblocking | Seeded | Official BSE basis-of-allotment notice supports the August 2021 timetable and the low 1.61x subscription readout. |
+| `fino_payments_bank_seed_bundle` | `fino_payments_bank_basis_allotment_notice` | `https://www.bseindia.com/corporates/download/394744/ipo_T5/BasisOfAllotmentFino_20211111155443.pdf` | Issue window, allotment date, subscription ratios, ASBA unblocking | Seeded | Official BSE basis-of-allotment notice shows the 20,802,305-share issue at Rs 577, the 1.65x overall subscription, and trading on 12-Nov-2021. |
+| `fedbank_financial_services_seed_bundle` | `fedbank_financial_services_basis_allotment_notice` | `https://nsearchives.nseindia.com/web/sites/default/files/inline-files/Advt_2_Fedbank.pdf` | Issue window, allotment date, subscription ratios, ASBA unblocking | Seeded | Official NSE basis-of-allotment notice shows the 78,073,810-share issue at Rs 140, the 1.8961x overall subscription, and trading on 30-Nov-2023. |
+| `blackbuck_seed_bundle` | `blackbuck_basis_allotment_notice` | `https://nsearchives.nseindia.com/corporate/ADV_INE0UIZ01018_21NOV2024.pdf` | Issue window, allotment date, subscription ratios, ASBA unblocking | Seeded | Official NSE basis-of-allotment notice shows the 40,834,701-share issue at Rs 273, the 1.35x overall subscription, and trading on 22-Nov-2024. |
+| `bajaj_housing_finance_seed_bundle` | `bajaj_housing_finance_basis_allotment_notice` | `https://nsearchives.nseindia.com/web/sites/default/files/inline-files/post_bajaj.pdf` | Issue window, allotment date, subscription ratios, ASBA unblocking | Seeded | Official NSE basis-of-allotment notice shows the 937,142,856-share issue at Rs 70, the 49.97x overall subscription, and trading on 16-Sep-2024. |
+| `tata_technologies_seed_bundle` | `tata_technologies_basis_allotment_notice` | `https://nsearchives.nseindia.com/web/sites/default/files/inline-files/Advt_2_tata.pdf` | Issue window, allotment date, subscription ratios, ASBA unblocking | Seeded | Official NSE basis-of-allotment notice shows the 60,850,278-share issue at Rs 500, the 51.7788x overall subscription, and trading on 30-Nov-2023. |
+| `waaree_energies_seed_bundle` | `waaree_energies_basis_allotment_notice` | `https://nsearchives.nseindia.com/web/sites/default/files/inline-files/wareepostad.pdf` | Issue window, allotment date, subscription ratios, ASBA unblocking | Seeded | Official NSE basis-of-allotment notice shows the 28,752,095-share issue at Rs 1,503, the 56.44x overall subscription, and trading on 28-Oct-2024. |
+| `krn_heat_exchanger_seed_bundle` | `krn_heat_exchanger_basis_allotment_notice` | `https://nsearchives.nseindia.com/web/sites/default/files/inline-files/krnpost_0.pdf` | Issue window, allotment date, subscription ratios, ASBA unblocking | Seeded | Official NSE basis-of-allotment notice shows the 15,543,000-share issue at Rs 220, the 211.95x subscription after technical rejections, and trading on 03-Oct-2024. |

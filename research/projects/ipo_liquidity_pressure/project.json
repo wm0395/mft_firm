@@ -5,7 +5,7 @@
   "dataset_snapshot_id": "dataset_snapshot:ipo_liquidity_pressure_bootstrap",
   "hypothesis_id": "hypothesis:ipo_liquidity_pressure",
   "status": "draft",
-  "phase": "pilot evidence collection and seed event study",
+  "phase": "pilot evidence collection, seed event study, and market-history expansion",
   "state_file": "research_state.json",
   "review_pack_dir": "review_packs",
   "owner_role": "VP Research / Alpha PM"

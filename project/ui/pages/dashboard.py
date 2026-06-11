@@ -6,6 +6,9 @@ from project.data.quality import build_data_quality_report
 from project.ui._streamlit import get_streamlit
 from project.ui.components.empty_state import render_empty_state
 from project.ui.components.page_hero import render_page_hero
+from project.ui_services.price_action_strategy_lab_dashboard import (
+    render_price_action_strategy_lab_section as _render_research_suite,
+)
 
 
 def render(repository) -> None:
@@ -18,6 +21,7 @@ def render(repository) -> None:
     _render_hero(assets, data_summary)
     _render_metrics(st, assets, data_summary)
     _render_quick_actions(st, assets)
+    _render_research_suite(st)
     _render_quality(st, repository, assets)
     _render_asset_table(st, assets)
 
@@ -213,16 +217,7 @@ def _render_asset_table(st, assets) -> None:
         placeholder="Search by symbol or name...",
         label_visibility="collapsed",
     )
-    filtered = assets
-    if search:
-        sl = search.lower()
-        filtered = [
-            a
-            for a in assets
-            if sl in (getattr(a, "symbol", "") or "").lower()
-            or sl in (getattr(a, "name", "") or "").lower()
-        ]
-    total = len(filtered)
+    total = len(filtered := _filtered_assets(assets, search))
     st.markdown(
         f'<div style="color: #94a3b8; font-size: 0.8rem; margin: -0.5rem 0 0.75rem;">'
         f"{total} of {len(assets)} assets shown</div>",
@@ -241,14 +236,28 @@ def _render_asset_table(st, assets) -> None:
             ),
         )
         return
-    rows = []
-    for a in filtered:
-        rows.append(
-            {
-                "Symbol": getattr(a, "symbol", ""),
-                "Name": getattr(a, "name", ""),
-                "Sector": getattr(a, "sector", ""),
-                "Market": getattr(a, "market", ""),
-            }
-        )
-    st.dataframe(rows, use_container_width=True, height=420)
+    st.dataframe(_asset_rows(filtered), use_container_width=True, height=420)
+
+
+def _filtered_assets(assets, search: str):
+    if not search:
+        return assets
+    sl = search.lower()
+    return [
+        a
+        for a in assets
+        if sl in (getattr(a, "symbol", "") or "").lower()
+        or sl in (getattr(a, "name", "") or "").lower()
+    ]
+
+
+def _asset_rows(assets):
+    return [
+        {
+            "Symbol": getattr(a, "symbol", ""),
+            "Name": getattr(a, "name", ""),
+            "Sector": getattr(a, "sector", ""),
+            "Market": getattr(a, "market", ""),
+        }
+        for a in assets
+    ]

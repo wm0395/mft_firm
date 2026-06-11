@@ -24,8 +24,15 @@ from project.ui.components.sidebar_focus import render_sidebar_focus
 from project.ui.state import ensure_state, set_selected_page
 
 
+def _render_dashboard(repository: Any) -> None:
+    from project.ui.pages import dashboard as dashboard_page
+
+    dashboard_page.render(repository)
+
+
 PAGES = {
     "Mission Control": mission_control_page.render,
+    "Dashboard": _render_dashboard,
     "Data": data_page.render,
     "Research": research_page.render,
     "Hypotheses": hypotheses_page.render,

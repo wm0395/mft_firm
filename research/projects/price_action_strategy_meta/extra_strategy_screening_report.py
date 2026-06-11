@@ -12,6 +12,9 @@ from research.notebooks.alpha_001.research.alpha101_engine import load_panel
 from research.projects.price_action_strategy_meta.regime_analysis_strategies import (
     extra_strategy_specs,
 )
+from research.projects.price_action_strategy_meta.regime_panel_utils import (
+    subset_high_vol_panel,
+)
 from research.projects.price_action_strategy_meta.screening_report import (
     evaluate_strategy,
     family_summary,
@@ -31,7 +34,7 @@ DISPLAY_UNIVERSES = ("nifty500_high_vol_top100", "expanded_high_vol_top100")
 def build_results() -> pd.DataFrame:
     rows: list[dict[str, float | int | str]] = []
     for universe in UNIVERSES:
-        panel = load_panel(universe)
+        panel = subset_high_vol_panel(load_panel(universe))
         for horizon in HORIZONS:
             for spec in extra_strategy_specs():
                 print(f"screening {universe} horizon={horizon} strategy={spec.name}", flush=True)
@@ -46,6 +49,7 @@ def build_report(results: pd.DataFrame) -> str:
         "## Protocol",
         "",
         "- This supplemental pass screens the extra first-principles strategies only.",
+        "- Each universe is reduced to its top 100 high-vol names so the extra screen matches the base screen and the regime scan.",
         "- The extra pool now includes trend, reversal, structure, and regime helpers such as supertrend, parabolic SAR, Aroon, Ichimoku, KST, inverse Fisher RSI, mass index, trendlines, volume profile, and choppiness.",
         "- Universe and horizon settings match the base screen so the comparison is apples-to-apples.",
         "- The goal is to isolate whether the expanded extras add any durable edge before they are treated as gate inputs.",

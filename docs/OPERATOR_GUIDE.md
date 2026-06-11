@@ -11,6 +11,12 @@ The default human operating layer is the Streamlit cockpit:
 streamlit run project/ui/app.py
 ```
 
+For a charts-only Streamlit entrypoint backed by the market-collector DuckDB:
+
+```bash
+streamlit run project/ui/charts_app.py
+```
+
 Use Mission Control first. It summarizes system health, data readiness,
 research state, hypothesis readiness, trade ideas, and the next recommended
 command.

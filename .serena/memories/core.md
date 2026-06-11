@@ -1,0 +1,20 @@
+# Project root map
+- Repository: deterministic market research platform for signal generation, hypothesis evaluation, validation, trade idea generation, replay analysis, and backtesting.
+- Main runtime surfaces:
+  - `project/data/`: all DB access, repositories, loaders, schemas, validation, snapshotting.
+  - `project/signals/`: signal pipeline and registry.
+  - `project/hypotheses/`: hypothesis definitions, lifecycle, registry, catalog.
+  - `project/trade_engine/`: trade idea generation / execution modeling.
+  - `project/decision/`: decision models, system, service layer.
+  - `project/backtesting/`: backtest engine and research runner.
+  - `project/research/`: deterministic research workflows, runner, workbench, metrics, artifacts.
+  - `project/ui/` and `project/ui_services/`: Streamlit cockpit and supporting view/service layer.
+  - `project/alpha_math/`: indicator, regime, validation, and feature helpers.
+  - `project/data_sources/`: external source adapters, parsers, and source validation.
+  - `project/cli/`, `project/main.py`, `project/cli_*.py`: grouped `mft` CLI and compatibility entrypoints.
+  - `market_collector/`: separate ingestion/offload package.
+  - `research/`: research notebooks, examples, and project artifacts.
+  - `infra/` and `scripts/`: deployment, DB bootstrap, and repo checks.
+  - `codex_cli/`: developer tooling only, not runtime MFT code.
+- Canonical layer order is defined in `layers.yml`.
+- Read `mem:tech_stack` for runtime/tooling, `mem:conventions` for invariants, `mem:suggested_commands` for operator/dev commands, and `mem:task_completion` for the validation gate.

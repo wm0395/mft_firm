@@ -79,21 +79,39 @@ def benchmark_close(panel: Alpha101Panel) -> pd.Series:
 
 
 def quantile_bucket(series: pd.Series, labels: tuple[str, str, str]) -> pd.Series:
-    values = series.dropna()
-    if values.empty:
-        return pd.Series("unknown", index=series.index)
-    low = values.quantile(1.0 / 3.0)
-    high = values.quantile(2.0 / 3.0)
+    return rolling_quantile_bucket(series, labels)
+
+
+def rolling_quantile_bucket(
+    series: pd.Series,
+    labels: tuple[str, str, str],
+    lookback: int = 504,
+    min_periods: int = 126,
+) -> pd.Series:
+    history = series.shift(1)
+    low = history.rolling(lookback, min_periods=min_periods).quantile(1.0 / 3.0)
+    high = history.rolling(lookback, min_periods=min_periods).quantile(2.0 / 3.0)
     out = pd.Series(labels[1], index=series.index, dtype="object")
-    out[series.le(low)] = labels[0]
-    out[series.ge(high)] = labels[2]
-    out[series.isna()] = "unknown"
+    valid = series.notna() & low.notna() & high.notna()
+    out[~valid] = "unknown"
+    out[valid & series.le(low)] = labels[0]
+    out[valid & series.ge(high)] = labels[2]
     return out
+
+
+def rolling_upper_quantile(
+    series: pd.Series,
+    quantile: float = 0.75,
+    lookback: int = 504,
+    min_periods: int = 126,
+) -> pd.Series:
+    return series.shift(1).rolling(lookback, min_periods=min_periods).quantile(quantile)
 
 
 def regime_frame(panel: Alpha101Panel) -> pd.DataFrame:
     bench = benchmark_close(panel)
     bench_ret = bench.pct_change(fill_method=None)
+    drawdown = bench.div(bench.cummax()).sub(1.0)
     vol20 = bench_ret.rolling(20, min_periods=20).std().mul(np.sqrt(252.0))
     ma50 = bench.rolling(50, min_periods=50).mean()
     ma200 = bench.rolling(200, min_periods=200).mean()
@@ -102,7 +120,7 @@ def regime_frame(panel: Alpha101Panel) -> pd.DataFrame:
     gap_atr = gap.gap_atr.mean(axis=1)
     gap_dir = gap.gap.mean(axis=1)
     dollar_volume = panel.close.mul(panel.volume).mean(axis=1)
-    vol_state = quantile_bucket(vol20, ("low_vol", "normal_vol", "high_vol"))
+    vol_state = rolling_quantile_bucket(vol20, ("low_vol", "normal_vol", "high_vol"))
     breadth_state = pd.Series("neutral", index=bench.index, dtype="object")
     breadth_state[breadth.ge(0.25)] = "bullish"
     breadth_state[breadth.le(-0.25)] = "bearish"
@@ -111,13 +129,20 @@ def regime_frame(panel: Alpha101Panel) -> pd.DataFrame:
     bear = bench.lt(ma50) & ma50.lt(ma200) & bench_ret.rolling(20, min_periods=20).mean().lt(0.0)
     trend_state[bull] = "bull"
     trend_state[bear] = "bear"
-    gap_state = pd.Series("calm", index=bench.index, dtype="object")
-    shock = gap_atr.ge(gap_atr.quantile(0.75))
+    gap_state = pd.Series("unknown", index=bench.index, dtype="object")
+    gap_threshold = rolling_upper_quantile(gap_atr)
+    gap_valid = gap_atr.notna() & gap_threshold.notna()
+    gap_state[gap_valid] = "calm"
+    shock = gap_valid & gap_atr.ge(gap_threshold)
     gap_state[shock & gap_dir.gt(0.0)] = "up_gap_shock"
     gap_state[shock & gap_dir.lt(0.0)] = "down_gap_shock"
-    liquidity_state = quantile_bucket(
+    liquidity_state = rolling_quantile_bucket(
         np.log(dollar_volume.replace(0.0, np.nan)),
         ("low_liquidity", "normal_liquidity", "high_liquidity"),
+    )
+    drawdown_state = rolling_quantile_bucket(
+        drawdown,
+        ("deep_drawdown", "normal_drawdown", "shallow_drawdown"),
     )
     risk_state = pd.Series("mixed", index=bench.index, dtype="object")
     risk_on = trend_state.eq("bull") & vol_state.ne("high_vol") & breadth_state.eq("bullish")
@@ -132,20 +157,37 @@ def regime_frame(panel: Alpha101Panel) -> pd.DataFrame:
             "breadth_score": breadth,
             "gap_score": gap_atr.mul(np.sign(gap_dir)),
             "liquidity_score": np.log(dollar_volume.replace(0.0, np.nan)),
+            "drawdown_score": drawdown,
             "vol_state": vol_state,
             "trend_state": trend_state,
             "breadth_state": breadth_state,
             "gap_state": gap_state,
             "liquidity_state": liquidity_state,
+            "drawdown_state": drawdown_state,
             "risk_state": risk_state,
         }
     )
-    return frame.fillna({"vol_state": "unknown", "trend_state": "unknown", "breadth_state": "unknown", "gap_state": "unknown", "liquidity_state": "unknown", "risk_state": "unknown"})
+    return frame.fillna({
+        "vol_state": "unknown",
+        "trend_state": "unknown",
+        "breadth_state": "unknown",
+        "gap_state": "unknown",
+        "liquidity_state": "unknown",
+        "drawdown_state": "unknown",
+        "risk_state": "unknown",
+    })
 
 
-def strategy_daily_frame(panel: Alpha101Panel, spec: StrategySpec, horizon: int) -> pd.DataFrame:
-    mask = panel.high_vol_mask & panel.active_mask
-    future = forward_return(panel.close, horizon)
+def strategy_daily_frame(
+    panel: Alpha101Panel,
+    spec: StrategySpec,
+    horizon: int,
+    compute_rank_ic: bool = True,
+    future: pd.DataFrame | None = None,
+    base_mask: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    mask = base_mask if base_mask is not None else panel.high_vol_mask & panel.active_mask
+    future = future if future is not None else forward_return(panel.close, horizon)
     signal = spec.builder(panel).reindex_like(panel.close).astype(float)
     valid = mask & signal.notna() & future.notna()
     counts = valid.sum(axis=1)
@@ -161,7 +203,11 @@ def strategy_daily_frame(panel: Alpha101Panel, spec: StrategySpec, horizon: int)
     gross = gross.where(eligible)
     turnover = turnover.where(eligible)
     net = gross - turnover * (2.0 * TARGET_COST_BPS / 10_000.0)
-    rank_ic = fast_rank_ic_by_date(signal.where(valid), future.where(valid), min_names=MIN_NAMES)
+    rank_ic = (
+        fast_rank_ic_by_date(signal.where(valid), future.where(valid), min_names=MIN_NAMES)
+        if compute_rank_ic
+        else pd.Series(np.nan, index=panel.close.index)
+    )
     return pd.DataFrame(
         {
             "gross_return": gross,
@@ -220,9 +266,18 @@ def daily_group_summary(values: pd.Series, state: pd.Series, min_obs: int = 20) 
 
 def strategy_regime_rows(panel: Alpha101Panel, regime: pd.DataFrame, universe: str) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
+    base_mask = panel.high_vol_mask & panel.active_mask
     for horizon in HORIZONS:
+        future = forward_return(panel.close, horizon)
         for spec in all_strategy_specs():
-            daily = strategy_daily_frame(panel, spec, horizon).join(regime, how="left")
+            daily = strategy_daily_frame(
+                panel,
+                spec,
+                horizon,
+                compute_rank_ic=False,
+                future=future,
+                base_mask=base_mask,
+            ).join(regime, how="left")
             for dimension in ("vol_state", "trend_state", "breadth_state", "gap_state", "liquidity_state", "risk_state"):
                 summary = daily_group_summary(daily["net_return"], daily[dimension])
                 if summary.empty:
@@ -245,7 +300,9 @@ def correlation_rows(panel: Alpha101Panel, regime: pd.DataFrame, universe: str) 
     rows: list[dict[str, object]] = []
     for horizon in HORIZONS:
         for spec in all_strategy_specs():
-            daily = strategy_daily_frame(panel, spec, horizon).join(regime, how="left")
+            daily = strategy_daily_frame(
+                panel, spec, horizon, compute_rank_ic=False
+            ).join(regime, how="left")
             factors = daily[["net_return", "vol_score", "trend_score", "breadth_score", "gap_score", "liquidity_score"]].dropna()
             if len(factors) < 20:
                 continue
@@ -327,6 +384,7 @@ def build_report(strategy_rows: list[dict[str, object]], sector_rows: list[dict[
         "- Strategy pool: a curated subset of fast, representative base-screen strategies plus breakout, trend, reversal, gap, structure, and participation extras.",
         "- Each universe is reduced to its top 100 high-vol names before the regime scan so the panel matches the first-pass screen and stays tractable.",
         "- Regime axes: volatility, trend, breadth, gap shock, liquidity, and combined risk state.",
+        "- Volatility, gap, liquidity, and drawdown buckets are built from trailing windows only; no full-sample quantiles remain in the regime labels.",
         "- News effects are proxied by gap shocks because no local headline feed exists in the repository.",
         "- Cost stress uses `10bps` net returns for the regime summaries.",
         "",
@@ -373,11 +431,16 @@ def main() -> int:
     liquidity_rows: list[dict[str, object]] = []
     corr_rows: list[dict[str, object]] = []
     for universe in ("nifty500", "expanded"):
+        print(f"regime {universe}: loading high-vol subset", flush=True)
         panel = subset_high_vol_panel(load_panel(universe))
         regime = regime_frame(panel)
+        print(f"regime {universe}: strategy rows", flush=True)
         strategy_rows.extend(strategy_regime_rows(panel, regime, universe))
+        print(f"regime {universe}: sector rows", flush=True)
         sector_rows.extend(class_rows(panel, sector_members(panel), "sector", regime, universe))
+        print(f"regime {universe}: liquidity rows", flush=True)
         liquidity_rows.extend(class_rows(panel, liquidity_classes(panel), "liquidity_class", regime, universe))
+        print(f"regime {universe}: correlation rows", flush=True)
         corr_rows.extend(correlation_rows(panel, regime, universe))
     write_outputs(strategy_rows, sector_rows, liquidity_rows, corr_rows)
     MD_PATH.write_text(build_report(strategy_rows, sector_rows, liquidity_rows, corr_rows), encoding="utf-8")

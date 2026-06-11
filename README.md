@@ -26,6 +26,12 @@ The cockpit is organized around Mission Control, Data, Research, Hypotheses,
 Trade Ideas, Explainability, and Reports. It is the default way to inspect
 system health, review evidence, and decide what to do next.
 
+For a charts-only view against the market-collector DuckDB, run:
+
+```bash
+streamlit run project/ui/charts_app.py
+```
+
 When `streamlit-option-menu` is installed, the sidebar uses a modern option
 menu; otherwise it falls back to the built-in Streamlit radio selector.
 

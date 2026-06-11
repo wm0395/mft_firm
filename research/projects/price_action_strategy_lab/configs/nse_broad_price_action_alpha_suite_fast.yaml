@@ -1,0 +1,133 @@
+# Discovery-only profile for the expanded NSE price-action registry.
+# Validation is disabled so the 25-alpha sweep can finish quickly while still
+# reusing the cached signals and backtests from the broader run tree.
+
+universe:
+  name: all_nse_market_collector
+  source: market_collector_native
+  database_path: ../runtime/market_collector_central/market.duckdb
+  exchange: NSE
+  symbol_suffix: ".NS"
+  timeframe: 1d
+  min_history_days: 252
+  max_missing_ratio: 0.15
+  require_ohlcv: true
+
+alphas:
+  - bollinger_percent_b_mean_reversion_20
+  - stochastic_mean_reversion_14
+  - williams_r_mean_reversion_14
+  - fisher_transform_reversal_10
+  - inverse_fisher_rsi_reversal_10
+  - failed_breakout_score_20
+  - failed_reversal_score
+  - trend_volume_composite
+  - hybrid_confirmation
+  - breakout_20
+  - keltner_breakout_20
+  - squeeze_breakout_20
+  - relative_volume_breakout_20
+  - supertrend_direction_10
+  - parabolic_sar_trend
+  - chandelier_trend
+  - support_resistance_position_20
+  - support_trendline_position_20
+  - multi_timeframe_confirmation
+  - opening_gap_regime_score
+  - doji_reversal_score
+  - engulfing_reversal_score
+  - hammer_shooting_star_score
+  - inside_outside_bar_score
+  - piercing_dark_cloud_score
+
+expression_modes:
+  - cross_sectional_quintile
+  - time_series_threshold
+  - ranked_long_only
+
+backtests:
+  horizons: [1, 5, 10]
+  turnover_cost_bps: [0.0, 5.0, 10.0, 25.0]
+  min_active_names: 20
+  threshold: 0.0
+  top_quantile: 0.8
+  bottom_quantile: 0.2
+
+selectors:
+  enabled:
+    - best_mean_net_bps
+    - positive_mean_abstain
+  abstain_when_net_bps_lte: 0.0
+
+charts:
+  enabled: true
+  symbols: []
+  max_symbols: 50
+  include_modes:
+    - cross_sectional_quintile
+    - time_series_threshold
+    - ranked_long_only
+
+compute:
+  cache_enabled: true
+  cache_dir: research/projects/price_action_strategy_lab/cache/nse_broad_price_action_alpha_suite
+  report_dir: research/projects/price_action_strategy_lab/reports/nse_broad_price_action_alpha_suite_fast
+  max_workers: 4
+  parallelism_scope:
+    - alpha_signal
+    - expression_mode
+    - horizon_cost_backtest
+  cache_artifacts:
+    - nse_panel
+    - alpha_signal_frame
+    - backtest_summary
+    - chart_signal_table
+
+gpu:
+  enabled: true
+  backend: auto
+  reason: >
+    The runner now has an optional GPU rank-precompute path. Enable it on a
+    CUDA machine with CuPy available; otherwise it falls back to CPU. The
+    indicator layer is still pandas/numpy based, so the biggest gain currently
+    comes from caching the per-alpha rank matrices once and reusing them across
+    backtest modes.
+
+validation:
+  enabled: false
+  schemes:
+    - walk_forward
+    - purged
+    - embargo
+  outer_folds: 6
+  train_size: 756
+  test_size: 63
+  step_size: 63
+  lookahead: 10
+  embargo: 10
+  bootstrap_reps: 1000
+  bootstrap_block_length: 10
+  target_cost_bps: 10.0
+  min_active_days: 40
+
+selector_hardening:
+  lower_bound_margin_bps: 0.0
+  turnover_penalty_bps: 25.0
+  instability_penalty_bps: 1.0
+  minimum_fold_pass_rate: 0.5
+  abstain_lower_bound_bps: 0.0
+  primary_scheme: embargo
+
+outputs:
+  - run_summary.md
+  - alpha_results.csv
+  - mode_comparison.csv
+  - alpha_mode_matrix.csv
+  - selector_results.csv
+  - validation_folds.csv
+  - validation_summary.csv
+  - research_audit.md
+  - embargo_failure_diagnosis.md
+  - selector_robustness.md
+  - alpha_suite_decision_report.md
+  - chart_index.md

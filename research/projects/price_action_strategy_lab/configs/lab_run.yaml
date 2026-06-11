@@ -1,0 +1,26 @@
+{
+  "data_csv": "research/projects/price_action_strategy_lab/examples/signal_table.csv",
+  "report_dir": "research/projects/price_action_strategy_lab/reports/demo_run",
+  "chart_symbols": ["RELIANCE", "TCS"],
+  "backtests": [
+    {
+      "name": "reversal_cross_section",
+      "mode": "cross_sectional_quintile",
+      "horizon": 5,
+      "cost": {"turnover_bps": 10.0}
+    },
+    {
+      "name": "reversal_stock_local",
+      "mode": "time_series_threshold",
+      "horizon": 5,
+      "threshold": 0.0,
+      "cost": {"turnover_bps": 10.0}
+    },
+    {
+      "name": "reversal_long_only",
+      "mode": "ranked_long_only",
+      "horizon": 5,
+      "cost": {"turnover_bps": 10.0}
+    }
+  ]
+}

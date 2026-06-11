@@ -37,6 +37,16 @@ exchange records before building a full market-return study.
 | Afcons Infrastructure Limited | `AFCONS` | `117,327,139` shares at `463` (`5430.00` crore INR) | `2024-10-25` | `2024-10-29` | `2024-10-30` | `2024-11-04` | `2.77x` |
 | NTPC Green Energy Limited | `NTPCGREEN` | `926,824,881` shares at `108` (`10000.00` crore INR) | `2024-11-19` | `2024-11-22` | `2024-11-26` | `2024-11-27` | `1.94x` |
 | Vishal Mega Mart Limited | `VMM` | `1,025,641,025` shares at `78` (`8000.00` crore INR) | `2024-12-11` | `2024-12-13` | `2024-12-17` | `2024-12-18` | `20.46768x` |
+| Blue Jet Healthcare Limited | `BLUEJET` | `24,285,160` shares at `346` (`840.27` crore INR) | `2023-10-25` | `2023-10-27` | `2023-10-30` | `2023-11-01` | `5.97x` |
+| Honasa Consumer Limited | `HONASA` | `52,516,742` shares at `324` (`1701.44` crore INR) | `2023-10-31` | `2023-11-02` | `2023-11-03` | `2023-11-07` | `4.66x` |
+| Chemplast Sanmar Limited | `CHEMPLASTS` | `71,164,509` shares at `541` (`3850.00` crore INR) | `2021-08-10` | `2021-08-12` | `2021-08-18` | `2021-08-24` | `1.61x` |
+| Fino Payments Bank Limited | `FINOPB` | `20,802,305` shares at `577` (`1200.29` crore INR) | `2021-10-29` | `2021-11-02` | `2021-11-09` | `2021-11-12` | `1.65x` |
+| Fedbank Financial Services Limited | `FEDFINA` | `78,073,810` shares at `140` (`1092.26` crore INR) | `2023-11-22` | `2023-11-24` | `2023-11-29` | `2023-11-30` | `1.8961x` |
+| BlackBuck / Zinka Logistics Solutions Limited | `BLACKBUCK` | `40,834,701` shares at `273` (`1114.72` crore INR) | `2024-11-13` | `2024-11-18` | `2024-11-20` | `2024-11-22` | `1.35x` |
+| Bajaj Housing Finance Limited | `BAJAJHFL` | `937,142,856` shares at `70` (`6560.00` crore INR) | `2024-09-09` | `2024-09-11` | `2024-09-13` | `2024-09-16` | `49.97x` |
+| Tata Technologies Limited | `TATATECH` | `60,850,278` shares at `500` (`3042.51` crore INR) | `2023-11-22` | `2023-11-24` | `2023-11-29` | `2023-11-30` | `51.7788x` |
+| Waaree Energies Limited | `WAAREEENER` | `28,752,095` shares at `1503` (`4321.44` crore INR) | `2024-10-21` | `2024-10-23` | `2024-10-24` | `2024-10-28` | `56.44x` |
+| KRN Heat Exchanger and Refrigeration Limited | `KRN` | `15,543,000` shares at `220` (`341.95` crore INR) | `2024-09-25` | `2024-09-27` | `2024-09-30` | `2024-10-03` | `211.95x` |
 
 ## Category Ratios From Official Notices
 
@@ -70,18 +80,31 @@ exchange records before building a full market-return study.
 | Afcons Infrastructure Limited | `0.94x` | `1.35x` | `13.35x` | `3.96x` |
 | NTPC Green Energy Limited | `3.75x` | `1.39x` | `0.61x` | `3.51x` |
 | Vishal Mega Mart Limited | `2.44355x` | `10.44657x` | `17.21215x` | `85.07713x` |
+| Blue Jet Healthcare Limited | `2.36x` | `9.88x` | `15.54x` | `13.75x` |
+| Honasa Consumer Limited | `1.39x` | `2.40x` | `4.87x` | `11.49x` |
+| Chemplast Sanmar Limited | `NA` | `NA` | `NA` | `NA` |
+| Fino Payments Bank Limited | `3.95x` | `0.16x` | `NA` | `1.64x` |
+| Fedbank Financial Services Limited | `1.8905x` | `1.9716x` | `1.2753x` | `3.4714x` |
+| BlackBuck / Zinka Logistics Solutions Limited | `1.67x` | `0.37x` | `0.18x` | `2.24x` |
+| Bajaj Housing Finance Limited | `7.94x` | `32.83x` | `49.30x` | `222.60x` |
+| Tata Technologies Limited | `17.3093x` | `45.7878x` | `71.4176x` | `202.9006x` |
+| Waaree Energies Limited | `11.73x` | `54.48x` | `71.83x` | `214.70x` |
+| KRN Heat Exchanger and Refrigeration Limited | `101.07x` | `412.46x` | `448.62x` | `250.57x` |
 
 ## Reading
 
 - Mechanism plausibility: supported.
-- Why: the twenty-eight IPOs now span extreme, high, medium, and low pressure
+- Why: the thirty-eight IPOs now span extreme, high, medium, and low pressure
   cases across consumer services, insurance, asset management, healthcare,
   electronics, logistics, hospitality, industrial products, travel services,
-  home furnishing, energy, pharmaceuticals, financial services, and older
-  low-pressure comparators.
+  home furnishing, energy, pharmaceuticals, financial services, chemicals,
+  banking, and older low-pressure comparators.
 - NTPC Green Energy extends the mega-issue low-pressure end of the sample,
   while Vishal Mega Mart adds a highly oversubscribed large-cap comparator
-  with a much hotter subscription profile.
+  with a much hotter subscription profile; the new Blue Jet, Honasa,
+  Chemplast, Fino, Fedbank, BlackBuck, Bajaj Housing Finance, Tata
+  Technologies, Waaree Energies, and KRN rows broaden the pressure gradient
+  on both the medium and low ends.
 - Timing: allotment followed close within one trading day for all names, and
   listing followed allotment within one trading day.
 - Liquidity pull: not yet tested in a way that supports a broad rule.
@@ -96,9 +119,12 @@ pulled away or that any underperformance mean-reverted after allotment.
 
 The older Paytm and Delhivery comparators, plus Niva Bupa, Sagility, Aegis
 Vopak, Afcons, NTPC Green Energy, and Vishal Mega Mart, are official-source
-seed rows, but their compact source documents do not surface the same
-category-split fields as the newer exchange notices, so those cells are left
-as `NA` in the summary where applicable.
+seed rows, while the new Blue Jet, Honasa, Chemplast, Fino, Fedbank,
+BlackBuck, Bajaj Housing Finance, Tata Technologies, Waaree Energies, and
+KRN rows widen the comparator set across the low and medium pressure bands.
+Some compact source documents still do not surface the same category-split
+fields as the newer exchange notices, so those cells are left as `NA` in the
+summary where applicable.
 
 The thesis is therefore still open, but it is no longer speculative in the
 sense of lacking real event examples.

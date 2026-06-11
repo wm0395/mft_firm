@@ -1,0 +1,43 @@
+# Versioned external stress feature registry for weak-fold diagnostics.
+# This is a data/diagnostic config, not a trading-rule config.
+
+version: 1
+
+universe:
+  name: all_nse_market_collector
+  source: market_collector_native
+  database_path: ../runtime/market_collector_central/market.duckdb
+  exchange: NSE
+  symbol_suffix: ".NS"
+  min_history_days: 252
+  max_missing_ratio: 0.15
+
+compute:
+  report_root: research/projects/price_action_strategy_lab/reports/nse_external_stress_diagnostics
+  source_report_dir: research/projects/price_action_strategy_lab/reports/nse_broad_price_action_activator_suite
+  baseline_fold_metrics_path: research/projects/price_action_strategy_lab/reports/nse_broad_price_action_activator_suite/soft_throttle_walk_forward_fold_metrics.csv
+  max_folds: 24
+
+targets:
+  weak_quantile: 0.25
+  bottom_decile_quantile: 0.10
+
+features:
+  - {name: india_vix_level_lag1, source: india_vix, transform: level, lag_days: 1, available: false}
+  - {name: india_vix_1d_change_lag1, source: india_vix, transform: pct_change_1d, lag_days: 1, available: false}
+  - {name: india_vix_5d_change_lag1, source: india_vix, transform: pct_change_5d, lag_days: 1, available: false}
+  - {name: fpi_equity_flow_1d_lag1, source: fpi_equity_flows, transform: flow_1d, lag_days: 1, available: false}
+  - {name: fpi_equity_flow_5d_lag1, source: fpi_equity_flows, transform: flow_5d, lag_days: 1, available: false}
+  - {name: fpi_equity_flow_20d_lag1, source: fpi_equity_flows, transform: flow_20d, lag_days: 1, available: false}
+  - {name: usdinr_1d_change_lag1, source: usdinr, transform: pct_change_1d, lag_days: 1, available: false}
+  - {name: usdinr_5d_change_lag1, source: usdinr, transform: pct_change_5d, lag_days: 1, available: false}
+  - {name: crude_5d_change_lag1, source: crude_proxy, transform: pct_change_5d, lag_days: 1, available: false}
+  - {name: nifty_return_5d_lag1, source: market_collector_equal_weight_nse, transform: equal_weight_return_5d, lag_days: 1, available: true}
+  - {name: nifty_drawdown_20d_lag1, source: market_collector_equal_weight_nse, transform: equal_weight_drawdown_20d, lag_days: 1, available: true}
+  - {name: nifty_drawdown_60d_lag1, source: market_collector_equal_weight_nse, transform: equal_weight_drawdown_60d, lag_days: 1, available: true}
+  - {name: sector_dispersion_5d_lag1, source: market_collector_cross_section_proxy, transform: cross_section_return_dispersion_5d, lag_days: 1, available: true}
+  - {name: sector_dispersion_20d_lag1, source: market_collector_cross_section_proxy, transform: cross_section_return_dispersion_20d, lag_days: 1, available: true}
+  - {name: market_traded_value_zscore_20d_lag1, source: market_collector_nse_ohlcv, transform: traded_value_zscore_20d, lag_days: 1, available: true}
+  - {name: advance_decline_ratio_lag1, source: market_collector_nse_ohlcv, transform: advance_decline_ratio_1d, lag_days: 1, available: true}
+  - {name: advance_decline_ratio_5d_lag1, source: market_collector_nse_ohlcv, transform: advance_decline_ratio_5d, lag_days: 1, available: true}
+  - {name: breadth_risk_off_lag1, source: price_action_internal_activator, transform: breadth_risk_off_mask_mean, lag_days: 1, available: true}

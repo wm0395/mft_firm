@@ -5,6 +5,7 @@ from collections.abc import Mapping
 
 from project.ui._streamlit import get_streamlit
 from project.ui.navigation import page_definition
+from project.ui.state import set_selected_page
 
 
 def render_sidebar_focus(
@@ -20,11 +21,12 @@ def render_sidebar_focus(
     markdown = getattr(sidebar, "markdown", None)
     if callable(markdown):
         markdown(_focus_html(items), unsafe_allow_html=True)
-        return
-    caption = getattr(sidebar, "caption", None)
-    if callable(caption):
-        for label, value in items:
-            caption(f"{label}: {value}")
+    else:
+        caption = getattr(sidebar, "caption", None)
+        if callable(caption):
+            for label, value in items:
+                caption(f"{label}: {value}")
+    _render_research_jump(st, page)
 
 
 def _focus_items(
@@ -204,6 +206,20 @@ def _focus_value(items: tuple[tuple[str, str], ...], label: str) -> str:
         if item_label == label:
             return value
     return ""
+
+
+def _render_research_jump(st, page: str) -> None:
+    if page == "Research":
+        return
+    sidebar = getattr(st, "sidebar", None)
+    button = getattr(sidebar, "button", None)
+    if not callable(button):
+        return
+    if button("Go to Research", key="sidebar-go-research", type="primary", use_container_width=True):
+        set_selected_page(st.session_state, "Research")
+        rerun = getattr(st, "rerun", None)
+        if callable(rerun):
+            rerun()
 
 
 def _chip_html(label: str, value: str, variant: str) -> str:

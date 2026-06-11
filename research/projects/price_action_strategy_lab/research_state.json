@@ -1,0 +1,103 @@
+{
+  "canonical_state_file": "research/projects/price_action_strategy_lab/research_state.json",
+  "project_id": "research_project:price_action_strategy_lab",
+  "project_status": "draft",
+  "phase": "first_runnable_lab_spine",
+  "state_as_of_utc": "2026-06-06T00:00:00Z",
+  "source_of_truth": "research/projects/price_action_strategy_lab/README.md",
+  "objective": "Create a research-only tinkering lab for NSE market-collector price-action research with chart inspection, alpha expression modes, backtest modes, and meta selector options.",
+  "summary_artifacts": [
+    "research/projects/price_action_strategy_lab/README.md",
+    "research/projects/price_action_strategy_lab/configs/universe.yaml",
+    "research/projects/price_action_strategy_lab/configs/lab_run.yaml",
+    "project/data/market_collector_panel.py",
+    "research/projects/price_action_strategy_lab/universe_adapter.py",
+    "research/projects/price_action_strategy_lab/alpha_registry.py",
+    "research/projects/price_action_strategy_lab/alpha_specs.py",
+    "research/projects/price_action_strategy_lab/expression_modes.py",
+    "research/projects/price_action_strategy_lab/backtest_modes.py",
+    "research/projects/price_action_strategy_lab/selectors.py",
+    "research/projects/price_action_strategy_lab/selector_registry.py",
+    "research/projects/price_action_strategy_lab/chart_pack.py",
+    "research/projects/price_action_strategy_lab/run_lab.py",
+    "research/projects/price_action_strategy_lab/reports/README.md",
+    "research/projects/price_action_strategy_lab/review_packs/README.md"
+  ],
+  "active_refinements": [
+    "nse_market_collector_universe",
+    "chart_first_signal_inspection",
+    "alpha_expression_modes",
+    "backtest_mode_comparison",
+    "meta_selector_playground",
+    "reproducible_research_runs"
+  ],
+  "current_baseline": {
+    "universe": "all_nse_market_collector_pending",
+    "timeframe": "1d",
+    "cost_stress_bps": [
+      0,
+      5,
+      10,
+      25
+    ],
+    "evaluation_split": "not_started"
+  },
+  "initial_tasks": [
+    {
+      "task_id": "create_lab_scaffold",
+      "status": "completed",
+      "objective": "Create the project metadata, configs, report directories, and scaffold test.",
+      "deliverables": [
+        "README.md",
+        "project.json",
+        "research_state.json",
+        "configs/universe.yaml",
+        "configs/lab_run.yaml",
+        "reports/README.md",
+        "review_packs/README.md"
+      ]
+    },
+    {
+      "task_id": "build_market_collector_universe_adapter",
+      "status": "completed",
+      "objective": "Expose all available NSE stocks from approved data-layer APIs without DB access in research code.",
+      "deliverable": "project/data/market_collector_panel.py"
+    },
+    {
+      "task_id": "build_alpha_registry",
+      "status": "completed",
+      "objective": "Create explicit decorated alpha specs for price-action research functions.",
+      "deliverable": "alpha_registry.py"
+    },
+    {
+      "task_id": "build_chart_pack",
+      "status": "completed",
+      "objective": "Generate per-symbol chart artifacts with alpha events, entries, exits, regimes, and selector reasons.",
+      "deliverable": "chart_pack.py"
+    },
+    {
+      "task_id": "write_deployment_rules",
+      "status": "blocked",
+      "objective": "Write deployment rules only if later research clears out-of-sample, cost, and robustness gates.",
+      "deliverable": "not_applicable_for_research_lab"
+    }
+  ],
+  "validation_gates": [
+    "Scaffold gate",
+    "Universe integrity gate",
+    "Chart inspection gate",
+    "Backtest reproducibility gate",
+    "Cost stress gate",
+    "Selector baseline lift gate",
+    "Walk-forward purged embargo gate"
+  ],
+  "notes": [
+    "This project is a research-only sandbox and must not be treated as a deployment workflow.",
+    "The first runnable spine is implemented around CSV signal tables and market-collector repository panels.",
+    "All future market data access must stay inside project/data/.",
+    "The lab should support NSE market-collector universe expansion before strategy claims are made.",
+    "Cross-sectional ranking is only one expression mode and should be compared with stock-local and event-window alternatives.",
+    "Every selector must expose abstention and reason codes.",
+    "Every result must compare against flat, always-on, and simple benchmark baselines."
+  ]
+}

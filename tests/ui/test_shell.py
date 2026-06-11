@@ -94,6 +94,7 @@ def test_app_main_seeds_state_and_dispatches_selected_page(monkeypatch) -> None:
         "Section",
         (
             "Mission Control",
+            "Dashboard",
             "Data",
             "Research",
             "Hypotheses",

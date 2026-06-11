@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from typing import Literal
 from types import SimpleNamespace
 
 import project.ui.components.evidence_table as evidence_table_component
@@ -18,13 +19,15 @@ class _FakeBlock:
     def __enter__(self) -> "_FakeStreamlit":
         return self._parent
 
-    def __exit__(self, *_args) -> bool:
+    def __exit__(self, *_args) -> Literal[False]:
         return False
 
 
 class _FakeStreamlit:
     def __init__(self) -> None:
         self.sidebar = _FakeSidebar()
+        self.session_state: dict[str, object] = {}
+        self.rerun_calls = 0
         self.container_calls: list[bool] = []
         self.columns_calls: list[int] = []
         self.expander_calls: list[tuple[str, bool]] = []
@@ -69,17 +72,26 @@ class _FakeStreamlit:
     def dataframe(self, value: object, **_kwargs) -> None:
         self.dataframes.append(value)
 
+    def rerun(self) -> None:
+        self.rerun_calls += 1
+
 
 class _FakeSidebar:
     def __init__(self) -> None:
         self.markdowns: list[tuple[str, bool]] = []
         self.captions: list[str] = []
+        self.button_calls: list[tuple[str, dict[str, object]]] = []
+        self.next_button_result = False
 
     def markdown(self, text: str, unsafe_allow_html: bool = False) -> None:
         self.markdowns.append((text, unsafe_allow_html))
 
     def caption(self, text: str) -> None:
         self.captions.append(text)
+
+    def button(self, label: str, **kwargs) -> bool:
+        self.button_calls.append((label, kwargs))
+        return self.next_button_result
 
 
 def test_render_json_debug_summarizes_dict_payload(
@@ -281,6 +293,33 @@ def test_render_sidebar_focus_renders_compact_summary_card(monkeypatch) -> None:
     assert "Run Research" in html
     assert "RSI Mean Reversion" in html
     assert "ready" in html
+
+
+def test_render_sidebar_focus_offers_research_jump(monkeypatch) -> None:
+    fake_st = _FakeStreamlit()
+    fake_st.sidebar.next_button_result = True
+    monkeypatch.setattr(
+        sidebar_focus_component, "get_streamlit", lambda: fake_st
+    )
+
+    sidebar_focus_component.render_sidebar_focus(
+        object(),
+        {},
+        "Mission Control",
+    )
+
+    assert fake_st.sidebar.button_calls == [
+        (
+            "Go to Research",
+            {
+                "key": "sidebar-go-research",
+                "type": "primary",
+                "use_container_width": True,
+            },
+        )
+    ]
+    assert fake_st.session_state["ui_page"] == "Research"
+    assert fake_st.rerun_calls == 1
 
 
 def test_render_sidebar_focus_falls_back_to_captions(monkeypatch) -> None:

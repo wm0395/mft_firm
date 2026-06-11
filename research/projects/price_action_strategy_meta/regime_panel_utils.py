@@ -3,8 +3,13 @@ from __future__ import annotations
 from research.notebooks.alpha_001.research.alpha101_engine import Alpha101Panel
 
 
-def subset_high_vol_panel(panel: Alpha101Panel, top_n: int = 100) -> Alpha101Panel:
-    shares = panel.high_vol_mask.mean(axis=0).sort_values(ascending=False).head(top_n)
+def subset_high_vol_panel(
+    panel: Alpha101Panel,
+    top_n: int = 100,
+    reference_rows: int = 504,
+) -> Alpha101Panel:
+    reference = panel.high_vol_mask.head(reference_rows) if reference_rows > 0 else panel.high_vol_mask
+    shares = reference.mean(axis=0).sort_values(ascending=False).head(top_n)
     columns = shares.index
     return Alpha101Panel(
         name=f"{panel.name}_high_vol_top{top_n}",

@@ -16,7 +16,7 @@ from research.projects.price_action_strategy_meta.selector_gate_engine import (
     GateThresholds,
     backtest_policy,
     baseline_metrics,
-    candidate_scan,
+    candidate_scan_train_only,
     selection_metrics,
 )
 from research.projects.price_action_strategy_meta.selector_gate_report import (
@@ -32,6 +32,8 @@ REPORT_DIR = Path(__file__).resolve().parent / "reports"
 MD_PATH = REPORT_DIR / "selector_walk_forward.md"
 SUMMARY_CSV = REPORT_DIR / "selector_walk_forward_summary.csv"
 REGIME_CSV = REPORT_DIR / "selector_walk_forward_regime.csv"
+SELECTED_CSV = REPORT_DIR / "selector_walk_forward_selected.csv"
+RULES_CSV = REPORT_DIR / "selector_walk_forward_rules.csv"
 HORIZON = 5
 TRAIN_SIZE = 1260
 TEST_SIZE = 252
@@ -50,6 +52,7 @@ REGIME_DIMS = (
     "gap_state",
     "liquidity_state",
     "risk_state",
+    "drawdown_state",
 )
 
 
@@ -129,11 +132,16 @@ def evaluate_fold(
     fold: int,
     train_idx: pd.Index,
     test_idx: pd.Index,
-) -> tuple[FoldResult, list[dict[str, object]]]:
+) -> tuple[
+    FoldResult,
+    list[dict[str, object]],
+    pd.DataFrame,
+    pd.DataFrame,
+]:
     train_mask, test_mask = build_masks(index, train_idx, test_idx)
     summary, priors = training_summary(universe_data, train_mask)
     try:
-        _, policy, _ = candidate_scan(universe_data, summary, priors, train_mask, test_mask)
+        policy = candidate_scan_train_only(universe_data, summary, priors, train_mask)
     except ValueError:
         policy = abstain_policy()
     train_frame = backtest_policy(universe_data, policy, train_mask)
@@ -148,6 +156,7 @@ def evaluate_fold(
         regime_rows.extend(
             fold_state_rows(universe_test, data["regime"].loc[test_mask], split_type, fold, universe)
         )
+    selected_frame = test_frame.assign(split_type=split_type, fold=fold)
     fold_result = FoldResult(
         split_type=split_type,
         fold=fold,
@@ -165,7 +174,8 @@ def evaluate_fold(
         baseline_mean_net_bps=combined_baseline,
         lift_vs_baseline_bps=float(test_metrics["portfolio_mean_net_bps"] - combined_baseline),
     )
-    return fold_result, regime_rows
+    rules = pd.DataFrame([rule.__dict__ for rule in policy.rules]).assign(split_type=split_type, fold=fold)
+    return fold_result, regime_rows, selected_frame, rules
 
 
 def split_folds(index: pd.Index) -> list[tuple[str, int, pd.Index, pd.Index]]:
@@ -185,6 +195,7 @@ def protocol_lines() -> list[str]:
         f"- Split families: walk-forward, purged lookahead `{LOOKAHEAD}`, and embargo `{EMBARGO}`.",
         "- Strategy pool: the base screen plus the supplemental first-principles extras, so the fold refit sees the broader trend, reversal, structure, and regime set.",
         "- The selector is refit on each training fold using the same candidate scan as the gate prototype, then filtered by the consensus support floor.",
+        "- Family alignment bonus: reversal is favored in high-vol, bear, risk-off, gap-shock, and deep-drawdown states; trend is favored in bull and risk-on states; low-liquidity states are penalized.",
         "- This is the missing leakage-control layer for the selector gate.",
     ]
 
@@ -230,9 +241,9 @@ def takeaway_lines() -> list[str]:
     return [
         "## Takeaway",
         "",
-        "- The gate is only meaningful if the lift over the combined always-on baseline persists across all split families.",
-        "- Regime holdout rows show whether the gate still concentrates activity in the same high-vol, bear, risk-off, and gap-shock states after leakage control.",
-        "- The adaptive threshold scan still needs positive leakage-controlled lift before the selector can move beyond research-only status.",
+        "- All three split families remain below the combined always-on baseline on average.",
+        "- Only fold 5 activates; folds 1-4 abstain, so the scan is not persistent across time.",
+        "- Embargo remains negative on fold 5, so the selector stays research-only.",
     ]
 
 
@@ -251,30 +262,51 @@ def build_report(summary: pd.DataFrame, regime: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def write_outputs(summary: pd.DataFrame, regime: pd.DataFrame) -> None:
+def write_outputs(summary: pd.DataFrame, regime: pd.DataFrame, selected: pd.DataFrame, rules: pd.DataFrame) -> None:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     summary.to_csv(SUMMARY_CSV, index=False)
     regime.to_csv(REGIME_CSV, index=False)
+    selected.to_csv(SELECTED_CSV, index=False)
+    rules.to_csv(RULES_CSV, index=False)
     MD_PATH.write_text(build_report(summary, regime), encoding="utf-8")
 
 
 def main() -> int:
-    universe_data = {name: build_universe_data(name) for name in ("nifty500", "expanded")}
+    universe_data: dict[str, UniverseData] = {}
+    for name in ("nifty500", "expanded"):
+        print(f"walk-forward: building {name}", flush=True)
+        universe_data[name] = build_universe_data(name)
     index = next(iter(universe_data.values()))["regime"].index
     fold_rows: list[FoldResult] = []
     regime_rows: list[dict[str, object]] = []
+    selected_frames: list[pd.DataFrame] = []
+    rule_frames: list[pd.DataFrame] = []
     for split_type, fold, train_idx, test_idx in split_folds(index):
-        fold_result, fold_regime_rows = evaluate_fold(
+        print(
+            f"walk-forward {split_type} fold {fold}: train {train_idx[0].date()}..{train_idx[-1].date()} test {test_idx[0].date()}..{test_idx[-1].date()}",
+            flush=True,
+        )
+        fold_result, fold_regime_rows, selected_frame, rules = evaluate_fold(
             universe_data, index, split_type, fold, train_idx, test_idx
+        )
+        print(
+            f"walk-forward {split_type} fold {fold}: policy {fold_result.policy} lift {fold_result.lift_vs_baseline_bps:.3f} bps",
+            flush=True,
         )
         fold_rows.append(fold_result)
         regime_rows.extend(fold_regime_rows)
+        selected_frames.append(selected_frame)
+        rule_frames.append(rules)
     summary = pd.DataFrame([row.__dict__ for row in fold_rows])
     regime = pd.DataFrame(regime_rows)
-    write_outputs(summary, regime)
+    selected = pd.concat(selected_frames, ignore_index=True) if selected_frames else pd.DataFrame()
+    rules = pd.concat(rule_frames, ignore_index=True) if rule_frames else pd.DataFrame()
+    write_outputs(summary, regime, selected, rules)
     print(f"Wrote {MD_PATH}")
     print(f"Wrote {SUMMARY_CSV}")
     print(f"Wrote {REGIME_CSV}")
+    print(f"Wrote {SELECTED_CSV}")
+    print(f"Wrote {RULES_CSV}")
     return 0
 
 

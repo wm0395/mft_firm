@@ -4,7 +4,7 @@
 
 - Strategy pool: a curated subset of fast, representative base-screen strategies plus breakout, trend, reversal, gap, structure, and participation extras.
 - Each universe is reduced to its top 100 high-vol names before the regime scan so the panel matches the first-pass screen and stays tractable.
-- Regime axes: volatility, trend, breadth, gap shock, liquidity, and combined risk state.
+- Regime axes: volatility, trend, breadth, gap shock, liquidity, drawdown, and combined risk state.
 - News effects are proxied by gap shocks because no local headline feed exists in the repository.
 - Cost stress uses `10bps` net returns for the regime summaries.
 
@@ -12,41 +12,20 @@
 
 | universe | horizon | family | strategy | corr_vol_score | corr_trend_score | corr_breadth_score | corr_gap_score | corr_liquidity_score |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| nifty500 | 5 | gap_reaction | opening_gap_regime_score | -0.029 | 0.058 | -0.074 | -0.121 | -0.038 |
-| expanded | 1 | breakout_continuation | relative_volume_breakout_20 | -0.019 | 0.007 | 0.009 | 0.067 | 0.003 |
-| nifty500 | 1 | breakout_continuation | relative_volume_breakout_20 | -0.019 | 0.002 | 0.033 | 0.066 | 0.018 |
-| expanded | 5 | trend_following | chandelier_trend | -0.104 | 0.014 | -0.055 | -0.059 | 0.085 |
-| nifty500 | 5 | trend_following | chandelier_trend | -0.107 | 0.027 | -0.069 | -0.057 | 0.054 |
-| nifty500 | 1 | breakout_continuation | breakout_20 | -0.006 | -0.006 | 0.012 | 0.055 | 0.013 |
-| expanded | 1 | breakout_continuation | breakout_20 | -0.008 | -0.001 | -0.003 | 0.053 | 0.005 |
-| expanded | 5 | gap_reaction | opening_gap_regime_score | -0.002 | 0.080 | -0.000 | -0.053 | -0.105 |
-| nifty500 | 5 | volume_confirmation | force_index_13 | -0.077 | -0.014 | 0.002 | -0.048 | 0.044 |
-| nifty500 | 1 | gap_reaction | opening_gap_regime_score | 0.038 | 0.011 | -0.003 | 0.047 | -0.023 |
+| nifty500 | 1 | breakout_continuation | failed_breakout_score_20 | -0.108 | -0.059 | -0.070 | 0.128 | -0.040 |
+| nifty500 | 1 | gap_reaction | opening_gap_regime_score | -0.178 | 0.105 | 0.171 | 0.105 | -0.021 |
+| nifty500 | 1 | trend_following | chandelier_trend | 0.071 | 0.092 | 0.009 | 0.077 | -0.019 |
+| nifty500 | 5 | gap_reaction | opening_gap_regime_score | 0.214 | -0.232 | -0.055 | 0.063 | 0.035 |
+| nifty500 | 5 | trend_following | chandelier_trend | 0.141 | 0.083 | 0.010 | 0.063 | 0.021 |
+| nifty500 | 5 | breakout_continuation | keltner_breakout_20 | 0.014 | 0.109 | 0.077 | 0.053 | 0.106 |
+| nifty500 | 5 | trend_following | aroon_oscillator_25 | -0.011 | 0.046 | -0.016 | -0.052 | 0.146 |
+| nifty500 | 1 | reversal_exhaustion | williams_r_mean_reversion_14 | 0.070 | -0.129 | -0.064 | 0.043 | -0.012 |
+| nifty500 | 1 | reversal_exhaustion | stochastic_mean_reversion_14 | 0.070 | -0.129 | -0.064 | 0.043 | -0.012 |
+| nifty500 | 5 | breakout_continuation | failed_breakout_score_20 | 0.005 | -0.077 | -0.150 | 0.043 | 0.005 |
 
 ## High-Confidence Gate Candidates
 
-| family | strategy | regime_dimension | regime_state | mean_net_bps | median_net_bps | win_rate | tstat | obs | universes | horizons |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| reversal_exhaustion | fisher_transform_reversal_10 | trend_state | bear | 47.406 | 43.928 | 0.568 | 3.242 | 2310 | 2 | 2 |
-| reversal_exhaustion | fisher_transform_reversal_10 | risk_state | risk_off | 46.153 | 28.954 | 0.537 | 1.204 | 680 | 2 | 2 |
-| reversal_exhaustion | bollinger_percent_b_mean_reversion_20 | vol_state | high_vol | 44.572 | 35.511 | 0.555 | 4.411 | 4995 | 2 | 2 |
-| volume_confirmation | mfi_mean_reversion_14 | risk_state | risk_off | 43.058 | 39.706 | 0.545 | 1.363 | 680 | 2 | 2 |
-| reversal_exhaustion | fisher_transform_reversal_10 | vol_state | high_vol | 41.206 | 39.597 | 0.561 | 4.884 | 4995 | 2 | 2 |
-| breakout_continuation | keltner_breakout_20 | risk_state | risk_on | 40.439 | 42.962 | 0.536 | 0.691 | 346 | 2 | 2 |
-| reversal_exhaustion | williams_r_mean_reversion_14 | vol_state | high_vol | 39.102 | 36.470 | 0.560 | 3.764 | 4995 | 2 | 2 |
-| reversal_exhaustion | stochastic_mean_reversion_14 | vol_state | high_vol | 39.102 | 36.470 | 0.560 | 3.764 | 4995 | 2 | 2 |
-| reversal_exhaustion | bollinger_percent_b_mean_reversion_20 | gap_state | up_gap_shock | 37.705 | 22.167 | 0.536 | 1.931 | 1302 | 2 | 2 |
-| gap_reaction | opening_gap_regime_score | liquidity_state | low_liquidity | 36.118 | 9.631 | 0.524 | 0.735 | 145 | 2 | 2 |
-| reversal_exhaustion | stochastic_mean_reversion_14 | risk_state | risk_off | 34.958 | 30.548 | 0.533 | 0.639 | 680 | 2 | 2 |
-| reversal_exhaustion | williams_r_mean_reversion_14 | risk_state | risk_off | 34.958 | 30.548 | 0.533 | 0.639 | 680 | 2 | 2 |
-| reversal_exhaustion | williams_r_mean_reversion_14 | trend_state | bear | 31.048 | 30.136 | 0.541 | 1.680 | 2310 | 2 | 2 |
-| reversal_exhaustion | stochastic_mean_reversion_14 | trend_state | bear | 31.048 | 30.136 | 0.541 | 1.680 | 2310 | 2 | 2 |
-| reversal_exhaustion | stochastic_mean_reversion_14 | gap_state | up_gap_shock | 30.827 | 20.624 | 0.539 | 1.639 | 1302 | 2 | 2 |
-| reversal_exhaustion | williams_r_mean_reversion_14 | gap_state | up_gap_shock | 30.827 | 20.624 | 0.539 | 1.639 | 1302 | 2 | 2 |
-| reversal_exhaustion | fisher_transform_reversal_10 | liquidity_state | low_liquidity | 30.127 | 11.879 | 0.523 | 1.186 | 1590 | 2 | 2 |
-| volume_confirmation | mfi_mean_reversion_14 | liquidity_state | low_liquidity | 28.830 | 3.389 | 0.502 | 1.060 | 1594 | 2 | 2 |
-| reversal_exhaustion | fisher_transform_reversal_10 | gap_state | up_gap_shock | 28.524 | 27.134 | 0.538 | 1.750 | 1302 | 2 | 2 |
-| volume_confirmation | mfi_mean_reversion_14 | trend_state | bear | 28.460 | 26.502 | 0.537 | 2.081 | 2316 | 2 | 2 |
+_No rows._
 
 ## Market State Highlights
 
@@ -54,56 +33,56 @@ Top family/state pairs on 5-day horizon:
 
 | family | strategy | regime_state | mean_net_bps | win_rate | obs |
 | --- | --- | --- | --- | --- | --- |
-| reversal_exhaustion | fisher_transform_reversal_10 | bear | 85.321 | 0.617 | 582 |
-| reversal_exhaustion | bollinger_percent_b_mean_reversion_20 | bear | 71.260 | 0.591 | 582 |
-| reversal_exhaustion | williams_r_mean_reversion_14 | bear | 70.736 | 0.589 | 582 |
-| reversal_exhaustion | stochastic_mean_reversion_14 | bear | 70.736 | 0.589 | 582 |
-| volume_confirmation | mfi_mean_reversion_14 | bear | 59.090 | 0.578 | 583 |
-| breakout_continuation | keltner_breakout_20 | bull | 47.985 | 0.517 | 391 |
-| trend_following | chandelier_trend | sideways | 23.548 | 0.540 | 550 |
-| breakout_continuation | failed_breakout_score_20 | bear | 9.349 | 0.518 | 282 |
-| volume_confirmation | chaikin_money_flow_20 | bull | -2.091 | 0.514 | 1285 |
-| volume_confirmation | trend_volume_composite | bull | -3.201 | 0.509 | 1705 |
-| volume_confirmation | price_volume_trend_20 | sideways | -4.734 | 0.489 | 1692 |
-| trend_following | vortex_spread_14 | bull | -7.377 | 0.512 | 1431 |
-| reversal_exhaustion | ultimate_oscillator_reversal | bull | -10.676 | 0.485 | 1700 |
-| breakout_continuation | relative_volume_breakout_20 | bull | -16.367 | 0.473 | 1001 |
-| volume_confirmation | ease_of_movement_14 | bull | -19.276 | 0.459 | 1435 |
-| gap_reaction | gap_fade_score | bull | -19.484 | 0.463 | 1435 |
-| trend_following | trix_histogram_15_9 | sideways | -20.065 | 0.476 | 1692 |
-| breakout_continuation | breakout_20 | bull | -20.230 | 0.469 | 962 |
-| trend_following | elder_ray_trend | bear | -21.311 | 0.463 | 575 |
-| gap_reaction | opening_gap_regime_score | bull | -24.772 | 0.478 | 186 |
+| reversal_exhaustion | stochastic_mean_reversion_14 | bear | 192.569 | 0.697 | 99 |
+| reversal_exhaustion | williams_r_mean_reversion_14 | bear | 192.569 | 0.697 | 99 |
+| reversal_exhaustion | inverse_fisher_rsi_reversal_10 | bear | 163.183 | 0.747 | 99 |
+| reversal_exhaustion | fisher_transform_reversal_10 | bear | 148.958 | 0.727 | 99 |
+| reversal_exhaustion | bollinger_percent_b_mean_reversion_20 | bear | 136.042 | 0.667 | 99 |
+| volume_confirmation | mfi_mean_reversion_14 | sideways | 83.440 | 0.597 | 419 |
+| gap_reaction | opening_gap_regime_score | sideways | 70.077 | 0.538 | 26 |
+| trend_following | choppiness_inverse_14 | bear | 59.331 | 0.566 | 99 |
+| breakout_continuation | failed_breakout_score_20 | sideways | 47.694 | 0.562 | 89 |
+| trend_following | aroon_oscillator_25 | bull | -3.079 | 0.477 | 556 |
+| trend_following | elder_ray_trend | bull | -5.816 | 0.491 | 556 |
+| trend_following | trix_histogram_15_9 | bull | -5.991 | 0.516 | 556 |
+| gap_reaction | gap_fade_score | sideways | -6.107 | 0.496 | 419 |
+| gap_reaction | gap_continuation_score | bear | -16.938 | 0.485 | 99 |
+| reversal_exhaustion | failed_reversal_score | bull | -21.115 | 0.492 | 531 |
+| volume_confirmation | chaikin_money_flow_20 | bull | -22.720 | 0.495 | 513 |
+| trend_following | kst_momentum_9 | bull | -23.751 | 0.498 | 556 |
+| reversal_exhaustion | ultimate_oscillator_reversal | bull | -23.946 | 0.459 | 556 |
+| volume_confirmation | price_volume_trend_20 | bull | -24.578 | 0.460 | 556 |
+| structure_levels | support_trendline_position_20 | bull | -26.788 | 0.475 | 556 |
 
 ## Sectors
 
 | regime_state | obs | mean_net_bps | median_net_bps | win_rate | tstat | universe | horizon | sector | regime_dimension |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| up_gap_shock | 577 | 136.441 | 69.548 | 0.549 | 3.008 | expanded | 5 | Metals & Mining | gap_state |
-| up_gap_shock | 616 | 128.705 | 77.119 | 0.552 | 3.027 | nifty500 | 5 | Metals & Mining | gap_state |
-| risk_on | 822 | 124.703 | 111.195 | 0.609 | 7.211 | nifty500 | 5 | Capital Goods | risk_state |
-| bullish | 1478 | 122.089 | 96.104 | 0.592 | 8.773 | nifty500 | 5 | Capital Goods | breadth_state |
-| risk_on | 772 | 121.359 | 95.418 | 0.584 | 5.659 | expanded | 5 | Capital Goods | risk_state |
-| bullish | 1456 | 120.273 | 103.676 | 0.573 | 7.169 | nifty500 | 5 | Metals & Mining | breadth_state |
-| bullish | 1297 | 118.272 | 107.849 | 0.577 | 6.426 | expanded | 5 | Metals & Mining | breadth_state |
-| bull | 2282 | 116.979 | 108.528 | 0.587 | 7.306 | expanded | 5 | Metals & Mining | trend_state |
-| risk_on | 698 | 116.864 | 110.644 | 0.586 | 5.905 | expanded | 5 | Metals & Mining | risk_state |
-| low_liquidity | 982 | 115.799 | 78.766 | 0.558 | 3.706 | nifty500 | 5 | Metals & Mining | liquidity_state |
+| risk_off | 89 | 435.680 | 157.326 | 0.562 | 3.021 | expanded | 5 | Construction | risk_state |
+| risk_off | 104 | 311.420 | 272.033 | 0.615 | 2.907 | expanded | 5 | Chemicals | risk_state |
+| risk_off | 49 | 283.754 | 212.948 | 0.612 | 2.593 | nifty500 | 5 | Healthcare | risk_state |
+| risk_off | 20 | 278.291 | 172.999 | 0.550 | 1.854 | expanded | 5 | Healthcare | risk_state |
+| risk_on | 108 | 277.547 | 120.612 | 0.574 | 3.569 | expanded | 5 | Healthcare | risk_state |
+| risk_off | 147 | 255.651 | 129.916 | 0.571 | 3.262 | nifty500 | 5 | Capital Goods | risk_state |
+| risk_on | 132 | 243.642 | 94.255 | 0.583 | 2.919 | expanded | 5 | Construction | risk_state |
+| down_gap_shock | 269 | 238.397 | -20.631 | 0.476 | 0.996 | nifty500 | 5 | Metals & Mining | gap_state |
+| risk_off | 165 | 223.482 | 155.630 | 0.600 | 4.034 | nifty500 | 5 | Financial Services | risk_state |
+| risk_on | 76 | 193.526 | 175.932 | 0.618 | 3.232 | expanded | 5 | Oil Gas & Consumable Fuels | risk_state |
 
 ## Liquidity Classes
 
 | regime_state | obs | mean_net_bps | median_net_bps | win_rate | tstat | universe | horizon | liquidity_class | regime_dimension |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bullish | 1561 | 95.508 | 77.507 | 0.597 | 8.388 | nifty500 | 5 | low | breadth_state |
-| bullish | 1575 | 94.677 | 96.526 | 0.603 | 8.281 | nifty500 | 5 | very_low | breadth_state |
-| bullish | 1531 | 91.088 | 91.015 | 0.600 | 8.234 | nifty500 | 5 | mid | breadth_state |
-| high_vol | 1633 | 89.657 | 123.218 | 0.582 | 5.228 | nifty500 | 5 | very_low | vol_state |
-| bullish | 1533 | 87.450 | 82.950 | 0.594 | 7.377 | expanded | 5 | low | breadth_state |
-| risk_on | 864 | 86.628 | 99.572 | 0.611 | 6.341 | nifty500 | 5 | mid | risk_state |
-| risk_on | 721 | 86.311 | 101.309 | 0.607 | 5.411 | expanded | 5 | very_high | risk_state |
-| bullish | 1563 | 86.161 | 91.968 | 0.605 | 6.915 | expanded | 5 | very_low | breadth_state |
-| bullish | 1363 | 82.517 | 84.828 | 0.585 | 6.321 | expanded | 5 | very_high | breadth_state |
-| bullish | 1502 | 81.758 | 72.634 | 0.573 | 6.472 | expanded | 5 | mid | breadth_state |
+| risk_on | 166 | 195.253 | 112.477 | 0.669 | 5.482 | expanded | 5 | very_low | risk_state |
+| risk_off | 98 | 193.577 | 185.879 | 0.582 | 2.140 | expanded | 5 | very_low | risk_state |
+| risk_on | 269 | 189.082 | 192.422 | 0.714 | 8.263 | nifty500 | 5 | very_low | risk_state |
+| bullish | 458 | 173.211 | 114.184 | 0.609 | 5.637 | nifty500 | 5 | very_high | breadth_state |
+| bullish | 253 | 170.663 | 66.436 | 0.585 | 4.291 | expanded | 5 | mid | breadth_state |
+| risk_on | 275 | 169.449 | 148.935 | 0.636 | 6.637 | nifty500 | 5 | very_high | risk_state |
+| bullish | 446 | 162.205 | 163.292 | 0.657 | 8.115 | nifty500 | 5 | very_low | breadth_state |
+| bullish | 280 | 160.420 | 99.533 | 0.639 | 5.463 | expanded | 5 | very_low | breadth_state |
+| bullish | 280 | 146.962 | 89.914 | 0.604 | 3.829 | expanded | 5 | high | breadth_state |
+| risk_off | 208 | 145.056 | 122.790 | 0.591 | 3.473 | expanded | 5 | high | risk_state |
 
 ## Takeaway
 

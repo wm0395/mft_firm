@@ -68,17 +68,28 @@ repeatable and tradable pull-and-release effect in the secondary market.
 - `index_prices.parquet`
 - `market_liquidity.parquet`
 - `market_history_symbol_coverage.csv`
+- `sector_history.parquet`
+- `sector_history_coverage.csv`
+- `ipo_sector_conditioned_event_study.csv`
+- `ipo_sector_adjusted_basket_event_study.csv`
+- `ipo_pressure_gradient_diagnostics.csv`
+- `ipo_pressure_gradient_stability.csv`
 - `ipo_event_windows.parquet`
 - `ipo_baskets.parquet`
 - `ipo_event_study_results.parquet`
 - `ipo_event_study_summary.csv`
 - `ipo_pull_release_classification.csv`
+- `market_history_expansion.md`
+- `sector_history_expansion.md`
+- `sector_conditioned_event_study.md`
+- `sector_adjusted_basket_event_study.md`
+- `pressure_gradient_diagnostics.md`
 - `ipo_liquidity_strategy_v0.md`
 
 ## Pilot Evidence
 
 The project now has a source-backed seed sample from official exchange,
-issuer, and merchant-banker documents for twenty-eight mainboard IPOs:
+issuer, and merchant-banker documents for thirty-eight mainboard IPOs:
 
 - Urban Company Limited
 - Rubicon Research Limited
@@ -108,6 +119,16 @@ issuer, and merchant-banker documents for twenty-eight mainboard IPOs:
 - Afcons Infrastructure Limited
 - NTPC Green Energy Limited
 - Vishal Mega Mart Limited
+- Blue Jet Healthcare Limited
+- Honasa Consumer Limited
+- Chemplast Sanmar Limited
+- Fino Payments Bank Limited
+- Fedbank Financial Services Limited
+- BlackBuck / Zinka Logistics Solutions Limited
+- Bajaj Housing Finance Limited
+- Tata Technologies Limited
+- Waaree Energies Limited
+- KRN Heat Exchanger and Refrigeration Limited
 
 The seed sample supports mechanism plausibility only. The pilot event study is
 mixed: it does not show a simple monotonic pull-and-release pattern in the
@@ -127,10 +148,114 @@ market-liquidity panel from the local wide OHLCV cache and the index history in
 - `index_prices.parquet`
 - `market_liquidity.parquet`
 - `market_history_symbol_coverage.csv`
+- `market_history_expansion.md`
+- `direct_market_history_sources.csv`
+- `direct_market_history_sources.md`
+- `direct_market_history_collection_manifest.csv`
+- `direct_market_history_loader.md`
 
-This is still proxy-based. Direct exchange delivery-volume history, cash-market
-turnover feeds, and point-in-time sector return series are still missing, but
-the repo now has explicit daily liquidity and regime inputs for the IPO study.
+This is still proxy-based. Direct exchange delivery-volume history and
+standalone cash-market turnover feeds are still missing, but the repo now has
+explicit daily liquidity and regime inputs for the IPO study.
+
+## Direct Market History Sources
+
+The next wiring target is now explicit. Official NSE archive families have
+been identified for direct turnover, delivery, category-flow, and FII/DII
+history:
+
+- `Business Growth Data across all segments`
+- `Segment-wise Historical Reports - Capital Market`
+- `Security-wise Price Volume Archives (Equities)`
+- `Historical Reports - Capital Market`
+- `CM - Market Activity Report`
+- `CM - Security-wise Delivery Positions`
+- `CM - Category-wise Turnover`
+- `CM - Mode of Trading`
+- `FII/FPI and DII trading activity`
+- `Historical FII/FPI & DII trading activity on NSE, BSE and MSEI`
+
+These sources remain review-only until a parser and quality pass exists.
+
+## Direct Market Loader
+
+The first local loader now covers the CSV-shaped direct market-history feeds:
+
+- `market_activity_csv` for `Business Growth Data across all segments` and
+  `CM - Market Activity Report`
+- `security_price_volume_csv` for `Security-wise Price Volume Archives
+  (Equities)`
+- `delivery_positions_dat` for `CM - Security-wise Delivery Positions`
+- `fii_dii_csv` for `FII/FPI and DII trading activity` and `Historical
+  FII/FPI & DII trading activity on NSE, BSE and MSEI`
+
+The loader writes a manifest for those parser-ready families and leaves the
+remaining official archive families as manifest-only until a file-specific
+parser is added.
+
+## Sector History Expansion
+
+The sector-history expansion pass now writes a point-in-time sector-return and
+sector-turnover proxy panel from the expanded-parent industry map:
+
+- `sector_history.parquet`
+- `sector_history_coverage.csv`
+- `sector_history_expansion.md`
+
+This gives the IPO study a sector-relative conditioning layer without adding
+new external feeds. It still does not replace exchange-stamped delivery
+history or standalone cash-market turnover.
+
+## Sector-Conditioned Event Study
+
+The sector-conditioned event-study pass now uses the sector proxy panel to
+test whether the same-sector peer signal survives a sector-return adjustment:
+
+- `ipo_sector_conditioned_event_study.csv`
+- `sector_conditioned_event_study.md`
+
+The mapped subset covers 26 of the 38 seed IPO symbols. The sector-adjusted
+same-sector peer averages remain mixed, so the sector layer does not rescue a
+clean monotonic pull/release rule.
+
+## Sector-Adjusted Basket Event Study
+
+The broader sector-adjusted basket pass now tests every pilot basket against
+the sector proxy layer:
+
+- `ipo_sector_adjusted_basket_event_study.csv`
+- `sector_adjusted_basket_event_study.md`
+
+The sector-adjusted basket averages remain mixed across application and
+release windows, including recent winners, cash-source names, and the
+small/midcap baskets. That strengthens the falsification layer: sector drift
+does not explain the mixed pilot readout.
+
+## Pressure Gradient Diagnostics
+
+The pressure-gradient diagnostic compares raw and sector-adjusted basket
+returns across the ordered pressure buckets:
+
+- `ipo_pressure_gradient_diagnostics.csv`
+- `pressure_gradient_diagnostics.md`
+
+It finds one narrow clean case: sector-adjusted `midcap150` in the
+`release_5` window orders low -> medium -> high -> extreme with Spearman rho
+`1.0`. The rest of the basket/window combinations stay mixed, so the
+diagnostic still does not support a broad monotonic pressure gradient.
+
+## Pressure Gradient Stability
+
+The stability pass stress-tests that narrow lead against adjacent windows and
+nearby basket definitions:
+
+- `ipo_pressure_gradient_stability.csv`
+- `pressure_gradient_stability.md`
+
+The clean sector-adjusted `midcap150` `release_5` case does not generalize to
+the adjacent windows, and the release-window basket neighborhood remains mixed
+outside `midcap150`. That makes the one clean case look isolated rather than
+structural.
 
 ## Reports
 
@@ -143,6 +268,12 @@ the repo now has explicit daily liquidity and regime inputs for the IPO study.
 - [pilot_event_study.md](./reports/pilot_event_study.md)
 - [pilot_regime_control_panel.md](./reports/pilot_regime_control_panel.md)
 - [market_history_expansion.md](./reports/market_history_expansion.md)
+- [direct_market_history_sources.md](./reports/direct_market_history_sources.md)
+- [sector_history_expansion.md](./reports/sector_history_expansion.md)
+- [sector_conditioned_event_study.md](./reports/sector_conditioned_event_study.md)
+- [sector_adjusted_basket_event_study.md](./reports/sector_adjusted_basket_event_study.md)
+- [pressure_gradient_diagnostics.md](./reports/pressure_gradient_diagnostics.md)
+- [pressure_gradient_stability.md](./reports/pressure_gradient_stability.md)
 
 ## Loop Artifacts
 

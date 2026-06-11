@@ -12,6 +12,9 @@ if str(REPO_ROOT) not in sys.path:
 
 from project.data.repository import build_repository  # noqa: E402
 from project.regimes.engine import RegimeEngine  # noqa: E402
+from sector_history_expansion import (  # type: ignore[import-not-found]  # noqa: E402
+    main as write_sector_history_outputs,
+)
 
 
 WINDOW = 20
@@ -49,6 +52,7 @@ def main() -> None:
         seed_market_frames,
     )
     _write_outputs(root, index_prices, market_liquidity, coverage, panels, index_frames)
+    write_sector_history_outputs()
 
 
 def _load_panels(root: Path) -> dict[str, dict[str, pd.DataFrame]]:
@@ -342,7 +346,7 @@ def _render_report(
         "",
         f"- `index_prices.parquet`: {len(index_prices)} index rows from the local `project_mft.duckdb` cache.",
         f"- `market_liquidity.parquet`: {len(market_liquidity)} daily rows keyed by trading date.",
-        f"- `market_history_symbol_coverage.csv`: seed-IPO source coverage by local market-history store.",
+        "- `market_history_symbol_coverage.csv`: seed-IPO source coverage by local market-history store.",
         "",
         "## Local Panel Summary",
         "",
@@ -354,17 +358,17 @@ def _render_report(
         "",
         "## Seed Coverage Summary",
         "",
-        f"- `project_mft.duckdb` has direct market rows for {int((coverage['project_mft.duckdb_rows'] > 0).sum())} of the 28 seed IPO symbols.",
-        f"- `nifty500_high_vol` covers {int((coverage['nifty500_high_vol_rows'] > 0).sum())} of the 28 seed IPO symbols.",
-        f"- `expanded_high_vol_parent` covers {int((coverage['expanded_high_vol_parent_rows'] > 0).sum())} of the 28 seed IPO symbols.",
+        f"- `project_mft.duckdb` has direct market rows for {int((coverage['project_mft_duckdb_rows'] > 0).sum())} of the {len(coverage)} seed IPO symbols.",
+        f"- `nifty500_high_vol` covers {int((coverage['nifty500_high_vol_rows'] > 0).sum())} of the {len(coverage)} seed IPO symbols.",
+        f"- `expanded_high_vol_parent` covers {int((coverage['expanded_high_vol_parent_rows'] > 0).sum())} of the {len(coverage)} seed IPO symbols.",
         f"- Missing from all three local price stores: {', '.join(missing) if missing else 'none'}.",
         "",
         "## Reading",
         "",
         "- The price cache is broad enough to anchor the event study: the wide panels run from 1996-01-01 to 2026-05-22, and the index cache runs from 2016-05-22 to 2026-05-21.",
-        "- The bottleneck is still direct liquidity history. There is no local delivery-volume history, no standalone cash-market turnover feed, and no point-in-time sector-return series yet.",
+        "- The bottleneck is still direct liquidity history. There is no local delivery-volume history or standalone cash-market turnover feed yet, but the repo now has a point-in-time sector-return and sector-turnover proxy panel.",
         "- The new market-liquidity panel is proxy-based: it combines expanded-universe turnover, breadth, mean return, and NIFTY regime states into a daily table.",
-        "- That is enough to improve conditioning for the IPO hypothesis, but it is not yet the final turnover-and-delivery data contract described in the project docs.",
+        "- That is enough to improve conditioning for the IPO hypothesis, but it is still not the final turnover-and-delivery data contract described in the project docs.",
     ]
     return "\n".join(lines)
 
@@ -372,7 +376,22 @@ def _render_report(
 def _render_table(frame: pd.DataFrame) -> str:
     if frame.empty:
         return "_empty_"
-    return frame.to_markdown(index=False)
+    columns = list(frame.columns)
+    header = "| " + " | ".join(columns) + " |"
+    separator = "| " + " | ".join("---" for _ in columns) + " |"
+    rows = []
+    for _, row in frame.iterrows():
+        values = [_stringify_markdown_value(row[column]) for column in columns]
+        rows.append("| " + " | ".join(values) + " |")
+    return "\n".join([header, separator, *rows])
+
+
+def _stringify_markdown_value(value: object) -> str:
+    if pd.isna(value):
+        return ""
+    if isinstance(value, float):
+        return f"{value:.6g}"
+    return str(value)
 
 
 if __name__ == "__main__":

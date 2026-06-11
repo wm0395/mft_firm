@@ -1,0 +1,12 @@
+{
+  "research_project_id": "research_project:price_action_strategy_lab",
+  "name": "price-action-strategy-lab",
+  "description": "Research-only lab for tinkering with NSE market-collector price-action alphas, charts, expression modes, backtests, and meta selectors.",
+  "dataset_snapshot_id": "dataset_snapshot:nse_market_collector_lab_pending",
+  "hypothesis_id": "hypothesis:price_action_strategy_lab",
+  "status": "draft",
+  "phase": "first_runnable_lab_spine",
+  "state_file": "research_state.json",
+  "review_pack_dir": "review_packs",
+  "owner_role": "Researcher / Alpha Tinkerer"
+}

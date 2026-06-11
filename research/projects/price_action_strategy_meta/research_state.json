@@ -2,8 +2,8 @@
   "canonical_state_file": "research/projects/price_action_strategy_meta/research_state.json",
   "project_id": "research_project:price_action_strategy_meta",
   "project_status": "draft",
-  "phase": "cataloging price-action families, stock regime map, selector gate v0, and walk-forward validation",
-  "state_as_of_utc": "2026-06-04T10:09:08Z",
+  "phase": "selector gate hardening, embargo diagnosis, and robustness validation",
+  "state_as_of_utc": "2026-06-05T15:23:45Z",
   "source_of_truth": "research/projects/price_action_strategy_meta/README.md",
   "objective": "Catalog the repo-native price-action families, measure conditional edge, and design a regime-gated selector that only deploys when conditions are favorable.",
   "summary_artifacts": [
@@ -17,6 +17,13 @@
     "research/projects/price_action_strategy_meta/reports/stock_regime.md",
     "research/projects/price_action_strategy_meta/reports/selector_gate.md",
     "research/projects/price_action_strategy_meta/reports/selector_walk_forward.md",
+    "research/projects/price_action_strategy_meta/reports/research_audit.md",
+    "research/projects/price_action_strategy_meta/reports/embargo_failure_diagnosis.md",
+    "research/projects/price_action_strategy_meta/reports/selector_robustness.md",
+    "research/projects/price_action_strategy_meta/reports/selector_split_sensitivity.md",
+    "research/projects/price_action_strategy_meta/reports/selector_null_benchmark.md",
+    "research/projects/price_action_strategy_meta/reports/selector_neutral_variant.md",
+    "research/projects/price_action_strategy_meta/reports/observable_regime_gate.md",
     "research/projects/price_action_strategy_meta/review_packs/price_action_meta_pack.md"
   ],
   "active_refinements": [
@@ -31,7 +38,11 @@
     "cost_stress_panel",
     "meta_selector_precision",
     "selector_gate_v0",
-    "selector_abstention_rules"
+    "selector_abstention_rules",
+    "selector_split_sensitivity",
+    "selector_null_benchmark",
+    "neutral_selected_portfolio_sensitivity",
+    "observable_regime_gate"
   ],
   "current_baseline": {
     "universe": "indian_daily_liquid_equities",
@@ -92,12 +103,19 @@
     "Gap, breakout, and trend families fail in different regimes and must be evaluated separately.",
     "The regime scan uses the top 100 high-vol names from each universe and a curated representative strategy panel.",
     "Reversal exhaustion is the strongest broad pocket, especially in high-vol, bear, risk_off, and up-gap-shock states.",
-    "The supplemental extra-strategy screen identifies fisher_transform_reversal_10 as the cleanest extra candidate, especially in bear, high-vol, up-gap-shock, and low-liquidity states.",
+    "The supplemental extra-strategy screen identifies fisher_transform_reversal_10 and inverse_fisher_rsi_reversal_10 as the cleanest extra reversal candidates, especially in bear, high-vol, up-gap-shock, and low-liquidity states.",
     "The expanded extra pool now also includes supertrend, parabolic SAR, Aroon, Ichimoku, KST, inverse Fisher RSI, mass index, support trendline, volume profile, and choppiness helpers so the gate can probe more first-principles combinations.",
     "Metals & Mining and Capital Goods are the strongest 5-day sector pockets; risk_off low-liquidity slices are weak.",
     "The stock-level map shows names like ADANIENT, VOLTAS, CHENNPETRO, and SUZLON tilting into risk_on/high_vol regimes, while HINDZINC, TATASTEEL, BALRAMCHIN, and GLENMARK tilt the other way.",
-    "The strict selector gate clears the combined always-on baseline on the 5-day test slice with 54.3% precision, 13.5% coverage, and 6.735 bps mean portfolio return.",
-    "The leakage-controlled walk-forward layer now refits the same candidate scan on each fold, records abstain when no policy survives, and still does not beat the combined always-on baseline; average lift remains negative across walk-forward, purged, and embargoed splits.",
+    "The selector gate no longer clears the combined always-on baseline on the 5-day test slice; the chosen loose policy reaches 54.9% precision, 17.6% coverage, and 6.109 bps portfolio mean, while the combined always-on baseline remains 9.803 bps.",
+    "The full threshold sweep across strict through hyper_strict candidates did not rescue the gate; loose remains the best threshold policy, still below the combined always-on baseline.",
+    "The leakage-controlled walk-forward layer refits the same candidate scan on each fold, but only fold 5 activates; walk-forward, purged, and embargo all remain below the combined always-on baseline after the family-aware regime bonus.",
+    "The high-vol subset now uses a causal reference window when choosing the top 100 names, so the regime panel no longer ranks the full sample when constructing the high-vol universe.",
+    "The causal regime frame now uses trailing drawdown, volatility, liquidity, and gap buckets, and the minimal observable 2-of-3 stress gate still fails the combined always-on baseline on holdout and embargo.",
+    "Simple reversal-family basket variants under the causal stress rule also remain negative once abstentions are counted correctly, so the failure is not just a single-strategy ranking issue.",
+    "Split-sensitivity sweeps over shifted boundaries, embargo length, and train-window size still stay below the always-on baseline, so the selector remains fragile under modest respecifications of the split protocol.",
+    "The null benchmark shows the observed selector below the label-shuffle median but well above random-strategy draws, which narrows the chance-level explanation space without producing a deployable edge.",
+    "The neutral selected-portfolio sensitivity keeps the gate flat under market-neutral returns and lowers the holdout gate under sector-neutral returns, but it does not rescue the selector or replace a full neutral refit.",
     "A selector may abstain; abstention is a valid outcome.",
     "Every result must be compared with always-on and always-flat baselines."
   ]

@@ -1,0 +1,54 @@
+# Focused breadth-risk-off survivor diagnostic. This is not a discovery config.
+
+universe:
+  name: all_nse_market_collector
+  source: market_collector_native
+  database_path: ../runtime/market_collector_central/market.duckdb
+  exchange: NSE
+  symbol_suffix: ".NS"
+  timeframe: 1d
+  min_history_days: 252
+  max_missing_ratio: 0.15
+  require_ohlcv: true
+
+backtests:
+  mode: ranked_long_only
+  horizon: 10
+  cost_bps: [10.0]
+  min_active_names: 20
+  top_quantile: 0.8
+
+walk_forward_validation:
+  train_size_days: 126
+  test_size_days: 21
+  step_size_days: 21
+  lookahead_days: 10
+  max_folds: 24
+
+compute:
+  cache_dir: research/projects/price_action_strategy_lab/cache/nse_broad_price_action_alpha_suite
+  report_root: research/projects/price_action_strategy_lab/reports/nse_breadth_only_diagnostic
+  source_report_dir: research/projects/price_action_strategy_lab/reports/nse_broad_price_action_activator_suite
+  max_workers: 6
+
+gpu:
+  enabled: true
+  backend: auto
+
+variants:
+  - variant_id: baseline
+    indicators: []
+    combine: baseline
+    allowed_threshold_grid: [0.50]
+    allowed_multiplier_grid:
+      - {down: 1.00, up: 1.00}
+
+  - variant_id: breadth_risk_off_high
+    indicators: [breadth_risk_off]
+    combine: single
+    allowed_threshold_grid: [0.50, 0.60, 0.70, 0.80]
+    allowed_multiplier_grid:
+      - {down: 0.25, up: 1.10}
+      - {down: 0.25, up: 1.25}
+      - {down: 0.50, up: 1.10}
+      - {down: 0.50, up: 1.25}

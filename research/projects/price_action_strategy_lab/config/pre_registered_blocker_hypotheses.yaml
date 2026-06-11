@@ -1,0 +1,110 @@
+# Narrow falsification sprint. This is not a discovery config.
+
+universe:
+  name: all_nse_market_collector
+  source: market_collector_native
+  database_path: ../runtime/market_collector_central/market.duckdb
+  exchange: NSE
+  symbol_suffix: ".NS"
+  timeframe: 1d
+  min_history_days: 252
+  max_missing_ratio: 0.15
+  require_ohlcv: true
+
+backtests:
+  mode: ranked_long_only
+  horizon: 10
+  cost_bps: [10.0, 25.0, 50.0]
+  min_active_names: 20
+  top_quantile: 0.8
+
+walk_forward_validation:
+  train_size_days: 126
+  test_size_days: 21
+  step_size_days: 21
+  lookahead_days: 10
+  max_folds: 24
+  fold_selection: latest
+
+compute:
+  cache_dir: research/projects/price_action_strategy_lab/cache/nse_broad_price_action_alpha_suite
+  report_root: research/projects/price_action_strategy_lab/reports/nse_narrow_falsification
+  source_report_dir: research/projects/price_action_strategy_lab/reports/nse_broad_price_action_activator_suite
+  max_workers: 6
+
+gpu:
+  enabled: true
+  backend: auto
+
+promotion_criteria:
+  min_right_tail_retention: 0.95
+  require_positive_left_tail_delta: true
+  require_positive_delta_ci_low: true
+  max_bh_p_value: 0.05
+  min_gate_stability_rate: 0.50
+  required_cost_bps: 25.0
+  stress_cost_bps: 50.0
+
+hypotheses:
+  - hypothesis_id: doji_gap_fade_low_soft_aggressive
+    alpha: doji_reversal_score
+    indicator: gap_fade
+    side: low
+    throttle_variant: soft_aggressive
+    allowed_threshold_grid: [0.50, 0.60, 0.70, 0.80]
+    allowed_multiplier_grid:
+      - {down: 0.25, up: 1.10}
+      - {down: 0.25, up: 1.25}
+      - {down: 0.50, up: 1.10}
+      - {down: 0.50, up: 1.25}
+
+  - hypothesis_id: doji_gap_fade_low_drawdown_only
+    alpha: doji_reversal_score
+    indicator: gap_fade
+    side: low
+    throttle_variant: drawdown_only_throttle
+    allowed_threshold_grid: [0.50, 0.60, 0.70, 0.80]
+    allowed_multiplier_grid:
+      - {down: 0.25, up: 1.00}
+      - {down: 0.50, up: 1.00}
+      - {down: 0.75, up: 1.00}
+
+  - hypothesis_id: inside_outside_vol_expansion_high_drawdown_only
+    alpha: inside_outside_bar_score
+    indicator: volatility_expansion
+    side: high
+    throttle_variant: drawdown_only_throttle
+    allowed_threshold_grid: [0.50, 0.60, 0.70, 0.80]
+    allowed_multiplier_grid:
+      - {down: 0.25, up: 1.00}
+      - {down: 0.50, up: 1.00}
+      - {down: 0.75, up: 1.00}
+
+  - hypothesis_id: oscillator_family_gap_fade_low_soft_aggressive
+    alphas:
+      - bollinger_percent_b_mean_reversion_20
+      - stochastic_mean_reversion_14
+      - williams_r_mean_reversion_14
+      - fisher_transform_reversal_10
+      - inverse_fisher_rsi_reversal_10
+    indicator: gap_fade
+    side: low
+    throttle_variant: soft_aggressive
+    allowed_threshold_grid: [0.50, 0.60, 0.70, 0.80]
+    allowed_multiplier_grid:
+      - {down: 0.25, up: 1.10}
+      - {down: 0.25, up: 1.25}
+      - {down: 0.50, up: 1.10}
+      - {down: 0.50, up: 1.25}
+
+  - hypothesis_id: support_trendline_vol_expansion_high_soft_aggressive
+    alpha: support_trendline_position_20
+    indicator: volatility_expansion
+    side: high
+    throttle_variant: soft_aggressive
+    allowed_threshold_grid: [0.50, 0.60, 0.70, 0.80]
+    allowed_multiplier_grid:
+      - {down: 0.25, up: 1.10}
+      - {down: 0.25, up: 1.25}
+      - {down: 0.50, up: 1.10}
+      - {down: 0.50, up: 1.25}

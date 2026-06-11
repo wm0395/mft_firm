@@ -5,7 +5,7 @@
   "dataset_snapshot_id": "dataset_snapshot:price_action_strategy_meta_bootstrap",
   "hypothesis_id": "hypothesis:price_action_strategy_meta",
   "status": "draft",
-  "phase": "cataloging price-action families, stock regime map, selector gate v0, and walk-forward validation",
+  "phase": "selector gate hardening, embargo diagnosis, and robustness validation",
   "state_file": "research_state.json",
   "review_pack_dir": "review_packs",
   "owner_role": "VP Research / Alpha PM"

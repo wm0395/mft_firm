@@ -1,0 +1,111 @@
+# Activator pass for the broad NSE price-action registry.
+# The screen stage uses the strongest baseline setup and then the selected
+# family activators are run across the full backtest grid.
+
+universe:
+  name: all_nse_market_collector
+  source: market_collector_native
+  database_path: ../runtime/market_collector_central/market.duckdb
+  exchange: NSE
+  symbol_suffix: ".NS"
+  timeframe: 1d
+  min_history_days: 252
+  max_missing_ratio: 0.15
+  require_ohlcv: true
+
+alphas:
+  - bollinger_percent_b_mean_reversion_20
+  - stochastic_mean_reversion_14
+  - williams_r_mean_reversion_14
+  - fisher_transform_reversal_10
+  - inverse_fisher_rsi_reversal_10
+  - failed_breakout_score_20
+  - failed_reversal_score
+  - trend_volume_composite
+  - hybrid_confirmation
+  - breakout_20
+  - keltner_breakout_20
+  - squeeze_breakout_20
+  - relative_volume_breakout_20
+  - supertrend_direction_10
+  - parabolic_sar_trend
+  - chandelier_trend
+  - support_resistance_position_20
+  - support_trendline_position_20
+  - multi_timeframe_confirmation
+  - opening_gap_regime_score
+  - doji_reversal_score
+  - engulfing_reversal_score
+  - hammer_shooting_star_score
+  - inside_outside_bar_score
+  - piercing_dark_cloud_score
+
+expression_modes:
+  - cross_sectional_quintile
+  - time_series_threshold
+  - ranked_long_only
+
+backtests:
+  horizons: [1, 5, 10]
+  turnover_cost_bps: [0.0, 5.0, 10.0, 25.0]
+  min_active_names: 20
+  threshold: 0.0
+  top_quantile: 0.8
+  bottom_quantile: 0.2
+
+activator_screen:
+  mode: ranked_long_only
+  horizon: 10
+  cost_bps: 10.0
+  min_lift_bps: 0.0
+
+indicator_diagnostics:
+  lookback_days: 504
+  min_coverage: 0.05
+  max_coverage: 0.80
+  quantiles: [0.50, 0.60, 0.70, 0.80, 0.90]
+
+soft_throttle:
+  enabled: true
+  lookback_days: 504
+  rolling_window_days: 21
+
+walk_forward_validation:
+  enabled: true
+  lookback_days: 504
+  rolling_window_days: 21
+  train_size_days: 126
+  test_size_days: 21
+  step_size_days: 21
+  lookahead_days: 10
+  max_folds: 24
+  fold_selection: latest
+  max_workers: 3
+
+compute:
+  cache_dir: research/projects/price_action_strategy_lab/cache/nse_broad_price_action_alpha_suite
+  report_dir: research/projects/price_action_strategy_lab/reports/nse_broad_price_action_activator_suite
+  max_workers: 6
+
+gpu:
+  enabled: true
+  backend: auto
+
+outputs:
+  - activator_screen.csv
+  - activator_selection.csv
+  - activator_backtests.csv
+  - indicator_alpha_correlations.csv
+  - indicator_alpha_threshold_grid.csv
+  - indicator_alpha_tuned_gates.csv
+  - soft_throttle_2yr_metrics.csv
+  - soft_throttle_2yr_aggregate.csv
+  - soft_throttle_2yr_monthly.csv
+  - soft_throttle_exposure_diagnostics.csv
+  - soft_throttle_walk_forward_fold_metrics.csv
+  - soft_throttle_walk_forward_aggregate.csv
+  - soft_throttle_walk_forward_selected_gates.csv
+  - soft_throttle_walk_forward_gate_stability.csv
+  - soft_throttle_walk_forward_exposure.csv
+  - soft_throttle_walk_forward_decision.md
+  - run_summary.md

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 from types import SimpleNamespace
+from typing import cast
 
 import project.ui.pages.dashboard as dashboard_page
 
@@ -77,6 +78,9 @@ def test_render_uses_summary_hero(monkeypatch) -> None:
     monkeypatch.setattr(
         dashboard_page, "_render_quick_actions", lambda *_args, **_kwargs: None
     )
+    monkeypatch.setattr(
+        dashboard_page, "_render_research_suite", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(dashboard_page, "_render_quality", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         dashboard_page, "_render_asset_table", lambda *_args, **_kwargs: None
@@ -102,13 +106,17 @@ def test_render_uses_summary_hero(monkeypatch) -> None:
 
 def test_render_quality_uses_empty_state_when_no_assets(monkeypatch) -> None:
     fake_st = _MarkdownStreamlit()
-    captured: dict[str, object] = {}
+    captured: dict[str, tuple[object, ...]] = {}
 
     monkeypatch.setattr(dashboard_page, "render_empty_state", lambda *args: captured.setdefault("empty", args))
 
     dashboard_page._render_quality(fake_st, object(), [])
 
-    _, title, summary, note, chips = captured["empty"]
+    empty = cast(
+        tuple[object, str, str, str, tuple[tuple[str, str, str], ...]],
+        captured["empty"],
+    )
+    _, title, summary, note, chips = empty
     assert title == "No assets to check."
     assert "Add assets before running the quality report." in summary
     assert "at least one asset is registered" in note
@@ -117,7 +125,7 @@ def test_render_quality_uses_empty_state_when_no_assets(monkeypatch) -> None:
 
 def test_render_quality_uses_empty_state_when_report_unavailable(monkeypatch) -> None:
     fake_st = _MarkdownStreamlit()
-    captured: dict[str, object] = {}
+    captured: dict[str, tuple[object, ...]] = {}
     assets = [SimpleNamespace(symbol="NIFTY")]
 
     monkeypatch.setattr(
@@ -129,7 +137,11 @@ def test_render_quality_uses_empty_state_when_report_unavailable(monkeypatch) ->
 
     dashboard_page._render_quality(fake_st, object(), assets)
 
-    _, title, summary, note, chips = captured["empty"]
+    empty = cast(
+        tuple[object, str, str, str, tuple[tuple[str, str, str], ...]],
+        captured["empty"],
+    )
+    _, title, summary, note, chips = empty
     assert title == "Data quality report unavailable."
     assert "current assets" in summary
     assert note == "Error: boom"
@@ -138,13 +150,17 @@ def test_render_quality_uses_empty_state_when_report_unavailable(monkeypatch) ->
 
 def test_render_asset_table_uses_empty_state_when_universe_missing(monkeypatch) -> None:
     fake_st = _MarkdownStreamlit()
-    captured: dict[str, object] = {}
+    captured: dict[str, tuple[object, ...]] = {}
 
     monkeypatch.setattr(dashboard_page, "render_empty_state", lambda *args: captured.setdefault("empty", args))
 
     dashboard_page._render_asset_table(fake_st, [])
 
-    _, title, summary, note, chips = captured["empty"]
+    empty = cast(
+        tuple[object, str, str, str, tuple[tuple[str, str, str], ...]],
+        captured["empty"],
+    )
+    _, title, summary, note, chips = empty
     assert title == "No assets registered."
     assert "Add assets to make the dashboard useful." in summary
     assert "asset universe is empty" in note
@@ -153,7 +169,7 @@ def test_render_asset_table_uses_empty_state_when_universe_missing(monkeypatch) 
 
 def test_render_asset_table_uses_empty_state_for_no_match(monkeypatch) -> None:
     fake_st = _MarkdownStreamlit("BANK")
-    captured: dict[str, object] = {}
+    captured: dict[str, tuple[object, ...]] = {}
     assets = [
         SimpleNamespace(symbol="NIFTY", name="Nifty 50", sector="Index", market="NSE"),
         SimpleNamespace(symbol="FINANCE", name="Finance", sector="Finance", market="NSE"),
@@ -163,7 +179,11 @@ def test_render_asset_table_uses_empty_state_for_no_match(monkeypatch) -> None:
 
     dashboard_page._render_asset_table(fake_st, assets)
 
-    _, title, summary, note, chips = captured["empty"]
+    empty = cast(
+        tuple[object, str, str, str, tuple[tuple[str, str, str], ...]],
+        captured["empty"],
+    )
+    _, title, summary, note, chips = empty
     assert title == "No assets match your search."
     assert "Adjust the filter" in summary
     assert note == "2 assets are currently loaded."
